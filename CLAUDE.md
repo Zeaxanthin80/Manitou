@@ -3,6 +3,11 @@
 Guidance for Claude Code working in this repository. Keep this file short; the full
 roadmap lives in `PROJECT_PLAN.md`.
 
+**Read `PROJECT_PLAN.md` yourself (with the Read tool) at the start of any new phase, or whenever
+a question touches schema, architecture, or phase scope.** It is deliberately NOT imported here
+with `@` — at ~860 lines it would load into every session and crowd out these rules. Open it on
+demand instead.
+
 ## What this is
 A multi-platform online store for a single vendor. Web first, mobile later. One shared
 PostgreSQL database, accessed only through one backend API. Target ~1,000 concurrent users.
