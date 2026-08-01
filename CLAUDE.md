@@ -16,8 +16,9 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
 - Database: PostgreSQL (local via Docker; AWS RDS in production)
 - Backend: Python + FastAPI, SQLAlchemy, Alembic, Pydantic
 - Auth: JWT (bcrypt password hashing), roles: `customer` / `admin`
-- Web: Next.js (React) — storefront + `/admin` vendor portal (role-gated)
-- Mobile: Kotlin (Android), Swift (iOS) — added after web works
+- Web: Next.js (React) + Tailwind CSS — storefront and `/admin` vendor portal in ONE app
+- Mobile: Kotlin/Jetpack Compose (Android), Swift/SwiftUI (iOS) — added after web works
+- Design: `design-tokens.json` at repo root is the single source of truth for color, type, spacing
 - Payments: Stripe (PaymentIntents + webhook)
 - Infra: Docker, GitHub Actions, AWS (RDS, App Runner/ECS, S3, CloudFront, Route 53)
 
@@ -37,6 +38,13 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
   containerizes the API for AWS. Both install from the same `requirements.txt`.
 - Config comes from `.env` (git-ignored). Any new variable must also be added to `.env.example`
   with a placeholder.
+- **Never hardcode a color, font size, or spacing value in any component on any platform.** All of
+  them come from `design-tokens.json` (via Tailwind on web, via the theme file on Android/iOS).
+- The vendor portal is the `/admin` route of the same Next.js app — never a separate project. It
+  reuses the Phase 3 UI primitives.
+- Keep interface wording identical across web, Android, and iOS (same button labels, same terms).
+- Mobile apps match the brand (color, type, spacing, wording), not the website's layout — use
+  native navigation and native controls on each platform.
 - All schema changes go through an Alembic migration — never edit the DB by hand.
 - Money columns use `numeric(10,2)`, never floats.
 - `order_items` snapshot product name and price at purchase time.
