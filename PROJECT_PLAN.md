@@ -90,7 +90,8 @@ These choices are settled. Do not substitute them.
 | Layer | Technology | Reason it was chosen |
 |---|---|---|
 | Database | **PostgreSQL** | Strong transactions for orders/payments; good JSON support; open source |
-| Backend API | **Python + FastAPI** | You know Python; async serves ~1k concurrent well; auto-generated API docs |
+| Backend API | **Python 3.12+ with FastAPI** | You know Python; async serves ~1k concurrent well; auto-generated API docs |
+| Python isolation | **`venv` (built-in) + `pip` + `requirements.txt`** | Per-project packages; standard tooling; matches what the Docker image installs |
 | DB access | **SQLAlchemy + Alembic** | Python-to-SQL mapping plus safe, versioned schema migrations |
 | Validation | **Pydantic** | Enforces request/response shapes; ships with FastAPI |
 | Web frontend | **Next.js (React)** | You know JS/HTML/CSS; server rendering helps store SEO |
@@ -119,8 +120,13 @@ One repository holds everything so the whole system is discoverable:
 store/
 ├── CLAUDE.md              # concise guidance for Claude Code
 ├── PROJECT_PLAN.md        # this file — the master plan
-├── docker-compose.yml     # local Postgres + API for development
+├── README.md              # human-facing setup and run instructions
+├── .gitignore             # excludes .venv/, __pycache__/, .env, node_modules/
+├── docker-compose.yml     # local PostgreSQL for development
 ├── backend/               # FastAPI app
+│   ├── .venv/             # virtual environment — NEVER committed to Git
+│   ├── .env.example       # template of required env vars (safe to commit)
+│   ├── .env               # real local secrets — NEVER committed to Git
 │   ├── app/
 │   │   ├── main.py
 │   │   ├── models/        # SQLAlchemy tables
@@ -142,6 +148,55 @@ store/
 
 ---
 
+## 4.1 Local Python Environment (venv) and Its Relationship to Docker
+
+Every Python dependency for this project lives in a **virtual environment**, never in your system
+Python. Without one, `pip install` writes packages globally, projects with different version
+requirements collide, and your dependency list can't be reproduced reliably.
+
+**The venv and Docker are both used, and they do different jobs:**
+
+| | Virtual environment (`.venv`) | Docker |
+|---|---|---|
+| Isolates | Python packages for this project | The entire runtime (OS, Python, system libraries) |
+| Used for | Writing code: editor autocomplete, `pytest`, `alembic`, running the API locally | Running PostgreSQL locally; packaging the API for AWS |
+| Lives | On your machine, in `backend/.venv/` | In containers |
+| Shipped to AWS | No | Yes |
+
+**Day-to-day development setup:** PostgreSQL runs in Docker; the FastAPI app runs on your host
+inside the venv. You get fast hot-reload and easy debugging while developing, and Phase 6 packages
+the same app into a Docker image for deployment. Both the venv and the Docker image install from
+the same `requirements.txt`, so they stay in sync.
+
+Your editor also needs the venv to be selected as its interpreter — otherwise it can't see FastAPI
+or SQLAlchemy and you lose autocomplete and type checking.
+
+**Rules for this project:**
+
+- Create the venv once, in `backend/.venv`, and **activate it in every terminal session** before
+  running any `pip`, `python`, `alembic`, `uvicorn`, or `pytest` command.
+- Never `pip install` without the venv active. If you're unsure whether it's active, check that
+  your shell prompt shows the environment name.
+- Every new package gets recorded in `requirements.txt` and committed. The venv folder itself is
+  **never** committed.
+- The Node/Next.js side needs no equivalent step — `node_modules/` is already per-project isolation.
+  Just keep it out of Git.
+
+**Python version managers (pyenv):** not part of this project's required tooling. `pyenv` manages
+*which Python version* is installed, a separate layer from the venv (*which packages*) and Docker
+(*which whole runtime ships*). Decision rule: run `python3 --version` in Phase 0 step 2. If it
+reports 3.12 or higher, skip pyenv entirely. If it reports lower, install pyenv (macOS/Linux) or
+install 3.12 from python.org (Windows) rather than modifying your system Python — on macOS
+especially, other OS tooling depends on the bundled version. Either way, the venv is still created
+on top of whichever interpreter you end up with, and the Dockerfile pins the production version
+independently in Phase 6.
+
+**Environment variables:** the backend reads configuration (database URL, JWT secret, Stripe keys)
+from a `.env` file that is never committed. Commit a `.env.example` listing the required variable
+names with placeholder values so the setup is reproducible.
+
+---
+
 ## 5. Build Phases (with tasks)
 
 Do the phases in order. Do not start mobile (Phase 7) until the website works end to end.
@@ -156,12 +211,27 @@ Do the phases in order. Do not start mobile (Phase 7) until the website works en
 3. **[You]** Place `PROJECT_PLAN.md` and `CLAUDE.md` in the repo root. Commit and push them.
 4. **[You + Claude Code]** Create the folder structure from Section 4. Have Claude Code explain
    what each folder is for as you make it.
-5. **[You + Claude Code]** Write `docker-compose.yml` to run local PostgreSQL. Start it, then
+5. **[You + Claude Code]** Create `.gitignore` covering `.venv/`, `__pycache__/`, `.env`,
+   `node_modules/`, and OS junk files. Do this **before creating the venv or installing any project
+   dependencies** (steps 6–8), since those write files into the repo folder. The step 2 toolchain
+   installs to system locations outside the repo, so it isn't affected by this ordering.
+6. **[You]** Create the virtual environment in `backend/.venv` and activate it. Confirm it's active
+   (your prompt shows the environment name) and that `python --version` reports 3.12+.
+   Read Section 4.1 first so you understand what the venv is doing.
+7. **[You]** Point your editor at the venv as its Python interpreter, so autocomplete and type
+   hints work.
+8. **[You + Claude Code]** With the venv active, install FastAPI, Uvicorn, SQLAlchemy, Alembic,
+   Pydantic, and the Postgres driver. Record them in `requirements.txt` and commit it.
+9. **[You + Claude Code]** Write `docker-compose.yml` to run local PostgreSQL. Start it, then
    confirm the database is running by connecting with your Postgres client.
-6. **[You + Claude Code]** Initialize the FastAPI app with a single health-check endpoint. Run
-   it and open it in your browser to confirm it responds.
-7. **[You + Claude Code]** Connect the API to the local database and confirm the connection succeeds.
-8. **[You]** Commit and push. From here on, commit after each working step to build the habit.
+10. **[You + Claude Code]** Create `.env.example` (committed) and your real `.env` (ignored) with
+    the local database connection string.
+11. **[You + Claude Code]** Initialize the FastAPI app with a single health-check endpoint. Run it
+    with the venv active and open it in your browser to confirm it responds.
+12. **[You + Claude Code]** Connect the API to the local database and confirm the connection succeeds.
+13. **[You + Claude Code]** Write a short `README.md`: what the project is and how to set it up and
+    run it locally (start Docker, activate the venv, run the API).
+14. **[You]** Commit and push. From here on, commit after each working step to build the habit.
 
 ### Phase 1 — Database (details in Section 6)
 

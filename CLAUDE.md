@@ -29,6 +29,14 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
 - `infra/` — deployment notes/scripts
 
 ## Conventions
+- **Python work always runs inside the project venv at `backend/.venv`.** Before suggesting any
+  `pip`, `python`, `alembic`, `uvicorn`, or `pytest` command, assume the venv must be active and
+  remind the owner if it may not be. Never suggest a global `pip install`.
+- Every new dependency is added to `requirements.txt` and committed. `.venv/` is never committed.
+- Local dev split: PostgreSQL runs in Docker; the API runs on the host in the venv. Phase 6
+  containerizes the API for AWS. Both install from the same `requirements.txt`.
+- Config comes from `.env` (git-ignored). Any new variable must also be added to `.env.example`
+  with a placeholder.
 - All schema changes go through an Alembic migration — never edit the DB by hand.
 - Money columns use `numeric(10,2)`, never floats.
 - `order_items` snapshot product name and price at purchase time.
