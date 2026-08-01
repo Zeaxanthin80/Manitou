@@ -119,7 +119,7 @@ These choices are settled. Do not substitute them.
 One repository holds everything so the whole system is discoverable:
 
 ```
-store/
+Manitou/
 ├── CLAUDE.md              # concise guidance for Claude Code
 ├── PROJECT_PLAN.md        # this file — the master plan
 ├── README.md              # human-facing setup and run instructions
@@ -398,7 +398,7 @@ Do the phases in order. Do not start mobile (Phase 7) until the website works en
 ### Phase 0 — Foundations
 
 1. **[You]** Install **Git**. Sign in to (or create) your **GitHub** account. Create a new
-   repository named `store`, then clone it to your machine.
+   repository named `Manitou`, then clone it to your machine.
 2. **[You]** Install the toolchain: **Python 3.12+**, **Node.js LTS**, **Docker Desktop**, a
    PostgreSQL client (e.g., **psql** or **TablePlus/pgAdmin**), your editor, and **Claude Code**.
    Verify each with its `--version` command.
