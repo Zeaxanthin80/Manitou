@@ -126,6 +126,7 @@ Manitou/
 ├── design-tokens.json     # single source of truth for color, type, spacing (Section 4.3)
 ├── .gitignore             # excludes .venv/, __pycache__/, .env, node_modules/
 ├── docker-compose.yml     # local PostgreSQL for development
+├── docs/                  # per-phase build journals (commands, files, and why each exists)
 ├── backend/               # FastAPI app
 │   ├── .venv/             # virtual environment — NEVER committed to Git
 │   ├── .env.example       # template of required env vars (safe to commit)
@@ -136,6 +137,7 @@ Manitou/
 │   │   ├── schemas/       # Pydantic request/response models
 │   │   ├── routers/       # API endpoints (products, orders, auth, ...)
 │   │   ├── services/      # business logic (checkout, inventory, payments)
+│   │   ├── config.py      # settings loaded from .env (Pydantic)
 │   │   └── db.py          # engine, session, connection pool
 │   ├── alembic/           # migrations
 │   ├── tests/
