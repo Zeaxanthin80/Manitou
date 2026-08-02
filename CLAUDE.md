@@ -9,9 +9,22 @@ with `@` — at ~860 lines it would load into every session and crowd out these 
 demand instead.
 
 ## What this is
-A multi-platform online store for a single vendor. Web first, mobile later. One shared
+**Manitou** — a reusable single-vendor online store platform. Web first, mobile later. One shared
 PostgreSQL database, accessed only through one backend API. Target ~1,000 concurrent users.
-Payments via Stripe. Hosted on AWS.
+Payments via Stripe. Hosted on AWS. A learning project built from first principles rather than a
+hosted solution like Shopify.
+
+The repo should be cloneable and adaptable to different store types (T-shirts = the default build,
+candles, single-product, grocery, broad catalog) by changing config and content — not architecture.
+
+## Scope guardrails
+- **Single vendor, always.** One seller, many customers. Admin area is a role-gated route.
+- **Never propose marketplace features** — no multiple sellers, seller onboarding, split payouts,
+  or Stripe Connect. A large catalog is a scale problem (indexing, search, pagination), not a
+  multi-vendor one.
+- **Build the T-shirt store concretely first.** Do not generalize ahead of need. The only
+  pre-built reusability seams are the three in `PROJECT_PLAN.md` Section 1.1: store config,
+  `products.unit_of_measure`, and `product_variants.attributes` (JSONB). Nothing beyond those.
 
 ## Golden rule
 **Clients never touch the database directly.** The web app, vendor portal, iOS, and Android
@@ -45,6 +58,11 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
   with a placeholder.
 - **Never hardcode a color, font size, or spacing value in any component on any platform.** All of
   them come from `design-tokens.json` (via Tailwind on web, via the theme file on Android/iOS).
+- **Never hardcode a store-specific value** (store name, currency, tax rules, enabled features) in
+  a component or endpoint — it belongs in the store configuration. A cloned store should only need
+  to edit store config + `design-tokens.json` + content.
+- Variant dimensions live in `product_variants.attributes` (JSONB). The API validates key
+  consistency; the DB cannot. Use `variant_name` for display, `attributes` for logic/filtering.
 - The vendor portal is the `/admin` route of the same Next.js app — never a separate project. It
   reuses the Phase 3 UI primitives.
 - Keep interface wording identical across web, Android, and iOS (same button labels, same terms).
