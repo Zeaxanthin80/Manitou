@@ -87,22 +87,22 @@ Your requirement — manage products and users once, everywhere — is met by on
 never touch the database directly. Every client goes through one backend API.**
 
 ```
-        ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌───────────────┐
-        │  Web store   │   │ Vendor portal│   │  iOS (Swift) │   │Android(Kotlin)│
-        │  (browser)   │   │  (browser)   │   │              │   │               │
-        └──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬────────┘
-               │                  │                  │                  │
-               └────────────┬─────┴──────────────────┴──────────────────┘
-                            │  HTTPS / JSON (REST API)
-                     ┌──────▼────────┐
-                     │  Backend API  │  ← the ONLY thing that talks to the DB
-                     │  (FastAPI)    │     handles auth, validation, business rules
-                     └──────┬────────┘
-                            │  SQL (via SQLAlchemy)
-                     ┌──────▼────────┐
-                     │  PostgreSQL   │  ← single source of truth
-                     │  (AWS RDS)    │
-                     └───────────────┘
+     ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌───────────────┐
+     │  Web store   │   │ Vendor portal│   │  iOS (Swift) │   │Android(Kotlin)│
+     │  (browser)   │   │  (browser)   │   │              │   │               │
+     └──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬────────┘
+            │                  │                  │                  │
+            └────────────┬─────┴──────────────────┴──────────────────┘
+                         │  HTTPS / JSON (REST API)
+                  ┌──────▼────────┐
+                  │  Backend API  │  ← the ONLY thing that talks to the DB
+                  │  (FastAPI)    │     handles auth, validation, business rules
+                  └──────┬────────┘
+                         │  SQL (via SQLAlchemy)
+                  ┌──────▼────────┐
+                  │  PostgreSQL   │  ← single source of truth
+                  │  (AWS RDS)    │
+                  └───────────────┘
 ```
 
 Why this is the rule:
@@ -605,11 +605,22 @@ Design in this order:
 - A **product** has many **variants** (e.g., "Large / Red") and many **images**.
 - Each **variant** has one **inventory** record.
 - A **cart** belongs to a user and contains many **cart items**.
-- An **order** contains many **order items** and has one **payment**.
+- An **order** contains many **order items** and has zero or more **payments**.
 
 "Has many / belongs to" describes **cardinality** — one-to-one, one-to-many, or many-to-many.
 Most relationships above are one-to-many. Cart items and order items are the classic pattern for
 turning a many-to-many (products ↔ orders) into two one-to-many links through a join table.
+
+**Why an order has many payments, not one.** The intuitive model is one payment per order, but that
+assumes payment succeeds on the first attempt. A declined card followed by a successful retry is two
+records; a refund is a third; SCA/3-D Secure flows can produce more than one PaymentIntent for a
+single checkout. Financial records are **append-only** — you never overwrite or delete a payment
+row, you add another one, so an order's payment history is a ledger rather than a single value.
+This is why `payments.order_id` carries no unique constraint (contrast `inventory.variant_id`,
+which does — Section 6.3). It also means split-tender payment (two cards, or a card plus a gift
+card) could be added later as a *feature* with no schema change — but it is deliberately **not**
+part of v1 (Section 12), because it pulls in partial-payment order states, proportional refunds,
+and reconciliation rules.
 
 ### 6.3 Core Schema
 

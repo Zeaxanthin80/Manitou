@@ -1,0 +1,83 @@
+from datetime import datetime
+from decimal import Decimal
+
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Numeric, Text, func, text
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db import Base
+
+
+class Category(Base):
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(Text)
+    slug: Mapped[str] = mapped_column(Text, unique=True)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"))
+
+    parent: Mapped["Category | None"] = relationship(
+        back_populates="children", remote_side=[id]
+    )
+    children: Mapped[list["Category"]] = relationship(back_populates="parent")
+    products: Mapped[list["Product"]] = relationship(back_populates="category")
+
+
+class Product(Base):
+    __tablename__ = "products"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(Text)
+    slug: Mapped[str] = mapped_column(Text, unique=True)
+    description: Mapped[str | None] = mapped_column(Text)
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
+    base_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    unit_of_measure: Mapped[str] = mapped_column(Text, server_default=text("'each'"))
+    is_active: Mapped[bool] = mapped_column(server_default=text("true"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    category: Mapped["Category"] = relationship(back_populates="products")
+    variants: Mapped[list["ProductVariant"]] = relationship(back_populates="product")
+    images: Mapped[list["ProductImage"]] = relationship(back_populates="product")
+
+
+class ProductVariant(Base):
+    __tablename__ = "product_variants"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+    sku: Mapped[str] = mapped_column(Text, unique=True)
+    variant_name: Mapped[str] = mapped_column(Text)
+    attributes: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    price_override: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    product: Mapped["Product"] = relationship(back_populates="variants")
+    inventory: Mapped["Inventory"] = relationship(back_populates="variant")
+
+
+class ProductImage(Base):
+    __tablename__ = "product_images"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+    url: Mapped[str] = mapped_column(Text)
+    alt_text: Mapped[str] = mapped_column(Text)
+    is_primary: Mapped[bool] = mapped_column(server_default=text("false"))
+
+    product: Mapped["Product"] = relationship(back_populates="images")
+
+
+class Inventory(Base):
+    __tablename__ = "inventory"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    variant_id: Mapped[int] = mapped_column(
+        ForeignKey("product_variants.id"), unique=True
+    )
+    quantity_available: Mapped[int] = mapped_column(server_default=text("0"))
+    quantity_reserved: Mapped[int] = mapped_column(server_default=text("0"))
+    reorder_level: Mapped[int] = mapped_column(server_default=text("0"))
+
+    variant: Mapped["ProductVariant"] = relationship(back_populates="inventory")
