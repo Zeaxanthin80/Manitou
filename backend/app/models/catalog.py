@@ -1,7 +1,16 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Numeric, Text, func, text
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -30,7 +39,7 @@ class Product(Base):
     name: Mapped[str] = mapped_column(Text)
     slug: Mapped[str] = mapped_column(Text, unique=True)
     description: Mapped[str | None] = mapped_column(Text)
-    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), index=True)
     base_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     unit_of_measure: Mapped[str] = mapped_column(Text, server_default=text("'each'"))
     is_active: Mapped[bool] = mapped_column(server_default=text("true"))
@@ -47,7 +56,7 @@ class ProductVariant(Base):
     __tablename__ = "product_variants"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
     sku: Mapped[str] = mapped_column(Text, unique=True)
     variant_name: Mapped[str] = mapped_column(Text)
     attributes: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
@@ -71,6 +80,14 @@ class ProductImage(Base):
 
 class Inventory(Base):
     __tablename__ = "inventory"
+    __table_args__ = (
+        CheckConstraint(
+            "quantity_available >= 0", name="quantity_available_non_negative"
+        ),
+        CheckConstraint(
+            "quantity_reserved >= 0", name="quantity_reserved_non_negative"
+        ),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     variant_id: Mapped[int] = mapped_column(
