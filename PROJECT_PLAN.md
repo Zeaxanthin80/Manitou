@@ -15,7 +15,7 @@
 Every task in Section 5 is tagged so you always know who acts:
 
 - **[You]** — You do this yourself: create accounts, sign in, install software, run commands,
-  make decisions, and review results. Claude Code can explain *how*, but your hands are on it.
+  make decisions, and review results. Claude Code can explain _how_, but your hands are on it.
 - **[You + Claude Code]** — You work together. Claude Code explains the concept and drafts the
   code; you read it, ask questions, adjust, and only then save it. You must understand each
   change before moving on. This is deliberately not "let the agent do it."
@@ -54,11 +54,11 @@ configuration and content, not by rewriting the architecture.
 - **Single vendor, always.** One seller (the store owner) and many customer accounts. The vendor
   portal is an admin area gated by an `admin` role.
 - **Not a marketplace.** No multiple independent sellers, no seller onboarding, no split payouts,
-  no Stripe Connect. A large catalog ("Walmart-sized inventory, one owner") is a *scale* concern —
+  no Stripe Connect. A large catalog ("Walmart-sized inventory, one owner") is a _scale_ concern —
   handled with indexing, search, and pagination — not a structural one. It does **not** imply
   multi-vendor.
 - **Build one store concretely first.** The default build is the T-shirt store, built end to end
-  without generalizing as you go. Configurability is proven by *actually cloning it* for a second
+  without generalizing as you go. Configurability is proven by _actually cloning it_ for a second
   store type, not by speculating up front. The only exceptions are the deliberate seams in
   Section 1.1, which are cheap now and expensive later.
 
@@ -73,11 +73,11 @@ configuration and content, not by rewriting the architecture.
 These three seams exist so the repo can be cloned and adapted without a rewrite. They cost almost
 nothing in the default T-shirt build. **Nothing beyond this list should be generalized in advance.**
 
-| Seam | What it is | Why now, not later |
-|---|---|---|
-| **Store configuration** | One config source for store name, currency, locale, tax behavior, and feature flags (e.g. `variants_enabled`, `weight_pricing_enabled`) | If these values scatter across API code and React components, cloning means hunting through files instead of editing one |
-| **`unit_of_measure` on products** | `each` (default), `lb`, `kg`, `oz`, `g` | A grocery store sells by weight. Without this column, that store type is a rewrite rather than a clone |
-| **`attributes` JSONB on variants** | Free-form key/value per variant: `{"size":"L","color":"red"}` or `{"scent":"cedar","wax":"soy"}` | Lets each store type define its own variant dimensions with no schema change |
+| Seam                               | What it is                                                                                                                              | Why now, not later                                                                                                       |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Store configuration**            | One config source for store name, currency, locale, tax behavior, and feature flags (e.g. `variants_enabled`, `weight_pricing_enabled`) | If these values scatter across API code and React components, cloning means hunting through files instead of editing one |
+| **`unit_of_measure` on products**  | `each` (default), `lb`, `kg`, `oz`, `g`                                                                                                 | A grocery store sells by weight. Without this column, that store type is a rewrite rather than a clone                   |
+| **`attributes` JSONB on variants** | Free-form key/value per variant: `{"size":"L","color":"red"}` or `{"scent":"cedar","wax":"soy"}`                                        | Lets each store type define its own variant dimensions with no schema change                                             |
 
 Everything else — the catalog, cart, checkout, order, and payment model — is already store-type
 agnostic as designed in Section 6.
@@ -90,22 +90,24 @@ Your requirement — manage products and users once, everywhere — is met by on
 never touch the database directly. Every client goes through one backend API.**
 
 ```
-        ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌──────────────┐
-        │  Web store   │   │ Vendor portal│   │  iOS (Swift) │   │Android(Kotlin)│
-        │  (browser)   │   │  (browser)   │   │              │   │              │
-        └──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬───────┘
-               │                  │                  │                  │
-               └────────────┬─────┴──────────────────┴──────────────────┘
-                            │  HTTPS / JSON (REST API)
-                     ┌──────▼───────┐
-                     │  Backend API  │  ← the ONLY thing that talks to the DB
-                     │  (FastAPI)    │     handles auth, validation, business rules
-                     └──────┬───────┘
-                            │  SQL (via SQLAlchemy)
-                     ┌──────▼───────┐
-                     │  PostgreSQL   │  ← single source of truth
-                     │  (AWS RDS)    │
-                     └──────────────┘
+     ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌───────────────┐
+     │  Web store   │   │ Vendor portal│   │  iOS (Swift) │   │Android(Kotlin)│
+     │  (browser)   │   │  (browser)   │   │              │   │               │
+     └──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬────────┘
+            │                  │                  │                  │
+            └────────────┬─────┴──────────────────┴──────────────────┘
+                         │  HTTPS / JSON (REST API)
+                         ▼
+                  ┌───────────────┐
+                  │  Backend API  │  ← the ONLY thing that talks to the DB
+                  │  (FastAPI)    │     handles auth, validation, business rules
+                  └──────┬────────┘
+                         │  SQL (via SQLAlchemy)
+                         ▼
+                  ┌───────────────┐
+                  │  PostgreSQL   │  ← single source of truth
+                  │  (AWS RDS)    │
+                  └───────────────┘
 ```
 
 Why this is the rule:
@@ -124,31 +126,31 @@ Why this is the rule:
 
 These choices are settled. Do not substitute them.
 
-| Layer | Technology | Reason it was chosen |
-|---|---|---|
-| Database | **PostgreSQL** | Strong transactions for orders/payments; good JSON support; open source |
-| Backend API | **Python 3.12+ with FastAPI** | You know Python; async serves ~1k concurrent well; auto-generated API docs |
-| Python isolation | **`venv` (built-in) + `pip` + `requirements.txt`** | Per-project packages; standard tooling; matches what the Docker image installs |
-| DB access | **SQLAlchemy + Alembic** | Python-to-SQL mapping plus safe, versioned schema migrations |
-| Validation | **Pydantic** | Enforces request/response shapes; ships with FastAPI |
-| Web frontend | **Next.js (React)** | You know JS/HTML/CSS; server rendering helps store SEO |
-| Web styling | **Tailwind CSS**, configured from shared design tokens | Consistent spacing/color scale; tokens make cross-platform matching possible |
-| Design tokens | **`design-tokens.json`** at the repo root — the single source of truth for color, type, and spacing | One definition, manually mirrored into Tailwind, Kotlin, and Swift (Section 4.3) |
-| Vendor portal | **The same Next.js app**, at `/admin`, gated by an `admin` role | One codebase, one API, one auth system, one design system |
-| Android | **Kotlin (native)** | You already know it |
-| iOS | **Swift (native)** | You already know it |
-| Payments | **Stripe** | Strong web + mobile SDKs; handles the PCI burden |
-| Auth | **JWT tokens** issued by the API, passwords hashed with **bcrypt** | Identical flow for web and mobile |
-| Containerization | **Docker** | Same environment locally and on AWS |
-| CI/CD | **GitHub Actions** | You know Git; automate tests and deploys |
-| API hosting | **Amazon ECS (Express Mode)** | AWS App Runner closed to new customers April 30, 2026; Express Mode is AWS's official successor — same App Runner-like simplicity, on top of Fargate |
-| Container registry | **Amazon ECR** | Express Mode deploys pre-built images only (no source builds), so the Docker image is pushed here first |
-| Web hosting | **AWS Amplify Hosting** | Runs Next.js with built-in CI/CD from your Git repo |
-| Database hosting | **AWS RDS (PostgreSQL)** | Managed Postgres with backups and failover |
-| Images / static files | **AWS S3 + CloudFront** | Store product images; serve them via CDN |
-| DNS + HTTPS | **AWS Route 53 + ACM** | Domain and free TLS certificates |
-| Secrets | **AWS Secrets Manager** | DB password and Stripe keys, kept out of Git |
-| Monitoring | **AWS CloudWatch** | Logs, metrics, alarms |
+| Layer                 | Technology                                                                                          | Reason it was chosen                                                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Database              | **PostgreSQL**                                                                                      | Strong transactions for orders/payments; good JSON support; open source                                                                              |
+| Backend API           | **Python 3.12+ with FastAPI**                                                                       | You know Python; async serves ~1k concurrent well; auto-generated API docs                                                                           |
+| Python isolation      | **`venv` (built-in) + `pip` + `requirements.txt`**                                                  | Per-project packages; standard tooling; matches what the Docker image installs                                                                       |
+| DB access             | **SQLAlchemy + Alembic**                                                                            | Python-to-SQL mapping plus safe, versioned schema migrations                                                                                         |
+| Validation            | **Pydantic**                                                                                        | Enforces request/response shapes; ships with FastAPI                                                                                                 |
+| Web frontend          | **Next.js (React)**                                                                                 | You know JS/HTML/CSS; server rendering helps store SEO                                                                                               |
+| Web styling           | **Tailwind CSS**, configured from shared design tokens                                              | Consistent spacing/color scale; tokens make cross-platform matching possible                                                                         |
+| Design tokens         | **`design-tokens.json`** at the repo root — the single source of truth for color, type, and spacing | One definition, manually mirrored into Tailwind, Kotlin, and Swift (Section 4.3)                                                                     |
+| Vendor portal         | **The same Next.js app**, at `/admin`, gated by an `admin` role                                     | One codebase, one API, one auth system, one design system                                                                                            |
+| Android               | **Kotlin (native)**                                                                                 | You already know it                                                                                                                                  |
+| iOS                   | **Swift (native)**                                                                                  | You already know it                                                                                                                                  |
+| Payments              | **Stripe**                                                                                          | Strong web + mobile SDKs; handles the PCI burden                                                                                                     |
+| Auth                  | **JWT tokens** issued by the API, passwords hashed with **bcrypt**                                  | Identical flow for web and mobile                                                                                                                    |
+| Containerization      | **Docker**                                                                                          | Same environment locally and on AWS                                                                                                                  |
+| CI/CD                 | **GitHub Actions**                                                                                  | You know Git; automate tests and deploys                                                                                                             |
+| API hosting           | **Amazon ECS (Express Mode)**                                                                       | AWS App Runner closed to new customers April 30, 2026; Express Mode is AWS's official successor — same App Runner-like simplicity, on top of Fargate |
+| Container registry    | **Amazon ECR**                                                                                      | Express Mode deploys pre-built images only (no source builds), so the Docker image is pushed here first                                              |
+| Web hosting           | **AWS Amplify Hosting**                                                                             | Runs Next.js with built-in CI/CD from your Git repo                                                                                                  |
+| Database hosting      | **AWS RDS (PostgreSQL)**                                                                            | Managed Postgres with backups and failover                                                                                                           |
+| Images / static files | **AWS S3 + CloudFront**                                                                             | Store product images; serve them via CDN                                                                                                             |
+| DNS + HTTPS           | **AWS Route 53 + ACM**                                                                              | Domain and free TLS certificates                                                                                                                     |
+| Secrets               | **AWS Secrets Manager**                                                                             | DB password and Stripe keys, kept out of Git                                                                                                         |
+| Monitoring            | **AWS CloudWatch**                                                                                  | Logs, metrics, alarms                                                                                                                                |
 
 ---
 
@@ -197,12 +199,12 @@ requirements collide, and your dependency list can't be reproduced reliably.
 
 **The venv and Docker are both used, and they do different jobs:**
 
-| | Virtual environment (`.venv`) | Docker |
-|---|---|---|
-| Isolates | Python packages for this project | The entire runtime (OS, Python, system libraries) |
-| Used for | Writing code: editor autocomplete, `pytest`, `alembic`, running the API locally | Running PostgreSQL locally; packaging the API for AWS |
-| Lives | On your machine, in `backend/.venv/` | In containers |
-| Shipped to AWS | No | Yes |
+|                | Virtual environment (`.venv`)                                                   | Docker                                                |
+| -------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Isolates       | Python packages for this project                                                | The entire runtime (OS, Python, system libraries)     |
+| Used for       | Writing code: editor autocomplete, `pytest`, `alembic`, running the API locally | Running PostgreSQL locally; packaging the API for AWS |
+| Lives          | On your machine, in `backend/.venv/`                                            | In containers                                         |
+| Shipped to AWS | No                                                                              | Yes                                                   |
 
 **Day-to-day development setup:** PostgreSQL runs in Docker; the FastAPI app runs on your host
 inside the venv. You get fast hot-reload and easy debugging while developing, and Phase 6 packages
@@ -224,8 +226,8 @@ or SQLAlchemy and you lose autocomplete and type checking.
   Just keep it out of Git.
 
 **Python version managers (pyenv):** not part of this project's required tooling. `pyenv` manages
-*which Python version* is installed, a separate layer from the venv (*which packages*) and Docker
-(*which whole runtime ships*). Decision rule: run `python3 --version` in Phase 0 step 2. If it
+_which Python version_ is installed, a separate layer from the venv (_which packages_) and Docker
+(_which whole runtime ships_). Decision rule: run `python3 --version` in Phase 0 step 2. If it
 reports 3.12 or higher, skip pyenv entirely. If it reports lower, install pyenv (macOS/Linux) or
 install 3.12 from python.org (Windows) rather than modifying your system Python — on macOS
 especially, other OS tooling depends on the bundled version. Either way, the venv is still created
@@ -252,12 +254,12 @@ the source of the values differs.
 
 ### The two files, and why both exist
 
-| | `.env` | `.env.example` |
-|---|---|---|
-| Contains | Real working values | Variable names with placeholder values |
-| Committed to Git? | **Never** | **Always** |
-| Purpose | Makes the app run on your machine | Documents what the app requires |
-| Who has it | Each developer creates their own | Shared by everyone via the repo |
+|                   | `.env`                            | `.env.example`                         |
+| ----------------- | --------------------------------- | -------------------------------------- |
+| Contains          | Real working values               | Variable names with placeholder values |
+| Committed to Git? | **Never**                         | **Always**                             |
+| Purpose           | Makes the app run on your machine | Documents what the app requires        |
+| Who has it        | Each developer creates their own  | Shared by everyone via the repo        |
 
 `.env` holds live secrets, so it stays out of Git. But that creates a problem: someone cloning the
 repo — including future-you on a new machine — has no way to know the app needs eight specific
@@ -265,7 +267,7 @@ variables. They'd start the app, get a cryptic connection error, and have to rev
 requirements from the source code.
 
 `.env.example` solves exactly that. It's the committed, safe-to-read **contract** stating what
-configuration the application requires. It carries the variable *names* and harmless placeholders,
+configuration the application requires. It carries the variable _names_ and harmless placeholders,
 never real secrets.
 
 Example of the shape:
@@ -298,11 +300,11 @@ secrets in **AWS Secrets Manager**, and **ECS** supplies them to the running con
 environment variables at startup. Your code calls `os.environ` exactly as it does locally and never
 knows the difference — that's the whole point of the pattern.
 
-| Environment | Where values come from | Where secrets are stored |
-|---|---|---|
-| Local development | `.env` file, loaded at startup | On your machine only, git-ignored |
-| CI (GitHub Actions) | Repository secrets injected into the job | GitHub encrypted secrets |
-| Production (AWS) | Injected into the container by ECS (Express Mode) | **AWS Secrets Manager** |
+| Environment         | Where values come from                            | Where secrets are stored          |
+| ------------------- | ------------------------------------------------- | --------------------------------- |
+| Local development   | `.env` file, loaded at startup                    | On your machine only, git-ignored |
+| CI (GitHub Actions) | Repository secrets injected into the job          | GitHub encrypted secrets          |
+| Production (AWS)    | Injected into the container by ECS (Express Mode) | **AWS Secrets Manager**           |
 
 So `.env` is a **local development convenience**, not a deployment mechanism. Shipping a `.env`
 file to a server — or baking one into a Docker image — is a mistake: the image is stored in a
@@ -359,11 +361,11 @@ every platform can read or mirror it:
 
 How each platform consumes it:
 
-| Platform | How tokens are applied |
-|---|---|
-| Web (Next.js) | Imported into `tailwind.config.js` so Tailwind's palette, type scale, and spacing come from the tokens |
-| Android (Kotlin) | Mirrored into a Compose `Theme.kt` — `MaterialTheme` colors, typography, and shapes |
-| iOS (Swift) | Mirrored into a SwiftUI theme file — `Color` and `Font` extensions |
+| Platform         | How tokens are applied                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------ |
+| Web (Next.js)    | Imported into `tailwind.config.js` so Tailwind's palette, type scale, and spacing come from the tokens |
+| Android (Kotlin) | Mirrored into a Compose `Theme.kt` — `MaterialTheme` colors, typography, and shapes                    |
+| iOS (Swift)      | Mirrored into a SwiftUI theme file — `Color` and `Font` extensions                                     |
 
 Mobile mirroring is manual — you copy the values into the native theme file. That's acceptable
 because tokens change rarely, and it keeps the tooling simple. The rule is that `design-tokens.json`
@@ -381,7 +383,7 @@ Practically, this means Phase 3 should build shared UI primitives (button, input
 modal, form field) that Phase 4 reuses. The portal's density and priorities differ — it's dashboards
 and data tables rather than product photography — but it is recognizably the same product.
 
-### Consistency across mobile means *brand*, not pixel-cloning
+### Consistency across mobile means _brand_, not pixel-cloning
 
 An important distinction, and a place where "make the apps look like the website" can be taken too
 far: **do not reproduce the website's layout in the native apps.** Users expect platform
@@ -393,14 +395,14 @@ conventions, and an app that ignores them feels wrong and dated:
 
 So the target is: **identical brand, native feel.**
 
-| Keep identical across all platforms | Let each platform follow its own conventions |
-|---|---|
-| Colors and their roles | Navigation structure and patterns |
-| Typefaces, hierarchy, and relative scale | Native controls (pickers, date selectors, switches) |
-| Spacing rhythm and density | Gestures and transitions |
-| Logo, iconography style, imagery treatment | Layout for the screen size and input method |
-| Terminology and button wording | Platform-standard system components |
-| Product photography treatment | System share, permission, and payment sheets |
+| Keep identical across all platforms        | Let each platform follow its own conventions        |
+| ------------------------------------------ | --------------------------------------------------- |
+| Colors and their roles                     | Navigation structure and patterns                   |
+| Typefaces, hierarchy, and relative scale   | Native controls (pickers, date selectors, switches) |
+| Spacing rhythm and density                 | Gestures and transitions                            |
+| Logo, iconography style, imagery treatment | Layout for the screen size and input method         |
+| Terminology and button wording             | Platform-standard system components                 |
+| Product photography treatment              | System share, permission, and payment sheets        |
 
 Someone moving from your website to your iOS app should immediately recognize the same store —
 without the app feeling like a website in a wrapper.
@@ -606,7 +608,7 @@ the basics here. Read it as a short tutorial plus a concrete schema.
 Design in this order:
 
 1. **List the real-world things** the store cares about (customers, products, orders…). These become **tables**.
-2. **Describe how they relate** (an order *has many* items; a product *belongs to* a category).
+2. **Describe how they relate** (an order _has many_ items; a product _belongs to_ a category).
 3. **Turn that into a schema** — tables, columns, data types, keys.
 4. **Refine** for correctness (normalization) and speed (indexes).
 5. **Version it** with migrations so changes are safe and repeatable.
@@ -704,12 +706,12 @@ reference to another table's PK).
 | id | bigint | **PK** |
 | user_id | bigint | **FK** → users.id |
 
-| cart_items | Type | Notes |
-|---|---|---|
-| id | bigint | **PK** |
-| cart_id | bigint | **FK** → carts.id |
-| variant_id | bigint | **FK** → product_variants.id |
-| quantity | integer | |
+| cart_items | Type    | Notes                        |
+| ---------- | ------- | ---------------------------- |
+| id         | bigint  | **PK**                       |
+| cart_id    | bigint  | **FK** → carts.id            |
+| variant_id | bigint  | **FK** → product_variants.id |
+| quantity   | integer |                              |
 
 **orders**
 | Column | Type | Notes |
@@ -845,18 +847,18 @@ pooling** (SQLAlchemy's pool, plus
 
 ## 7. AWS Hosting Details
 
-| Need | Service | Notes |
-|---|---|---|
-| Database | **RDS (PostgreSQL)** | Managed Postgres; enable backups; add Multi-AZ before launch |
-| API hosting | **ECS (Express Mode)** | Runs your container on Fargate with minimal setup — AWS App Runner's official successor |
-| Container registry | **ECR** | Where your built API image is pushed before Express Mode deploys it |
-| Web hosting | **Amplify Hosting** | Runs Next.js with CI/CD from your Git repo |
-| Images / static files | **S3 + CloudFront** | Store product images in S3, serve via the CDN |
-| DNS + HTTPS | **Route 53 + ACM** | Domain plus free TLS certificates |
-| Secrets | **Secrets Manager** | DB password, Stripe keys — out of Git |
-| Permissions | **IAM** | Least-privilege roles; a dedicated user for daily work |
-| Networking | **VPC** | Keep RDS private; only the API reaches it |
-| Monitoring | **CloudWatch** | Logs, metrics, alarms — Express Mode wires this up automatically |
+| Need                  | Service                | Notes                                                                                   |
+| --------------------- | ---------------------- | --------------------------------------------------------------------------------------- |
+| Database              | **RDS (PostgreSQL)**   | Managed Postgres; enable backups; add Multi-AZ before launch                            |
+| API hosting           | **ECS (Express Mode)** | Runs your container on Fargate with minimal setup — AWS App Runner's official successor |
+| Container registry    | **ECR**                | Where your built API image is pushed before Express Mode deploys it                     |
+| Web hosting           | **Amplify Hosting**    | Runs Next.js with CI/CD from your Git repo                                              |
+| Images / static files | **S3 + CloudFront**    | Store product images in S3, serve via the CDN                                           |
+| DNS + HTTPS           | **Route 53 + ACM**     | Domain plus free TLS certificates                                                       |
+| Secrets               | **Secrets Manager**    | DB password, Stripe keys — out of Git                                                   |
+| Permissions           | **IAM**                | Least-privilege roles; a dedicated user for daily work                                  |
+| Networking            | **VPC**                | Keep RDS private; only the API reaches it                                               |
+| Monitoring            | **CloudWatch**         | Logs, metrics, alarms — Express Mode wires this up automatically                        |
 
 **A note on App Runner:** the original version of this plan specified App Runner for API hosting.
 AWS closed App Runner to new customers on April 30, 2026 and now directs new workloads to **ECS
@@ -920,11 +922,11 @@ following, not a population figure at all — the method is the same, the inputs
 **2. Apply a realistic capture rate for where the business actually is.** A new, single-vendor
 entrant does not start with meaningful market share. Model growth in stages:
 
-| Stage | Realistic share of the addressable market | What changes it |
-|---|---|---|
-| Early launch (first 6–12 months) | ~0.3–0.5% | Little to no brand recognition yet |
-| Established (year 2–3) | ~2–3% | Real marketing spend, word of mouth |
-| Mature presence (multi-year) | ~5–8% | Meaningful competitor in its category |
+| Stage                            | Realistic share of the addressable market | What changes it                       |
+| -------------------------------- | ----------------------------------------- | ------------------------------------- |
+| Early launch (first 6–12 months) | ~0.3–0.5%                                 | Little to no brand recognition yet    |
+| Established (year 2–3)           | ~2–3%                                     | Real marketing spend, word of mouth   |
+| Mature presence (multi-year)     | ~5–8%                                     | Meaningful competitor in its category |
 
 **3. Convert active customers into visits, using actual behavior, not requests.**
 `visits/month ≈ active customers × orders/month × visits per order` (browsing, list-building, and
@@ -937,11 +939,11 @@ busy window), not spread evenly across 24 hours.
 
 **Worked example (Florida statewide grocery delivery, illustrating the method):**
 
-| Stage | Active customers | Peak-day visits | Peak-hour concurrent users |
-|---|---|---|---|
-| Early launch | ~10,000–17,000 | ~4,000–4,800 | **~80–90** |
-| Established regional | ~68,000–100,000 | ~30,000 | **~500–550** |
-| Mature statewide | ~170,000–270,000 | ~75,000–88,000 | **~1,250–1,400** |
+| Stage                | Active customers | Peak-day visits | Peak-hour concurrent users |
+| -------------------- | ---------------- | --------------- | -------------------------- |
+| Early launch         | ~10,000–17,000   | ~4,000–4,800    | **~80–90**                 |
+| Established regional | ~68,000–100,000  | ~30,000         | **~500–550**               |
+| Mature statewide     | ~170,000–270,000 | ~75,000–88,000  | **~1,250–1,400**           |
 
 The finding worth internalizing: **1,000+ concurrent is roughly what a genuinely successful,
 multi-year, statewide-recognized business sees at peak — not a reasonable day-one target.** A real
@@ -951,7 +953,7 @@ load test and RDS sizing, not the round-number milestone.
 **Why this matters more for grocery-type stores than the default T-shirt build:** real-time
 inventory checks against a specific warehouse per delivery address, plus delivery-slot booking
 against a genuinely limited resource, make grocery traffic far more write-heavy and backend-costly
-per concurrent user than catalog browsing. The *concurrency number* isn't the whole capacity
+per concurrent user than catalog browsing. The _concurrency number_ isn't the whole capacity
 picture — the traffic mix behind it (cached reads vs. writes) matters just as much. Re-run this
 sizing exercise for whichever store type you actually clone Manitou into; the inputs in step 1 and
 the write-heaviness in this last point are what change between a T-shirt store and a grocery store,
