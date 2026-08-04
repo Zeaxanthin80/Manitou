@@ -15,7 +15,7 @@
 Every task in Section 5 is tagged so you always know who acts:
 
 - **[You]** — You do this yourself: create accounts, sign in, install software, run commands,
-  make decisions, and review results. Claude Code can explain _how_, but your hands are on it.
+  make decisions, and review results. Claude Code can explain *how*, but your hands are on it.
 - **[You + Claude Code]** — You work together. Claude Code explains the concept and drafts the
   code; you read it, ask questions, adjust, and only then save it. You must understand each
   change before moving on. This is deliberately not "let the agent do it."
@@ -41,7 +41,10 @@ configuration and content, not by rewriting the architecture.
 **Fixed requirements:**
 
 - One shared database so products, users, inventory, and orders are managed once and reflected everywhere.
-- Support ~1,000 concurrent users.
+- Support the concurrency the business actually warrants — **sized via the methodology in Section
+  10.1**, not assumed. Design and Phase 8 load-test against the early-launch tier for whatever
+  store this becomes; treat higher figures (including the commonly-assumed "~1,000 concurrent") as
+  earned scale milestones, not day-one requirements.
 - Payments via **Stripe**.
 - Host on **AWS** (this also supports your AWS Certified Cloud Practitioner goal).
 - Build order: **database → backend API → website → payments → deploy → mobile apps.**
@@ -51,11 +54,11 @@ configuration and content, not by rewriting the architecture.
 - **Single vendor, always.** One seller (the store owner) and many customer accounts. The vendor
   portal is an admin area gated by an `admin` role.
 - **Not a marketplace.** No multiple independent sellers, no seller onboarding, no split payouts,
-  no Stripe Connect. A large catalog ("Walmart-sized inventory, one owner") is a _scale_ concern —
+  no Stripe Connect. A large catalog ("Walmart-sized inventory, one owner") is a *scale* concern —
   handled with indexing, search, and pagination — not a structural one. It does **not** imply
   multi-vendor.
 - **Build one store concretely first.** The default build is the T-shirt store, built end to end
-  without generalizing as you go. Configurability is proven by _actually cloning it_ for a second
+  without generalizing as you go. Configurability is proven by *actually cloning it* for a second
   store type, not by speculating up front. The only exceptions are the deliberate seams in
   Section 1.1, which are cheap now and expensive later.
 
@@ -70,11 +73,11 @@ configuration and content, not by rewriting the architecture.
 These three seams exist so the repo can be cloned and adapted without a rewrite. They cost almost
 nothing in the default T-shirt build. **Nothing beyond this list should be generalized in advance.**
 
-| Seam                               | What it is                                                                                                                              | Why now, not later                                                                                                       |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **Store configuration**            | One config source for store name, currency, locale, tax behavior, and feature flags (e.g. `variants_enabled`, `weight_pricing_enabled`) | If these values scatter across API code and React components, cloning means hunting through files instead of editing one |
-| **`unit_of_measure` on products**  | `each` (default), `lb`, `kg`, `oz`, `g`                                                                                                 | A grocery store sells by weight. Without this column, that store type is a rewrite rather than a clone                   |
-| **`attributes` JSONB on variants** | Free-form key/value per variant: `{"size":"L","color":"red"}` or `{"scent":"cedar","wax":"soy"}`                                        | Lets each store type define its own variant dimensions with no schema change                                             |
+| Seam | What it is | Why now, not later |
+|---|---|---|
+| **Store configuration** | One config source for store name, currency, locale, tax behavior, and feature flags (e.g. `variants_enabled`, `weight_pricing_enabled`) | If these values scatter across API code and React components, cloning means hunting through files instead of editing one |
+| **`unit_of_measure` on products** | `each` (default), `lb`, `kg`, `oz`, `g` | A grocery store sells by weight. Without this column, that store type is a rewrite rather than a clone |
+| **`attributes` JSONB on variants** | Free-form key/value per variant: `{"size":"L","color":"red"}` or `{"scent":"cedar","wax":"soy"}` | Lets each store type define its own variant dimensions with no schema change |
 
 Everything else — the catalog, cart, checkout, order, and payment model — is already store-type
 agnostic as designed in Section 6.
@@ -87,22 +90,22 @@ Your requirement — manage products and users once, everywhere — is met by on
 never touch the database directly. Every client goes through one backend API.**
 
 ```
-     ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌───────────────┐
-     │  Web store   │   │ Vendor portal│   │  iOS (Swift) │   │Android(Kotlin)│
-     │  (browser)   │   │  (browser)   │   │              │   │               │
-     └──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬────────┘
-            │                  │                  │                  │
-            └────────────┬─────┴──────────────────┴──────────────────┘
-                         │  HTTPS / JSON (REST API)
-                  ┌──────▼────────┐
-                  │  Backend API  │  ← the ONLY thing that talks to the DB
-                  │  (FastAPI)    │     handles auth, validation, business rules
-                  └──────┬────────┘
-                         │  SQL (via SQLAlchemy)
-                  ┌──────▼────────┐
-                  │  PostgreSQL   │  ← single source of truth
-                  │  (AWS RDS)    │
-                  └───────────────┘
+        ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌──────────────┐
+        │  Web store   │   │ Vendor portal│   │  iOS (Swift) │   │Android(Kotlin)│
+        │  (browser)   │   │  (browser)   │   │              │   │              │
+        └──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬───────┘
+               │                  │                  │                  │
+               └────────────┬─────┴──────────────────┴──────────────────┘
+                            │  HTTPS / JSON (REST API)
+                     ┌──────▼───────┐
+                     │  Backend API  │  ← the ONLY thing that talks to the DB
+                     │  (FastAPI)    │     handles auth, validation, business rules
+                     └──────┬───────┘
+                            │  SQL (via SQLAlchemy)
+                     ┌──────▼───────┐
+                     │  PostgreSQL   │  ← single source of truth
+                     │  (AWS RDS)    │
+                     └──────────────┘
 ```
 
 Why this is the rule:
@@ -121,30 +124,31 @@ Why this is the rule:
 
 These choices are settled. Do not substitute them.
 
-| Layer                 | Technology                                                                                          | Reason it was chosen                                                             |
-| --------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Database              | **PostgreSQL**                                                                                      | Strong transactions for orders/payments; good JSON support; open source          |
-| Backend API           | **Python 3.12+ with FastAPI**                                                                       | You know Python; async serves ~1k concurrent well; auto-generated API docs       |
-| Python isolation      | **`venv` (built-in) + `pip` + `requirements.txt`**                                                  | Per-project packages; standard tooling; matches what the Docker image installs   |
-| DB access             | **SQLAlchemy + Alembic**                                                                            | Python-to-SQL mapping plus safe, versioned schema migrations                     |
-| Validation            | **Pydantic**                                                                                        | Enforces request/response shapes; ships with FastAPI                             |
-| Web frontend          | **Next.js (React)**                                                                                 | You know JS/HTML/CSS; server rendering helps store SEO                           |
-| Web styling           | **Tailwind CSS**, configured from shared design tokens                                              | Consistent spacing/color scale; tokens make cross-platform matching possible     |
-| Design tokens         | **`design-tokens.json`** at the repo root — the single source of truth for color, type, and spacing | One definition, manually mirrored into Tailwind, Kotlin, and Swift (Section 4.3) |
-| Vendor portal         | **The same Next.js app**, at `/admin`, gated by an `admin` role                                     | One codebase, one API, one auth system, one design system                        |
-| Android               | **Kotlin (native)**                                                                                 | You already know it                                                              |
-| iOS                   | **Swift (native)**                                                                                  | You already know it                                                              |
-| Payments              | **Stripe**                                                                                          | Strong web + mobile SDKs; handles the PCI burden                                 |
-| Auth                  | **JWT tokens** issued by the API, passwords hashed with **bcrypt**                                  | Identical flow for web and mobile                                                |
-| Containerization      | **Docker**                                                                                          | Same environment locally and on AWS                                              |
-| CI/CD                 | **GitHub Actions**                                                                                  | You know Git; automate tests and deploys                                         |
-| API hosting           | **AWS App Runner**                                                                                  | Simplest managed way to run the container (upgrade path defined in Section 7)    |
-| Web hosting           | **AWS Amplify Hosting**                                                                             | Runs Next.js with built-in CI/CD from your Git repo                              |
-| Database hosting      | **AWS RDS (PostgreSQL)**                                                                            | Managed Postgres with backups and failover                                       |
-| Images / static files | **AWS S3 + CloudFront**                                                                             | Store product images; serve them via CDN                                         |
-| DNS + HTTPS           | **AWS Route 53 + ACM**                                                                              | Domain and free TLS certificates                                                 |
-| Secrets               | **AWS Secrets Manager**                                                                             | DB password and Stripe keys, kept out of Git                                     |
-| Monitoring            | **AWS CloudWatch**                                                                                  | Logs, metrics, alarms                                                            |
+| Layer | Technology | Reason it was chosen |
+|---|---|---|
+| Database | **PostgreSQL** | Strong transactions for orders/payments; good JSON support; open source |
+| Backend API | **Python 3.12+ with FastAPI** | You know Python; async serves ~1k concurrent well; auto-generated API docs |
+| Python isolation | **`venv` (built-in) + `pip` + `requirements.txt`** | Per-project packages; standard tooling; matches what the Docker image installs |
+| DB access | **SQLAlchemy + Alembic** | Python-to-SQL mapping plus safe, versioned schema migrations |
+| Validation | **Pydantic** | Enforces request/response shapes; ships with FastAPI |
+| Web frontend | **Next.js (React)** | You know JS/HTML/CSS; server rendering helps store SEO |
+| Web styling | **Tailwind CSS**, configured from shared design tokens | Consistent spacing/color scale; tokens make cross-platform matching possible |
+| Design tokens | **`design-tokens.json`** at the repo root — the single source of truth for color, type, and spacing | One definition, manually mirrored into Tailwind, Kotlin, and Swift (Section 4.3) |
+| Vendor portal | **The same Next.js app**, at `/admin`, gated by an `admin` role | One codebase, one API, one auth system, one design system |
+| Android | **Kotlin (native)** | You already know it |
+| iOS | **Swift (native)** | You already know it |
+| Payments | **Stripe** | Strong web + mobile SDKs; handles the PCI burden |
+| Auth | **JWT tokens** issued by the API, passwords hashed with **bcrypt** | Identical flow for web and mobile |
+| Containerization | **Docker** | Same environment locally and on AWS |
+| CI/CD | **GitHub Actions** | You know Git; automate tests and deploys |
+| API hosting | **Amazon ECS (Express Mode)** | AWS App Runner closed to new customers April 30, 2026; Express Mode is AWS's official successor — same App Runner-like simplicity, on top of Fargate |
+| Container registry | **Amazon ECR** | Express Mode deploys pre-built images only (no source builds), so the Docker image is pushed here first |
+| Web hosting | **AWS Amplify Hosting** | Runs Next.js with built-in CI/CD from your Git repo |
+| Database hosting | **AWS RDS (PostgreSQL)** | Managed Postgres with backups and failover |
+| Images / static files | **AWS S3 + CloudFront** | Store product images; serve them via CDN |
+| DNS + HTTPS | **AWS Route 53 + ACM** | Domain and free TLS certificates |
+| Secrets | **AWS Secrets Manager** | DB password and Stripe keys, kept out of Git |
+| Monitoring | **AWS CloudWatch** | Logs, metrics, alarms |
 
 ---
 
@@ -193,12 +197,12 @@ requirements collide, and your dependency list can't be reproduced reliably.
 
 **The venv and Docker are both used, and they do different jobs:**
 
-|                | Virtual environment (`.venv`)                                                   | Docker                                                |
-| -------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Isolates       | Python packages for this project                                                | The entire runtime (OS, Python, system libraries)     |
-| Used for       | Writing code: editor autocomplete, `pytest`, `alembic`, running the API locally | Running PostgreSQL locally; packaging the API for AWS |
-| Lives          | On your machine, in `backend/.venv/`                                            | In containers                                         |
-| Shipped to AWS | No                                                                              | Yes                                                   |
+| | Virtual environment (`.venv`) | Docker |
+|---|---|---|
+| Isolates | Python packages for this project | The entire runtime (OS, Python, system libraries) |
+| Used for | Writing code: editor autocomplete, `pytest`, `alembic`, running the API locally | Running PostgreSQL locally; packaging the API for AWS |
+| Lives | On your machine, in `backend/.venv/` | In containers |
+| Shipped to AWS | No | Yes |
 
 **Day-to-day development setup:** PostgreSQL runs in Docker; the FastAPI app runs on your host
 inside the venv. You get fast hot-reload and easy debugging while developing, and Phase 6 packages
@@ -220,8 +224,8 @@ or SQLAlchemy and you lose autocomplete and type checking.
   Just keep it out of Git.
 
 **Python version managers (pyenv):** not part of this project's required tooling. `pyenv` manages
-_which Python version_ is installed, a separate layer from the venv (_which packages_) and Docker
-(_which whole runtime ships_). Decision rule: run `python3 --version` in Phase 0 step 2. If it
+*which Python version* is installed, a separate layer from the venv (*which packages*) and Docker
+(*which whole runtime ships*). Decision rule: run `python3 --version` in Phase 0 step 2. If it
 reports 3.12 or higher, skip pyenv entirely. If it reports lower, install pyenv (macOS/Linux) or
 install 3.12 from python.org (Windows) rather than modifying your system Python — on macOS
 especially, other OS tooling depends on the bundled version. Either way, the venv is still created
@@ -248,12 +252,12 @@ the source of the values differs.
 
 ### The two files, and why both exist
 
-|                   | `.env`                            | `.env.example`                         |
-| ----------------- | --------------------------------- | -------------------------------------- |
-| Contains          | Real working values               | Variable names with placeholder values |
-| Committed to Git? | **Never**                         | **Always**                             |
-| Purpose           | Makes the app run on your machine | Documents what the app requires        |
-| Who has it        | Each developer creates their own  | Shared by everyone via the repo        |
+| | `.env` | `.env.example` |
+|---|---|---|
+| Contains | Real working values | Variable names with placeholder values |
+| Committed to Git? | **Never** | **Always** |
+| Purpose | Makes the app run on your machine | Documents what the app requires |
+| Who has it | Each developer creates their own | Shared by everyone via the repo |
 
 `.env` holds live secrets, so it stays out of Git. But that creates a problem: someone cloning the
 repo — including future-you on a new machine — has no way to know the app needs eight specific
@@ -261,7 +265,7 @@ variables. They'd start the app, get a cryptic connection error, and have to rev
 requirements from the source code.
 
 `.env.example` solves exactly that. It's the committed, safe-to-read **contract** stating what
-configuration the application requires. It carries the variable _names_ and harmless placeholders,
+configuration the application requires. It carries the variable *names* and harmless placeholders,
 never real secrets.
 
 Example of the shape:
@@ -290,15 +294,15 @@ Each developer's `.env` is personal and different. The `.env.example` they all s
 **There is no `.env` file in production.** This is the part that surprises people.
 
 On AWS, values are injected into the container's environment by the platform. You store the real
-secrets in **AWS Secrets Manager**, and **App Runner** supplies them to the running container as
+secrets in **AWS Secrets Manager**, and **ECS** supplies them to the running container as
 environment variables at startup. Your code calls `os.environ` exactly as it does locally and never
 knows the difference — that's the whole point of the pattern.
 
-| Environment         | Where values come from                    | Where secrets are stored          |
-| ------------------- | ----------------------------------------- | --------------------------------- |
-| Local development   | `.env` file, loaded at startup            | On your machine only, git-ignored |
-| CI (GitHub Actions) | Repository secrets injected into the job  | GitHub encrypted secrets          |
-| Production (AWS)    | Injected into the container by App Runner | **AWS Secrets Manager**           |
+| Environment | Where values come from | Where secrets are stored |
+|---|---|---|
+| Local development | `.env` file, loaded at startup | On your machine only, git-ignored |
+| CI (GitHub Actions) | Repository secrets injected into the job | GitHub encrypted secrets |
+| Production (AWS) | Injected into the container by ECS (Express Mode) | **AWS Secrets Manager** |
 
 So `.env` is a **local development convenience**, not a deployment mechanism. Shipping a `.env`
 file to a server — or baking one into a Docker image — is a mistake: the image is stored in a
@@ -355,11 +359,11 @@ every platform can read or mirror it:
 
 How each platform consumes it:
 
-| Platform         | How tokens are applied                                                                                 |
-| ---------------- | ------------------------------------------------------------------------------------------------------ |
-| Web (Next.js)    | Imported into `tailwind.config.js` so Tailwind's palette, type scale, and spacing come from the tokens |
-| Android (Kotlin) | Mirrored into a Compose `Theme.kt` — `MaterialTheme` colors, typography, and shapes                    |
-| iOS (Swift)      | Mirrored into a SwiftUI theme file — `Color` and `Font` extensions                                     |
+| Platform | How tokens are applied |
+|---|---|
+| Web (Next.js) | Imported into `tailwind.config.js` so Tailwind's palette, type scale, and spacing come from the tokens |
+| Android (Kotlin) | Mirrored into a Compose `Theme.kt` — `MaterialTheme` colors, typography, and shapes |
+| iOS (Swift) | Mirrored into a SwiftUI theme file — `Color` and `Font` extensions |
 
 Mobile mirroring is manual — you copy the values into the native theme file. That's acceptable
 because tokens change rarely, and it keeps the tooling simple. The rule is that `design-tokens.json`
@@ -377,7 +381,7 @@ Practically, this means Phase 3 should build shared UI primitives (button, input
 modal, form field) that Phase 4 reuses. The portal's density and priorities differ — it's dashboards
 and data tables rather than product photography — but it is recognizably the same product.
 
-### Consistency across mobile means _brand_, not pixel-cloning
+### Consistency across mobile means *brand*, not pixel-cloning
 
 An important distinction, and a place where "make the apps look like the website" can be taken too
 far: **do not reproduce the website's layout in the native apps.** Users expect platform
@@ -389,14 +393,14 @@ conventions, and an app that ignores them feels wrong and dated:
 
 So the target is: **identical brand, native feel.**
 
-| Keep identical across all platforms        | Let each platform follow its own conventions        |
-| ------------------------------------------ | --------------------------------------------------- |
-| Colors and their roles                     | Navigation structure and patterns                   |
-| Typefaces, hierarchy, and relative scale   | Native controls (pickers, date selectors, switches) |
-| Spacing rhythm and density                 | Gestures and transitions                            |
-| Logo, iconography style, imagery treatment | Layout for the screen size and input method         |
-| Terminology and button wording             | Platform-standard system components                 |
-| Product photography treatment              | System share, permission, and payment sheets        |
+| Keep identical across all platforms | Let each platform follow its own conventions |
+|---|---|
+| Colors and their roles | Navigation structure and patterns |
+| Typefaces, hierarchy, and relative scale | Native controls (pickers, date selectors, switches) |
+| Spacing rhythm and density | Gestures and transitions |
+| Logo, iconography style, imagery treatment | Layout for the screen size and input method |
+| Terminology and button wording | Platform-standard system components |
+| Product photography treatment | System share, permission, and payment sheets |
 
 Someone moving from your website to your iOS app should immediately recognize the same store —
 without the app feeling like a website in a wrapper.
@@ -550,11 +554,17 @@ primitives and `design-tokens.json`, and calls the same API with the same JWT au
 4. **[You + Claude Code]** Provision **RDS PostgreSQL**. Keep it private so only the API reaches it.
 5. **[You + Claude Code]** Point Alembic at RDS and apply your migrations there, producing the
    same schema you have locally.
-6. **[You + Claude Code]** Containerize the API with Docker and deploy it to **App Runner**.
-7. **[You + Claude Code]** Deploy the web app to **Amplify Hosting**, connected to your Git repo.
-8. **[You + Claude Code]** Set up **S3 + CloudFront** for product images and switch uploads to use them.
-9. **[You]** Register a domain in **Route 53** and issue an **ACM** certificate for HTTPS.
-10. **[You + Claude Code]** Move secrets into **Secrets Manager** and set up **CloudWatch** logs and alarms.
+6. **[You + Claude Code]** Containerize the API with Docker. Push the image to **ECR** (Elastic
+   Container Registry) — Express Mode deploys pre-built images only, not source repos, so this
+   push step is required before the next one.
+7. **[You + Claude Code]** Deploy the pushed image with **ECS Express Mode**, AWS's current
+   recommended successor to App Runner (closed to new customers as of April 30, 2026). Express
+   Mode runs on the same Fargate compute and automates the cluster, load balancer, HTTPS, and
+   scaling setup App Runner used to handle.
+8. **[You + Claude Code]** Deploy the web app to **Amplify Hosting**, connected to your Git repo.
+9. **[You + Claude Code]** Set up **S3 + CloudFront** for product images and switch uploads to use them.
+10. **[You]** Register a domain in **Route 53** and issue an **ACM** certificate for HTTPS.
+11. **[You + Claude Code]** Move secrets into **Secrets Manager** and set up **CloudWatch** logs and alarms.
 
 ### Phase 7 — Mobile Apps
 
@@ -575,11 +585,14 @@ existing API and mirror `design-tokens.json` per Section 4.3.
 
 ### Phase 8 — Hardening and Launch
 
-1. **[You + Claude Code]** Load test toward ~1,000 concurrent users. Adjust the RDS instance size
-   and connection pool based on results.
-2. **[You + Claude Code]** Add rate limiting, review input validation, and do a security pass.
-3. **[You]** Verify backups by performing a test restore. An untested backup is not a backup.
-4. **[You + Claude Code]** Confirm logging, alerts, and error tracking are in place, then launch.
+1. **[You]** Size a real launch-tier concurrency target using the methodology in Section 10.1 —
+   addressable market → realistic early-launch capture rate → visits → concurrent users. Don't
+   skip this step in favor of a round number.
+2. **[You + Claude Code]** Load test against that sized target, not an assumed one. Adjust the RDS
+   instance size and connection pool based on the results.
+3. **[You + Claude Code]** Add rate limiting, review input validation, and do a security pass.
+4. **[You]** Verify backups by performing a test restore. An untested backup is not a backup.
+5. **[You + Claude Code]** Confirm logging, alerts, and error tracking are in place, then launch.
 
 ---
 
@@ -593,7 +606,7 @@ the basics here. Read it as a short tutorial plus a concrete schema.
 Design in this order:
 
 1. **List the real-world things** the store cares about (customers, products, orders…). These become **tables**.
-2. **Describe how they relate** (an order _has many_ items; a product _belongs to_ a category).
+2. **Describe how they relate** (an order *has many* items; a product *belongs to* a category).
 3. **Turn that into a schema** — tables, columns, data types, keys.
 4. **Refine** for correctness (normalization) and speed (indexes).
 5. **Version it** with migrations so changes are safe and repeatable.
@@ -605,22 +618,11 @@ Design in this order:
 - A **product** has many **variants** (e.g., "Large / Red") and many **images**.
 - Each **variant** has one **inventory** record.
 - A **cart** belongs to a user and contains many **cart items**.
-- An **order** contains many **order items** and has zero or more **payments**.
+- An **order** contains many **order items** and has one **payment**.
 
 "Has many / belongs to" describes **cardinality** — one-to-one, one-to-many, or many-to-many.
 Most relationships above are one-to-many. Cart items and order items are the classic pattern for
 turning a many-to-many (products ↔ orders) into two one-to-many links through a join table.
-
-**Why an order has many payments, not one.** The intuitive model is one payment per order, but that
-assumes payment succeeds on the first attempt. A declined card followed by a successful retry is two
-records; a refund is a third; SCA/3-D Secure flows can produce more than one PaymentIntent for a
-single checkout. Financial records are **append-only** — you never overwrite or delete a payment
-row, you add another one, so an order's payment history is a ledger rather than a single value.
-This is why `payments.order_id` carries no unique constraint (contrast `inventory.variant_id`,
-which does — Section 6.3). It also means split-tender payment (two cards, or a card plus a gift
-card) could be added later as a *feature* with no schema change — but it is deliberately **not**
-part of v1 (Section 12), because it pulls in partial-payment order states, proportional refunds,
-and reconciliation rules.
 
 ### 6.3 Core Schema
 
@@ -702,12 +704,12 @@ reference to another table's PK).
 | id | bigint | **PK** |
 | user_id | bigint | **FK** → users.id |
 
-| cart_items | Type    | Notes                        |
-| ---------- | ------- | ---------------------------- |
-| id         | bigint  | **PK**                       |
-| cart_id    | bigint  | **FK** → carts.id            |
-| variant_id | bigint  | **FK** → product_variants.id |
-| quantity   | integer |                              |
+| cart_items | Type | Notes |
+|---|---|---|
+| id | bigint | **PK** |
+| cart_id | bigint | **FK** → carts.id |
+| variant_id | bigint | **FK** → product_variants.id |
+| quantity | integer | |
 
 **orders**
 | Column | Type | Notes |
@@ -801,7 +803,7 @@ inventory, record the payment. If any step fails, **none** should apply. Wrap th
 in a **database transaction** so all steps commit together or roll back together (the "atomicity"
 in ACID).
 
-Concurrency matters: with ~1,000 users, two people may buy the last item at the same moment.
+Concurrency matters at any real traffic level: two people may buy the last item at the same moment.
 Protect the inventory decrement so stock can't go negative — either a row lock
 (`SELECT ... FOR UPDATE`) inside the transaction, or a conditional update that only succeeds when
 enough stock remains. Implement this in `services/checkout` and call it out to Claude Code so it
@@ -835,28 +837,39 @@ restore at least once before launch — an untested backup isn't a backup.
 
 Develop against local PostgreSQL via Docker, then point the same app at **RDS PostgreSQL** in
 production by swapping the connection string. Because you use migrations, the schema is identical
-in both places. For ~1,000 concurrent users, use **connection pooling** (SQLAlchemy's pool, plus
+in both places. At your launch-tier concurrency target (sized per Section 10.1), use **connection
+pooling** (SQLAlchemy's pool, plus
 **RDS Proxy** in front of the database) so you don't exhaust connections.
 
 ---
 
 ## 7. AWS Hosting Details
 
-| Need                  | Service              | Notes                                                        |
-| --------------------- | -------------------- | ------------------------------------------------------------ |
-| Database              | **RDS (PostgreSQL)** | Managed Postgres; enable backups; add Multi-AZ before launch |
-| API hosting           | **App Runner**       | Runs your container with minimal setup                       |
-| Web hosting           | **Amplify Hosting**  | Runs Next.js with CI/CD from your Git repo                   |
-| Images / static files | **S3 + CloudFront**  | Store product images in S3, serve via the CDN                |
-| DNS + HTTPS           | **Route 53 + ACM**   | Domain plus free TLS certificates                            |
-| Secrets               | **Secrets Manager**  | DB password, Stripe keys — out of Git                        |
-| Permissions           | **IAM**              | Least-privilege roles; a dedicated user for daily work       |
-| Networking            | **VPC**              | Keep RDS private; only the API reaches it                    |
-| Monitoring            | **CloudWatch**       | Logs, metrics, alarms                                        |
+| Need | Service | Notes |
+|---|---|---|
+| Database | **RDS (PostgreSQL)** | Managed Postgres; enable backups; add Multi-AZ before launch |
+| API hosting | **ECS (Express Mode)** | Runs your container on Fargate with minimal setup — AWS App Runner's official successor |
+| Container registry | **ECR** | Where your built API image is pushed before Express Mode deploys it |
+| Web hosting | **Amplify Hosting** | Runs Next.js with CI/CD from your Git repo |
+| Images / static files | **S3 + CloudFront** | Store product images in S3, serve via the CDN |
+| DNS + HTTPS | **Route 53 + ACM** | Domain plus free TLS certificates |
+| Secrets | **Secrets Manager** | DB password, Stripe keys — out of Git |
+| Permissions | **IAM** | Least-privilege roles; a dedicated user for daily work |
+| Networking | **VPC** | Keep RDS private; only the API reaches it |
+| Monitoring | **CloudWatch** | Logs, metrics, alarms — Express Mode wires this up automatically |
 
-**Defined upgrade path:** deploy the API on **App Runner**. If the Phase 8 load test shows you
-need finer control over scaling or networking, migrate the same Docker container to **ECS Fargate**.
-Do not add this complexity earlier.
+**A note on App Runner:** the original version of this plan specified App Runner for API hosting.
+AWS closed App Runner to new customers on April 30, 2026 and now directs new workloads to **ECS
+Express Mode** instead. This isn't a step down — Express Mode runs on the same Fargate compute
+App Runner used, and automates the same things (load balancer, HTTPS, scaling, CloudWatch). The
+one real difference: Express Mode deploys **pre-built container images only**, not source repos —
+which is why Phase 6 now has an explicit "push to ECR" step before deployment.
+
+**Defined upgrade path:** deploy the API with **ECS Express Mode**. Because Express Mode already
+runs on Fargate underneath its simplified interface, there's no service migration if you outgrow
+it — if the Phase 8 load test shows you need finer control (custom task placement, advanced ALB
+rules) than Express Mode's automation allows, you configure standard **ECS Fargate** directly,
+same service, training wheels off. Do not add that complexity earlier.
 
 ---
 
@@ -887,7 +900,67 @@ Do not add this complexity earlier.
 
 - Backend: unit tests for services (checkout, inventory) and integration tests for endpoints.
 - Prioritize the money-and-stock paths — that's where bugs hurt most.
-- Load test toward ~1,000 concurrent users before launch and tune RDS size and pool settings.
+- Load test against the **launch-tier concurrency target from Section 10.1**, not a flat assumed
+  number, and tune RDS size and pool settings to that result.
+
+---
+
+## 10.1 Sizing a Real Concurrency Target (don't assume a round number)
+
+**A flat "~1,000 concurrent users" is not a launch requirement — it's a scale milestone that has to
+be earned, and it needs to be derived, not assumed.** Round numbers like 1,000 feel like a safe
+planning default, but they carry an implicit workload and business size that may be wildly wrong
+for what you're actually building. Size it properly instead, in four steps:
+
+**1. Find the addressable market.** Population of the area served → households → the fraction that
+plausibly buys this category online at all. For a statewide grocery store, that might be
+~30–35% of households. For a niche T-shirt store, it might be a mailing list size or social
+following, not a population figure at all — the method is the same, the inputs differ per store type.
+
+**2. Apply a realistic capture rate for where the business actually is.** A new, single-vendor
+entrant does not start with meaningful market share. Model growth in stages:
+
+| Stage | Realistic share of the addressable market | What changes it |
+|---|---|---|
+| Early launch (first 6–12 months) | ~0.3–0.5% | Little to no brand recognition yet |
+| Established (year 2–3) | ~2–3% | Real marketing spend, word of mouth |
+| Mature presence (multi-year) | ~5–8% | Meaningful competitor in its category |
+
+**3. Convert active customers into visits, using actual behavior, not requests.**
+`visits/month ≈ active customers × orders/month × visits per order` (browsing, list-building, and
+cart revisits typically produce several visits per completed order, not one).
+
+**4. Convert visits into concurrent users**, following the standard capacity-planning formula:
+`concurrent users ≈ peak-hour visits × average session duration ÷ 60`. Peak-hour visits are
+usually a concentrated slice of the peak day's total (commonly ~10–15% for a store with a defined
+busy window), not spread evenly across 24 hours.
+
+**Worked example (Florida statewide grocery delivery, illustrating the method):**
+
+| Stage | Active customers | Peak-day visits | Peak-hour concurrent users |
+|---|---|---|---|
+| Early launch | ~10,000–17,000 | ~4,000–4,800 | **~80–90** |
+| Established regional | ~68,000–100,000 | ~30,000 | **~500–550** |
+| Mature statewide | ~170,000–270,000 | ~75,000–88,000 | **~1,250–1,400** |
+
+The finding worth internalizing: **1,000+ concurrent is roughly what a genuinely successful,
+multi-year, statewide-recognized business sees at peak — not a reasonable day-one target.** A real
+launch for a store like this is closer to 80–100 concurrent, and that number should drive Phase 8's
+load test and RDS sizing, not the round-number milestone.
+
+**Why this matters more for grocery-type stores than the default T-shirt build:** real-time
+inventory checks against a specific warehouse per delivery address, plus delivery-slot booking
+against a genuinely limited resource, make grocery traffic far more write-heavy and backend-costly
+per concurrent user than catalog browsing. The *concurrency number* isn't the whole capacity
+picture — the traffic mix behind it (cached reads vs. writes) matters just as much. Re-run this
+sizing exercise for whichever store type you actually clone Manitou into; the inputs in step 1 and
+the write-heaviness in this last point are what change between a T-shirt store and a grocery store,
+not the method.
+
+**Practical rule for this project:** size and load-test against the **early-launch tier** for
+whatever store you're actually building. Treat the higher tiers as documented future milestones to
+revisit once real usage data exists — don't architect Phase 6/8 around a number with no grounding
+in an actual addressable market and capture rate.
 
 ---
 
@@ -897,7 +970,7 @@ The exam is broad and conceptual. Building on AWS gives you hands-on context for
 
 - **RDS** → managed databases, backups, Multi-AZ.
 - **S3 + CloudFront** → object storage and content delivery.
-- **App Runner / ECS / EC2** → compute options and the shared-responsibility model.
+- **ECS / Fargate / EC2** → compute options and the shared-responsibility model.
 - **IAM** → identity, roles, least privilege.
 - **VPC** → basic networking and isolation.
 - **CloudWatch** → monitoring.
@@ -923,16 +996,40 @@ After v1 launches, add reviews, richer search, sales reporting, and the mobile a
 
 ## 13. Glossary
 
-- **API** — the backend service clients call to read/write data.
-- **ORM** — library that maps database rows to code objects (SQLAlchemy).
+- **API (Application Programming Interface)** — the backend service clients call to read/write data.
+- **ORM (Object-Relational Mapper)** — library that maps database rows to code objects (SQLAlchemy).
 - **Migration** — a versioned, repeatable schema change (Alembic).
 - **Primary key (PK)** — column that uniquely identifies a row.
 - **Foreign key (FK)** — column referencing another table's PK.
 - **Index** — structure that speeds up lookups on a column.
-- **Transaction** — a group of DB operations that all succeed or all fail together.
+- **Transaction** — a group of database (DB) operations that all succeed or all fail together.
 - **Normalization** — organizing data so each fact is stored once.
-- **JWT** — a signed token proving who a user is on each request.
-- **JOIN** — combining rows from related tables in a query.
-- **SKU** — stock keeping unit; a unique code per sellable variant.
-- **IAM** — AWS Identity and Access Management; controls who can do what.
-- **VPC** — a private network in AWS that isolates your resources.
+- **JWT (JSON Web Token)** — a signed token proving who a user is on each request.
+- **JOIN** — a SQL operation combining rows from related tables in a query.
+- **SKU (Stock Keeping Unit)** — a unique code per sellable variant.
+- **IAM (Identity and Access Management)** — the AWS service controlling who can do what.
+- **VPC (Virtual Private Cloud)** — a private, isolated network within AWS.
+
+**Other acronyms used elsewhere in this plan, for reference:**
+
+- **SQL (Structured Query Language)** — the language used to query and modify relational databases like PostgreSQL.
+- **CRUD (Create, Read, Update, Delete)** — the four basic operations an API performs on data.
+- **REST (Representational State Transfer)** — the API design style this backend follows: resources addressed by URL, manipulated with standard HTTP methods.
+- **JSON (JavaScript Object Notation)** — the text format APIs use to send and receive structured data.
+- **JSONB** — PostgreSQL's binary-optimized storage format for JSON, used for `product_variants.attributes` (Section 6).
+- **HTTP / HTTPS (HyperText Transfer Protocol / … Secure)** — the protocol clients and the API communicate over; HTTPS adds TLS encryption.
+- **TLS (Transport Layer Security)** — the encryption protocol behind HTTPS; ACM issues the certificates that enable it.
+- **YAML (YAML Ain't Markup Language)** — the indentation-based format used by `docker-compose.yml` and GitHub Actions workflow files.
+- **CI/CD (Continuous Integration / Continuous Deployment)** — automatically testing and deploying code on every push (GitHub Actions).
+- **ACID (Atomicity, Consistency, Isolation, Durability)** — the transaction guarantees PostgreSQL provides, central to the checkout logic in Section 6.7.
+- **CDN (Content Delivery Network)** — a network of edge servers that cache and serve static content close to the user (CloudFront).
+- **DNS (Domain Name System)** — translates a domain name into a server address (Route 53).
+- **ACM (AWS Certificate Manager)** — issues the free TLS certificates used for HTTPS.
+- **RDS (Relational Database Service)** — AWS's managed PostgreSQL hosting.
+- **ECS (Elastic Container Service)** — AWS's container-hosting service; **Express Mode** is its simplified deployment path (Section 7).
+- **ECR (Elastic Container Registry)** — where the built Docker image is stored before ECS deploys it.
+- **ALB (Application Load Balancer)** — distributes incoming traffic across running containers.
+- **S3 (Simple Storage Service)** — AWS's object storage, used here for product images.
+- **EC2 (Elastic Compute Cloud)** — AWS's raw virtual server offering, mentioned for contrast with managed options like RDS and ECS.
+- **RPS (Requests Per Second)** — the throughput metric used for capacity planning in Section 10.1.
+- **SRE (Site Reliability Engineering)** — the discipline behind the capacity-planning approach cited in Section 10.1.

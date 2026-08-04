@@ -10,7 +10,9 @@ demand instead.
 
 ## What this is
 **Manitou** — a reusable single-vendor online store platform. Web first, mobile later. One shared
-PostgreSQL database, accessed only through one backend API. Target ~1,000 concurrent users.
+PostgreSQL database, accessed only through one backend API. Concurrency target is sized per
+`PROJECT_PLAN.md` Section 10.1 (early-launch tier), not assumed as a round number — don't propose
+"~1,000 concurrent users" as a launch requirement; it's a documented later-stage milestone.
 Payments via Stripe. Hosted on AWS. A learning project built from first principles rather than a
 hosted solution like Shopify.
 
@@ -38,7 +40,7 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
 - Mobile: Kotlin/Jetpack Compose (Android), Swift/SwiftUI (iOS) — added after web works
 - Design: `design-tokens.json` at repo root is the single source of truth for color, type, spacing
 - Payments: Stripe (PaymentIntents + webhook)
-- Infra: Docker, GitHub Actions, AWS (RDS, App Runner/ECS, S3, CloudFront, Route 53)
+- Infra: Docker, GitHub Actions, AWS (RDS, ECS Express Mode, ECR, S3, CloudFront, Route 53)
 
 ## Repo layout
 - `backend/` — FastAPI app (`models/`, `schemas/`, `routers/`, `services/`, `db.py`)
