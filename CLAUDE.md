@@ -9,6 +9,7 @@ with `@` — at ~860 lines it would load into every session and crowd out these 
 demand instead.
 
 ## What this is
+
 **Manitou** — a reusable single-vendor online store platform. Web first, mobile later. One shared
 PostgreSQL database, accessed only through one backend API. Concurrency target is sized per
 `PROJECT_PLAN.md` Section 10.1 (early-launch tier), not assumed as a round number — don't propose
@@ -20,6 +21,7 @@ The repo should be cloneable and adaptable to different store types (T-shirts = 
 candles, single-product, grocery, broad catalog) by changing config and content — not architecture.
 
 ## Scope guardrails
+
 - **Single vendor, always.** One seller, many customers. Admin area is a role-gated route.
 - **Never propose marketplace features** — no multiple sellers, seller onboarding, split payouts,
   or Stripe Connect. A large catalog is a scale problem (indexing, search, pagination), not a
@@ -29,10 +31,12 @@ candles, single-product, grocery, broad catalog) by changing config and content 
   `products.unit_of_measure`, and `product_variants.attributes` (JSONB). Nothing beyond those.
 
 ## Golden rule
+
 **Clients never touch the database directly.** The web app, vendor portal, iOS, and Android
 apps all go through the backend API. Only the API connects to PostgreSQL.
 
 ## Tech stack
+
 - Database: PostgreSQL (local via Docker; AWS RDS in production)
 - Backend: Python + FastAPI, SQLAlchemy, Alembic, Pydantic
 - Auth: JWT (bcrypt password hashing), roles: `customer` / `admin`
@@ -43,6 +47,7 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
 - Infra: Docker, GitHub Actions, AWS (RDS, ECS Express Mode, ECR, S3, CloudFront, Route 53)
 
 ## Repo layout
+
 - `backend/` — FastAPI app (`models/`, `schemas/`, `routers/`, `services/`, `db.py`)
 - `backend/alembic/` — migrations
 - `web/` — Next.js storefront + vendor portal
@@ -50,6 +55,7 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
 - `infra/` — deployment notes/scripts
 
 ## Conventions
+
 - **Python work always runs inside the project venv at `backend/.venv`.** Before suggesting any
   `pip`, `python`, `alembic`, `uvicorn`, or `pytest` command, assume the venv must be active and
   remind the owner if it may not be. Never suggest a global `pip install`.
@@ -80,6 +86,7 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
 - Stripe handles card data; we store only Stripe reference IDs.
 
 ## Working style
+
 - **This is a learning project. The owner drives; you guide. This is not agent mode.**
   Explain the concept, draft code together, and let the owner review and understand each change
   before it is saved. Do not batch-implement multiple files without walking through them.
@@ -91,5 +98,7 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
 - Prefer clear, teachable code — the owner is learning databases and AWS.
 
 ## Current phase
+
 <!-- Update this line as you progress, e.g. "Phase 1 — Database" -->
-Phase 0 — Foundations
+
+Phase 2 — Backend API
