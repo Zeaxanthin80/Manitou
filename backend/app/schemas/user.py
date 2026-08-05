@@ -50,7 +50,16 @@ class UserRead(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    """Login input.
+
+    `email` is a plain str, not EmailStr, on purpose. Login matches against a
+    stored value rather than validating a new one, and rejecting malformed input
+    here would return 422 where an unknown-but-valid address returns 401 --
+    a difference in response shape that reveals something about the input. Every
+    failed login should look the same. Registration stays strict.
+    """
+
+    email: str
     password: str
 
 

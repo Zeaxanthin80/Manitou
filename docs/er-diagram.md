@@ -10,7 +10,7 @@ Where the two differ, Section 6.3 and this file are authoritative.
 erDiagram
     USERS            ||--o{ ADDRESSES        : has
     USERS            ||--o{ ORDERS           : places
-    USERS            ||--o{ CARTS            : owns
+    USERS            ||--o| CARTS            : owns
 
     CATEGORIES       ||--o{ CATEGORIES       : parent_of
     CATEGORIES       ||--o{ PRODUCTS         : contains
@@ -53,7 +53,7 @@ the cardinality is identical, only the reading order changes.
 | ---------------------------------- | ---------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `users` → `addresses`              | one to zero-or-more    | `addresses.user_id`               | A customer can save several addresses (home, work, gift recipient) — or none, if they've only just registered.                                                                                                                                               |
 | `users` → `orders`                 | one to zero-or-more    | `orders.user_id`                  | Zero, because a newly registered user hasn't ordered yet.                                                                                                                                                                                                    |
-| `users` → `carts`                  | one to zero-or-more    | `carts.user_id`                   | **Worth revisiting.** The schema puts no unique constraint on `carts.user_id`, so many carts per user are permitted. If the intent is one active cart per user, that needs an explicit constraint — a decision for Phase 1 task 5 (constraints and indexes). |
+| `users` → `carts`                  | **one to zero-or-one** | `carts.user_id` *(unique)*        | One cart per user, enforced by a unique constraint added in Phase 1 task 5. Zero because the cart is created on first use, not at registration. As a constraint rather than a convention, "get my cart" is unambiguous and duplicates cannot appear by accident. |
 | `categories` → `categories`        | one to zero-or-more    | `categories.parent_id`            | **Self-referencing.** A category's parent is another category, letting "Apparel → T-Shirts → Long Sleeve" nest to any depth without a table per level. Nullable, because top-level categories have no parent.                                                |
 | `categories` → `products`          | one to zero-or-more    | `products.category_id`            | One category holds many products; each product sits in exactly one. Drawn once — the connector already states both directions.                                                                                                                               |
 | `products` → `product_variants`    | one to zero-or-more    | `product_variants.product_id`     | "T-Shirt" is the product; "Large / Red" is the variant. The variant carries the `sku`, because that's the unit actually sold.                                                                                                                                |

@@ -704,7 +704,7 @@ reference to another table's PK).
 | carts | Type | Notes |
 |---|---|---|
 | id | bigint | **PK** |
-| user_id | bigint | **FK** → users.id |
+| user_id | bigint | **FK** → users.id, unique — one cart per user |
 
 | cart_items | Type    | Notes                        |
 | ---------- | ------- | ---------------------------- |
@@ -778,13 +778,60 @@ dimensions per store in the store configuration (Section 1.1). Use `variant_name
 
 - A **primary key** (`id`) on every table.
 - **Foreign keys** so references are always valid.
-- **Unique constraints** on `users.email`, `categories.slug`, `products.slug`, `product_variants.sku`.
 - **Not-null constraints** on anything required (email, prices, quantities).
 - Let the database enforce these; constraints are your safety net even if the app has a bug.
+
+**Unique constraints** — six in total:
+
+| Column | What it guarantees |
+|---|---|
+| `users.email` | One account per address |
+| `categories.slug` | URLs resolve to one category |
+| `products.slug` | URLs resolve to one product |
+| `product_variants.sku` | A SKU identifies exactly one sellable item |
+| `inventory.variant_id` | At most one stock row per variant — this is what makes the relationship one-to-one |
+| `carts.user_id` | One cart per user |
+
+Note what `inventory.variant_id` does *not* do: it enforces **at most** one inventory row, never
+**at least** one. A variant with no stock row is legal SQL. Keeping every variant supplied with one
+is an application invariant, upheld in the seed script and in product creation.
+
+**CHECK constraints** — eight, in two groups.
+
+Quantity guards. These are the database-level half of Section 6.7's requirement that stock can
+never go negative; the row lock in checkout is the other half:
+
+| Table | Rule |
+|---|---|
+| `inventory` | `quantity_available >= 0` |
+| `inventory` | `quantity_reserved >= 0` |
+| `cart_items` | `quantity > 0` |
+| `order_items` | `quantity > 0` |
+| `payments` | `amount > 0` |
+
+Enum-like text columns. Section 6.3 specifies `text` rather than a PostgreSQL `ENUM` type, so the
+permitted values are enforced with a CHECK:
+
+| Column | Permitted values |
+|---|---|
+| `users.role` | `customer`, `admin` |
+| `addresses.type` | `shipping`, `billing` |
+| `orders.status` | `pending`, `paid`, `shipped`, `delivered`, `cancelled`, `refunded` |
+
+**`products.unit_of_measure` is deliberately left unconstrained.** It looks like an oversight beside
+the columns above and is not one: it is a Section 1.1 reusability seam. A CHECK restricting it to
+`each/lb/kg/oz/g` would force a schema migration on any cloned store selling in a unit not on that
+list, which is exactly what the seam exists to prevent. It is validated at the API boundary instead.
 
 ### 6.6 Indexes
 
 An index speeds up lookups at a small cost to writes. Add indexes on columns you filter or join by:
+
+**PostgreSQL does not automatically index foreign key columns.** This surprises most people. A
+foreign key requires an index on the *referenced* (parent) column — which the primary key already
+supplies — but creates nothing on the *referencing* (child) column. That is why nearly every entry
+below is an FK: without them, "find this order's items" is a sequential scan. Unique constraints
+*do* create an index, which is why `users.email` needs no separate one.
 
 - `users.email` (unique — already indexed)
 - `products.category_id`, `products.slug`
@@ -818,6 +865,20 @@ column, or index) becomes a migration file committed to Git, applied identically
 and reversible if something goes wrong. Never edit the production database by hand — always through
 a migration.
 
+**Autogenerate does not detect CHECK constraints.** `alembic revision --autogenerate` compares
+models against the database and finds added tables, columns, indexes, and unique constraints — but
+it will not notice a `CheckConstraint` declared on a model, and will silently produce an empty
+migration. `alembic check` uses the same comparison logic, so it cannot catch the omission either.
+Write them by hand with `op.create_check_constraint()`, with matching `op.drop_constraint(...,
+type_='check')` calls in `downgrade()`, and verify against `pg_constraint` rather than trusting
+`alembic check`.
+
+**Constraint names come from a naming convention** set on `Base.metadata` in `app/db.py`, producing
+`pk_<table>`, `fk_<table>_<column>_<referred_table>`, `uq_<table>_<column>`, `ck_<table>_<name>`,
+and `ix_<table>_<column>`. Without it the database invents names that vary by engine and are hard
+to predict — and a constraint can only be altered or dropped *by name*. Set this before the first
+migration; retrofitting it later means renaming every constraint in the database.
+
 ### 6.9 Seeding
 
 Write a script that fills a fresh database with a few categories, sample products and variants
@@ -828,6 +889,13 @@ Seed the **T-shirt store** (the default build): a couple of categories, products
 `unit_of_measure = 'each'`, and variants whose `attributes` carry `{"size": ..., "color": ...}`.
 Include at least one product with no variants, so the "single item store" path is exercised from
 day one rather than discovered later.
+
+**Seed data must satisfy the same validation the API enforces.** The seed writes through the ORM
+and so bypasses the Pydantic schemas — which makes it easy to create a row the API itself would
+reject, leaving two disagreeing definitions of what is valid. This happened: the admin was seeded
+with an `@…​.local` address, which `POST /auth/register` refuses because `.local` is a reserved
+special-use domain. The account existed and could never be logged into. When seeding a record type
+the API also creates, check that the API would accept it.
 
 ### 6.10 Backups and Recovery
 
@@ -881,6 +949,24 @@ same service, training wheels off. Do not add that complexity earlier.
 - Issue **JWT** access tokens on login; clients send them on each request. This is identical for
   web and mobile.
 - Include the user's **role** in the token so the vendor portal can require `admin`.
+- **The role claim is for clients, not for server-side authorisation.** It lets the web app decide
+  whether to render `/admin` without an extra request. The API reads the role from the *database*
+  on every request, so a role changed there takes effect immediately rather than when the token
+  expires. Never authorise from the token's claim alone.
+- **Registration always creates a `customer`.** The registration schema has no `role` field at all
+  — omitted rather than validated — so a request body has no way to ask for an admin account.
+  Admins are created deliberately (the seed script, or an admin-only endpoint).
+- **Authentication failures must be indistinguishable.** An unknown email and a wrong password
+  return the same 401 with the same body *and take the same time*. Identical bodies alone are not
+  enough: if a missing user short-circuits before the password check, the response is ~100ms faster
+  and that gap enumerates which addresses have accounts. Run a real hash comparison against a dummy
+  hash when no user matches.
+- Distinguish **401 from 403**. Missing, malformed, or expired credentials are 401 ("who are you?");
+  a valid identity without permission is 403 ("I know who you are, and no"). Note that FastAPI's
+  `HTTPBearer` returns 403 for a missing header by default — set `auto_error=False` and raise 401.
+- **No refresh tokens in v1.** A deliberate omission, not an oversight: access tokens expire after
+  `ACCESS_TOKEN_EXPIRE_MINUTES` and the user logs in again. Revisit if session length becomes a
+  real complaint.
 - Serve everything over **HTTPS**.
 - Keep all secrets out of Git (environment variables locally, Secrets Manager on AWS).
 - Validate every input at the API boundary with Pydantic.

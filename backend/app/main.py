@@ -3,8 +3,11 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.routers import auth
 
-app = FastAPI()
+app = FastAPI(title="Manitou API")
+
+app.include_router(auth.router)
 
 
 @app.get("/health")

@@ -38,7 +38,11 @@ from app.models import (
 )
 from app.security import hash_password
 
-ADMIN_EMAIL = "admin@manitou.local"
+# .example is reserved by RFC 2606, so this address can never route real mail --
+# unlike a plausible-looking domain someone else might own. Note that .local and
+# .test are rejected outright by the EmailStr validator on registration, so an
+# address using them could never be created through the API.
+ADMIN_EMAIL = "admin@manitou.example"
 ADMIN_PASSWORD = "admin"  # local development only
 
 # Children before parents, so no delete leaves a dangling reference.
