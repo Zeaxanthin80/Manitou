@@ -1,0 +1,157 @@
+"""Public catalogue endpoints.
+
+No authentication anywhere in this module: a storefront must be readable by
+anyone. Every query filters is_active, so a deactivated product is invisible
+here even by direct URL. Admin endpoints (task 6) see everything.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, selectinload
+
+from app.db import get_db
+from app.models import Category, Product
+from app.schemas import (
+    CategoryRead,
+    ImageRead,
+    ProductDetail,
+    ProductListItem,
+    ProductPage,
+    VariantRead,
+)
+from app.schemas.catalog import MAX_PAGE_SIZE
+
+router = APIRouter(tags=["catalog"])
+
+
+def _category_subtree_ids(db: Session, slug: str) -> list[int] | None:
+    """Every category id at or below `slug`, or None if the slug is unknown.
+
+    categories.parent_id is the schema's only self-reference, and a shopper
+    clicking a parent category expects to see everything underneath it -- with
+    the seeded tree, "apparel" holds no products directly and both its children
+    do, so a non-recursive filter would show an empty catalogue.
+
+    WITH RECURSIVE is the SQL tool for this. The first SELECT is the anchor (the
+    category named by the slug); the second repeatedly joins children onto what
+    has been found so far, until nothing new appears. One query, any depth.
+    """
+    anchor = select(Category.id).where(Category.slug == slug)
+    subtree = anchor.cte(name="subtree", recursive=True)
+    subtree = subtree.union_all(
+        select(Category.id).join(subtree, Category.parent_id == subtree.c.id)
+    )
+    ids = list(db.scalars(select(subtree.c.id)))
+    return ids or None
+
+
+def _to_list_item(product: Product) -> ProductListItem:
+    primary = next(
+        (img for img in product.images if img.is_primary),
+        next(iter(product.images), None),
+    )
+    return ProductListItem(
+        id=product.id,
+        name=product.name,
+        slug=product.slug,
+        base_price=product.base_price,
+        unit_of_measure=product.unit_of_measure,
+        category_id=product.category_id,
+        primary_image=ImageRead.model_validate(primary) if primary else None,
+    )
+
+
+@router.get("/categories", response_model=list[CategoryRead])
+def list_categories(db: Session = Depends(get_db)) -> list[Category]:
+    return list(db.scalars(select(Category).order_by(Category.name)))
+
+
+@router.get("/categories/{slug}", response_model=CategoryRead)
+def get_category(slug: str, db: Session = Depends(get_db)) -> Category:
+    category = db.scalar(select(Category).where(Category.slug == slug))
+    if category is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Category not found")
+    return category
+
+
+@router.get("/products", response_model=ProductPage)
+def list_products(
+    db: Session = Depends(get_db),
+    category: str | None = Query(None, description="Category slug, including subcategories"),
+    q: str | None = Query(None, description="Case-insensitive product name search"),
+    limit: int = Query(20, ge=1, le=MAX_PAGE_SIZE),
+    offset: int = Query(0, ge=0),
+) -> ProductPage:
+    conditions = [Product.is_active.is_(True)]
+
+    if category is not None:
+        ids = _category_subtree_ids(db, category)
+        if ids is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Category not found")
+        conditions.append(Product.category_id.in_(ids))
+
+    if q:
+        # ILIKE with a leading wildcard cannot use an index. Acceptable at this
+        # catalogue size; Section 12 defers real full-text search past v1.
+        conditions.append(Product.name.ilike(f"%{q}%"))
+
+    total = db.scalar(select(func.count()).select_from(Product).where(*conditions))
+
+    # selectinload issues one extra query for all images at once. Without it,
+    # rendering N products lazily loads each product's images: N+1 queries.
+    products = db.scalars(
+        select(Product)
+        .where(*conditions)
+        .options(selectinload(Product.images))
+        .order_by(Product.name)
+        .limit(limit)
+        .offset(offset)
+    ).all()
+
+    return ProductPage(
+        items=[_to_list_item(p) for p in products],
+        total=total or 0,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/products/{slug}", response_model=ProductDetail)
+def get_product(slug: str, db: Session = Depends(get_db)) -> ProductDetail:
+    product = db.scalar(
+        select(Product)
+        .where(Product.slug == slug, Product.is_active.is_(True))
+        .options(
+            selectinload(Product.images),
+            selectinload(Product.variants),
+            selectinload(Product.category),
+        )
+    )
+    if product is None:
+        # Also covers an inactive product: hidden means hidden, including by
+        # direct URL, not merely absent from the listing.
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
+
+    variants = [
+        VariantRead(
+            id=v.id,
+            sku=v.sku,
+            variant_name=v.variant_name,
+            attributes=v.attributes,
+            price=v.price_override if v.price_override is not None else product.base_price,
+            in_stock=v.inventory is not None and v.inventory.quantity_available > 0,
+        )
+        for v in product.variants
+    ]
+
+    return ProductDetail(
+        id=product.id,
+        name=product.name,
+        slug=product.slug,
+        description=product.description,
+        base_price=product.base_price,
+        unit_of_measure=product.unit_of_measure,
+        category=CategoryRead.model_validate(product.category),
+        images=[ImageRead.model_validate(i) for i in product.images],
+        variants=variants,
+    )
