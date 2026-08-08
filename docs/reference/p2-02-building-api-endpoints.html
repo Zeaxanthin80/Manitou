@@ -1,0 +1,1504 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Building API Endpoints — Manitou Reference</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ground: #0e141b;
+        --surface: #161f29;
+        --surface-2: #1d2833;
+        --line: #2a3947;
+        --ink: #e6edf4;
+        --muted: #8496a6;
+        --client: #4db6e2;
+        --server: #d4a32c;
+        --safe: #8fa98b;
+        --risk: #d9775b;
+        --display: "Barlow Condensed", system-ui, sans-serif;
+        --body: "IBM Plex Sans", system-ui, sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+        font-family: var(--body);
+        font-size: 16px;
+        line-height: 1.65;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 24px 96px;
+      }
+
+      .masthead {
+        padding: 72px 0 40px;
+        border-bottom: 1px solid var(--line);
+      }
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 18px;
+      }
+      h1 {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: clamp(44px, 8vw, 86px);
+        line-height: 0.92;
+        letter-spacing: -0.01em;
+        margin: 0 0 20px;
+        text-transform: uppercase;
+      }
+      .standfirst {
+        max-width: 64ch;
+        color: var(--muted);
+        font-size: 17px;
+        margin: 0;
+      }
+      .standfirst strong {
+        color: var(--ink);
+        font-weight: 500;
+      }
+
+      .toc {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: rgba(14, 20, 27, 0.92);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 2px;
+        overflow-x: auto;
+        padding: 10px 0;
+        margin-bottom: -1px;
+      }
+      .toc a {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-decoration: none;
+        padding: 6px 12px;
+        border-radius: 2px;
+        white-space: nowrap;
+      }
+      .toc a:hover,
+      .toc a:focus-visible {
+        color: var(--ink);
+        background: var(--surface-2);
+      }
+      .toc a.on {
+        color: var(--ink);
+        background: var(--surface-2);
+      }
+
+      section {
+        padding: 64px 0 0;
+        scroll-margin-top: 20px;
+      }
+      .sec-head {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        margin: 0 0 8px;
+      }
+      .sec-num {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        padding: 3px 8px;
+        border-radius: 2px;
+        flex: none;
+      }
+      h2 {
+        font-family: var(--display);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: clamp(26px, 4vw, 38px);
+        line-height: 1.05;
+        letter-spacing: 0.01em;
+        margin: 0;
+      }
+      h3 {
+        font-family: var(--display);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 17px;
+        margin: 36px 0 12px;
+      }
+      .lede {
+        max-width: 68ch;
+        color: var(--muted);
+        margin: 14px 0 0;
+      }
+      p {
+        max-width: 70ch;
+      }
+      code {
+        font-family: var(--mono);
+        font-size: 0.88em;
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        padding: 1px 5px;
+        border-radius: 2px;
+        color: var(--ink);
+      }
+
+      pre {
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.7;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        padding: 16px 18px;
+        margin: 20px 0;
+        overflow-x: auto;
+        color: var(--ink);
+      }
+      pre.flow {
+        color: var(--muted);
+        white-space: pre;
+        font-size: 12.5px;
+      }
+      pre b {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .c-client {
+        color: var(--client);
+      }
+      .c-server {
+        color: var(--server);
+      }
+      .c-safe {
+        color: var(--safe);
+      }
+      .c-risk {
+        color: var(--risk);
+      }
+      .c-muted {
+        color: var(--muted);
+      }
+
+      .callout {
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--client);
+        background: var(--surface);
+        padding: 18px 22px;
+        margin: 26px 0;
+        border-radius: 2px;
+      }
+      .callout.warn {
+        border-left-color: var(--risk);
+      }
+      .callout.good {
+        border-left-color: var(--safe);
+      }
+      .callout .k {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        display: block;
+        margin-bottom: 8px;
+      }
+      .callout p {
+        margin: 0;
+        max-width: 72ch;
+      }
+      .callout p + p {
+        margin-top: 12px;
+      }
+
+      .tbl {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 24px 0;
+        font-size: 15px;
+      }
+      .tbl th {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-align: left;
+        padding: 0 16px 10px 0;
+        border-bottom: 1px solid var(--line);
+        font-weight: 400;
+      }
+      .tbl td {
+        padding: 13px 16px 13px 0;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      .tbl tr:last-child td {
+        border-bottom: none;
+      }
+      .tbl .m {
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--ink);
+      }
+      .yes {
+        color: #a8c7a3 !important;
+      }
+      .no {
+        color: #e89478 !important;
+      }
+
+      /* URL anatomy — signature element */
+      .urlbox {
+        border: 1px solid var(--line);
+        background: var(--surface);
+        border-radius: 2px;
+        padding: 26px 24px;
+        margin: 24px 0;
+      }
+      .urlstr {
+        font-family: var(--mono);
+        font-size: clamp(13px, 2.2vw, 17px);
+        word-break: break-all;
+        line-height: 2.2;
+        margin-bottom: 22px;
+      }
+      .urlstr .base {
+        color: var(--muted);
+      }
+      .urlstr .res {
+        color: var(--server);
+      }
+      .urlstr .pth {
+        color: var(--risk);
+      }
+      .urlstr .qry {
+        color: var(--client);
+      }
+      .urlparts {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+      .upart {
+        border-top: 2px solid;
+        padding-top: 12px;
+      }
+      .upart:nth-child(1) {
+        border-color: var(--server);
+      }
+      .upart:nth-child(2) {
+        border-color: var(--risk);
+      }
+      .upart:nth-child(3) {
+        border-color: var(--client);
+      }
+      .upart h4 {
+        font-family: var(--display);
+        text-transform: uppercase;
+        font-size: 15px;
+        letter-spacing: 0.05em;
+        margin: 0 0 6px;
+        font-weight: 600;
+      }
+      .upart p {
+        font-size: 13.5px;
+        color: var(--muted);
+        margin: 0;
+      }
+
+      /* layer stack */
+      .layers {
+        margin: 24px 0;
+        border-top: 1px solid var(--line);
+      }
+      .layer {
+        display: grid;
+        grid-template-columns: 92px 1fr;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface);
+      }
+      .layer:hover {
+        background: var(--surface-2);
+      }
+      .lname {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted);
+        padding: 18px 0 18px 16px;
+        border-right: 1px solid var(--line);
+      }
+      .lbody {
+        padding: 16px 20px;
+      }
+      .lbody h4 {
+        font-family: var(--display);
+        text-transform: uppercase;
+        font-size: 18px;
+        letter-spacing: 0.03em;
+        margin: 0 0 6px;
+        font-weight: 600;
+      }
+      .lbody p {
+        margin: 0;
+        font-size: 14.5px;
+        color: var(--muted);
+      }
+      .lbody .file {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--client);
+      }
+
+      footer {
+        margin-top: 80px;
+        padding-top: 24px;
+        border-top: 1px solid var(--line);
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--muted);
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      :focus-visible {
+        outline: 2px solid var(--client);
+        outline-offset: 2px;
+      }
+
+      @media (max-width: 760px) {
+        .masthead {
+          padding: 48px 0 32px;
+        }
+        .urlparts {
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+        .layer {
+          grid-template-columns: 64px 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="masthead">
+        <p class="eyebrow">Manitou · Phase 2, step 2 · Reference</p>
+        <h1>Building<br />Endpoints</h1>
+        <p class="standfirst">
+          Phase 2 asks you to hold five new domains at once — HTTP, REST,
+          SQLAlchemy loading, Pydantic, and async Python. This takes them
+          <strong>one at a time</strong>, in the order they appear in a single
+          request.
+        </p>
+        <div class="callout" style="margin-top: 28px">
+          <span class="k">Read this first</span>
+          <p>
+            The difficulty jump here is real and expected. Phase 0 was setup;
+            Phase 1 was one subject (SQL). Phase 2 is the first time several
+            unfamiliar things interact inside one file — which feels like not
+            understanding <em>any</em> of them.
+          </p>
+          <p>
+            <b>You do not need all of this before writing code.</b> Sections
+            00–05 are enough to build a working endpoint. Sections 06–09 explain
+            what Claude Code is doing when it optimises. Section 10 is the one
+            to read when someone suggests a CTE.
+          </p>
+        </div>
+      </header>
+
+      <nav class="toc" aria-label="Sections">
+        <a href="#cycle">Request cycle</a>
+        <a href="#endpoint">Endpoints</a>
+        <a href="#url">URL anatomy</a>
+        <a href="#status">Status codes</a>
+        <a href="#slug">Slugs</a>
+        <a href="#layers">The three layers</a>
+        <a href="#schemas">Schemas</a>
+        <a href="#loading">Loading</a>
+        <a href="#nplus1">N+1</a>
+        <a href="#paging">Pagination</a>
+        <a href="#cte">CTEs</a>
+        <a href="#worked">Worked example</a>
+        <a href="#glossary">Glossary</a>
+      </nav>
+
+      <section id="cycle">
+        <div class="sec-head">
+          <span class="sec-num">00</span>
+          <h2>The request cycle</h2>
+        </div>
+        <p class="lede">
+          Everything in Phase 2 is one of the steps below. When a piece of code
+          confuses you, the first useful question is
+          <b>"which step is this?"</b>
+        </p>
+        <pre
+          class="flow"
+        >  <span class="c-client">Browser / app</span>                         <span class="c-server">FastAPI</span>                    <span class="c-server">PostgreSQL</span>
+      │                                    │                             │
+      │  GET /products?limit=20            │                             │
+      ├───────────────────────────────────▶│                             │
+      │                                    │                             │
+      │                   <b>1. ROUTE</b>   match URL to a Python function      │
+      │                   <b>2. VALIDATE</b> parse + check inputs (Pydantic)    │
+      │                   <b>3. AUTH</b>     run any Depends() checks           │
+      │                                    │                             │
+      │                   <b>4. QUERY</b>    build SQL via SQLAlchemy           │
+      │                                    ├────────────────────────────▶│
+      │                                    │◀────────────────────────────┤
+      │                                    │  rows → Python objects      │
+      │                                    │                             │
+      │                   <b>5. SERIALISE</b> objects → JSON (Pydantic)         │
+      │                   <b>6. STATUS</b>    attach 200 / 404 / 422            │
+      │  200 OK  {"items": [...]}          │                             │
+      │◀───────────────────────────────────┤                             │</pre>
+        <p>
+          Six steps, and each has exactly one job. The overwhelm comes from
+          meeting all six in one file for the first time — not from any single
+          one being hard.
+        </p>
+      </section>
+
+      <section id="endpoint">
+        <div class="sec-head">
+          <span class="sec-num">01</span>
+          <h2>What an endpoint is</h2>
+        </div>
+        <p class="lede">
+          An <b>endpoint</b> is one URL paired with one HTTP method, handled by
+          one Python function. That's the whole definition.
+        </p>
+        <pre><span class="c-client">@router.get("/products")</span>              <span class="c-muted"># ← this line makes it an endpoint</span>
+<span class="c-server">async def</span> list_products():
+    <span class="c-server">return</span> [...]</pre>
+        <p>
+          The decorator tells FastAPI: "when a GET request arrives for
+          <code>/products</code>, call this function." Nothing more mysterious
+          than that.
+        </p>
+
+        <h3>Methods carry meaning</h3>
+        <p>
+          REST conventions assign each HTTP method a job. Following them means
+          any client developer can predict your API without reading docs.
+        </p>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width: 14%">Method</th>
+              <th style="width: 30%">Means</th>
+              <th>Manitou example</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="m">GET</td>
+              <td>Read. Never changes anything.</td>
+              <td><code>GET /products</code></td>
+            </tr>
+            <tr>
+              <td class="m">POST</td>
+              <td>Create something new.</td>
+              <td><code>POST /auth/register</code></td>
+            </tr>
+            <tr>
+              <td class="m">PATCH</td>
+              <td>Update part of something.</td>
+              <td><code>PATCH /admin/products/5</code></td>
+            </tr>
+            <tr>
+              <td class="m">PUT</td>
+              <td>Replace something entirely.</td>
+              <td>Rarely needed; PATCH usually fits better.</td>
+            </tr>
+            <tr>
+              <td class="m">DELETE</td>
+              <td>Remove something.</td>
+              <td><code>DELETE /cart/items/3</code></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          <span class="k">The rule that makes GET special</span>
+          <p>
+            A GET must never change data. Browsers, proxies, and CDNs all assume
+            this — they'll pre-fetch, cache, and retry GETs freely. An endpoint
+            like <code>GET /products/5/delete</code> is a genuine hazard: a
+            crawler following links would start deleting your catalogue.
+          </p>
+        </div>
+
+        <h3>Resources, not actions</h3>
+        <p>
+          URLs name <b>things</b> (nouns); methods supply the <b>verb</b>. This
+          is the single biggest shift if you're used to thinking in function
+          names.
+        </p>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width: 44%">Action-style (avoid)</th>
+              <th>Resource-style (correct)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="m no" style="width: 44%">GET /getAllProducts</td>
+              <td class="m yes">GET /products</td>
+            </tr>
+            <tr>
+              <td class="m no">POST /createProduct</td>
+              <td class="m yes">POST /products</td>
+            </tr>
+            <tr>
+              <td class="m no">GET /getProductById?id=5</td>
+              <td class="m yes">GET /products/5</td>
+            </tr>
+            <tr>
+              <td class="m no">POST /deleteProduct</td>
+              <td class="m yes">DELETE /products/5</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="url">
+        <div class="sec-head">
+          <span class="sec-num">02</span>
+          <h2>URL anatomy</h2>
+        </div>
+        <p class="lede">
+          Two ways to pass information in a URL, and they are not
+          interchangeable. Choosing wrongly is one of the most common early API
+          mistakes.
+        </p>
+
+        <div class="urlbox">
+          <div class="urlstr">
+            <span class="base">https://api.manitou.example</span
+            ><span class="res">/products</span
+            ><span class="pth">/classic-cotton-tee</span
+            ><span class="qry">?include=variants&amp;limit=20</span>
+          </div>
+          <div class="urlparts">
+            <div class="upart">
+              <h4>Resource path</h4>
+              <p>
+                Which collection. Plural noun, always. <code>/products</code>,
+                <code>/categories</code>, <code>/orders</code>.
+              </p>
+            </div>
+            <div class="upart">
+              <h4>Path parameter</h4>
+              <p>
+                <b>Identifies one specific thing.</b> Required — without it the
+                URL means something different. Declared as
+                <code>/products/{slug}</code>.
+              </p>
+            </div>
+            <div class="upart">
+              <h4>Query parameters</h4>
+              <p>
+                <b>Modifies how you view the collection.</b> Always optional,
+                always has a sensible default. Filtering, sorting, paging.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <p>
+          <b>The test:</b> if removing it would change <em>which</em> thing
+          you're asking for, it's a path parameter. If removing it just gives
+          you a broader or default view of the same thing, it's a query
+          parameter.
+        </p>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width: 34%">URL</th>
+              <th>Reading</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="m">/products</td>
+              <td>All products, default view</td>
+            </tr>
+            <tr>
+              <td class="m">/products/classic-cotton-tee</td>
+              <td>One specific product</td>
+            </tr>
+            <tr>
+              <td class="m">/products?category=t-shirts</td>
+              <td>All products, filtered view</td>
+            </tr>
+            <tr>
+              <td class="m">/products?limit=20&amp;offset=40</td>
+              <td>All products, third page of 20</td>
+            </tr>
+            <tr>
+              <td class="m">/categories/t-shirts/products</td>
+              <td>Products belonging to one category — a nested resource</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          In FastAPI the distinction is automatic: a name that appears in the
+          route string becomes a path parameter, and any other function argument
+          becomes a query parameter.
+        </p>
+        <pre><span class="c-client">@router.get("/products/{slug}")</span>
+<span class="c-server">async def</span> get_product(
+    slug: str,                       <span class="c-muted"># in the path → path parameter</span>
+    include_variants: bool = True,   <span class="c-muted"># not in path → query parameter, optional</span>
+):</pre>
+      </section>
+
+      <section id="status">
+        <div class="sec-head">
+          <span class="sec-num">03</span>
+          <h2>Status codes</h2>
+        </div>
+        <p class="lede">
+          A three-digit number telling the client what happened, before it reads
+          a single byte of the body. Clients branch on this, so getting it right
+          is functional, not cosmetic.
+        </p>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width: 9%">Code</th>
+              <th style="width: 24%">Name</th>
+              <th>When Manitou returns it</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="m yes">200</td>
+              <td>OK</td>
+              <td>Successful GET, PATCH, or DELETE. The default success.</td>
+            </tr>
+            <tr>
+              <td class="m yes">201</td>
+              <td>Created</td>
+              <td>A POST made something new — registration, an order.</td>
+            </tr>
+            <tr>
+              <td class="m yes">204</td>
+              <td>No Content</td>
+              <td>Succeeded, nothing to return. Common for DELETE.</td>
+            </tr>
+            <tr>
+              <td class="m no">400</td>
+              <td>Bad Request</td>
+              <td>Malformed in a way validation didn't cover.</td>
+            </tr>
+            <tr>
+              <td class="m no">401</td>
+              <td>Unauthorized</td>
+              <td>Not authenticated — missing or invalid token.</td>
+            </tr>
+            <tr>
+              <td class="m no">403</td>
+              <td>Forbidden</td>
+              <td>Authenticated, but the role isn't permitted.</td>
+            </tr>
+            <tr>
+              <td class="m no">404</td>
+              <td>Not Found</td>
+              <td>That slug or id doesn't exist.</td>
+            </tr>
+            <tr>
+              <td class="m no">409</td>
+              <td>Conflict</td>
+              <td>
+                Clashes with existing state — duplicate email, duplicate slug.
+              </td>
+            </tr>
+            <tr>
+              <td class="m no">422</td>
+              <td>Unprocessable</td>
+              <td>
+                <b>FastAPI's automatic validation failure.</b> Wrong type,
+                missing required field, failed constraint.
+              </td>
+            </tr>
+            <tr>
+              <td class="m no">500</td>
+              <td>Server Error</td>
+              <td>
+                Your code crashed. Always a bug, never the client's fault.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          <span class="k">The 4xx / 5xx split</span>
+          <p>
+            <b>4xx means the client did something wrong</b> — bad input, missing
+            auth, asking for something absent.
+            <b>5xx means the server did something wrong.</b> If a malformed
+            request produces a 500, that's a bug in your error handling: it
+            should have been a 400 or 422.
+          </p>
+        </div>
+        <div class="callout good">
+          <span class="k">404 vs 200 with an empty list</span>
+          <p>This trips people up constantly, and the rule is clean:</p>
+          <p>
+            <code>GET /products/no-such-slug</code> → <b>404</b>. You asked for
+            one specific thing; it doesn't exist.<br />
+            <code>GET /products?category=empty-cat</code> → <b>200</b> with
+            <code>[]</code>. You asked for a collection matching a filter; the
+            collection is legitimately empty.
+            <b>An empty result is not an error.</b>
+          </p>
+          <p>
+            Your Apparel category from the SQL exercises is exactly this case —
+            it has no products, and asking for them is a successful request that
+            returns nothing.
+          </p>
+        </div>
+      </section>
+
+      <section id="slug">
+        <div class="sec-head">
+          <span class="sec-num">04</span>
+          <h2>Slugs</h2>
+        </div>
+        <p class="lede">
+          A URL-safe text identifier: lowercase, words joined by hyphens, no
+          spaces or punctuation. You already have them —
+          <code>classic-cotton-tee</code>, <code>t-shirts</code>.
+        </p>
+        <pre>Product name:  <span class="c-muted">"Classic Cotton Tee"</span>
+Slug:          <span class="c-safe">"classic-cotton-tee"</span>
+
+  /products/5                     <span class="c-muted">← works, tells nobody anything</span>
+  /products/classic-cotton-tee    <span class="c-safe">← works, and is readable</span></pre>
+
+        <h3>Why they exist</h3>
+        <table class="tbl">
+          <tbody>
+            <tr>
+              <td class="m" style="width: 150px">Readability</td>
+              <td>
+                A person can tell what the link points at before clicking.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">SEO</td>
+              <td>
+                Search engines weigh words in URLs. For a store, this is a real
+                commercial reason — and part of why Section 3 chose Next.js for
+                server rendering.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Stability</td>
+              <td>
+                Database ids are an internal implementation detail. Slugs are a
+                deliberate public contract.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">No enumeration</td>
+              <td>
+                Sequential ids let anyone walk <code>/products/1</code>,
+                <code>2</code>, <code>3</code> and count your catalogue. Slugs
+                don't invite that.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="callout warn">
+          <span class="k">The trap: slugs are mutable, ids are not</span>
+          <p>
+            If the owner renames "Classic Cotton Tee" to "Classic Tee," should
+            the slug change? If yes, every existing link and bookmark breaks. If
+            no, the slug slowly stops matching the name.
+          </p>
+          <p>
+            The usual answer:
+            <b>generate the slug once at creation, then leave it alone.</b>
+            Renaming the product does not regenerate it. If a slug genuinely
+            must change, keep the old one as a redirect. This is a real decision
+            for Phase 4's product editor — worth settling deliberately rather
+            than discovering later.
+          </p>
+        </div>
+        <p>
+          Note your schema already enforces this properly:
+          <code>products.slug</code> carries a unique constraint from Section
+          6.5, so two products can never collide on one. When generating slugs
+          from names, that collision is a real case to handle — two products
+          called "Tote Bag" need <code>tote-bag</code> and
+          <code>tote-bag-2</code>.
+        </p>
+      </section>
+
+      <section id="layers">
+        <div class="sec-head">
+          <span class="sec-num">05</span>
+          <h2>The three layers</h2>
+        </div>
+        <p class="lede">
+          The folder structure from Section 4 of PROJECT_PLAN.md isn't
+          arbitrary. Each layer has one job, and knowing which layer you're in
+          tells you what belongs there.
+        </p>
+
+        <div class="layers">
+          <div class="layer">
+            <div class="lname">HTTP</div>
+            <div class="lbody">
+              <h4>Router</h4>
+              <p class="file">app/routers/products.py</p>
+              <p>
+                Owns URLs, methods, status codes, and auth dependencies. Should
+                be <b>thin</b> — it translates HTTP into a function call and
+                translates the result back. No business rules, no SQL.
+              </p>
+            </div>
+          </div>
+          <div class="layer">
+            <div class="lname">LOGIC</div>
+            <div class="lbody">
+              <h4>Service</h4>
+              <p class="file">app/services/products.py</p>
+              <p>
+                Owns the actual work: querying, filtering, calculating. Knows
+                nothing about HTTP — no status codes, no request objects. This
+                is what makes checkout testable in isolation later.
+              </p>
+            </div>
+          </div>
+          <div class="layer">
+            <div class="lname">DATA</div>
+            <div class="lbody">
+              <h4>Model</h4>
+              <p class="file">app/models/product.py</p>
+              <p>
+                The SQLAlchemy classes mapping to tables. Structure and
+                relationships only — the tables you already inspected with
+                <code>\d products</code>.
+              </p>
+            </div>
+          </div>
+          <div class="layer">
+            <div class="lname">CONTRACT</div>
+            <div class="lbody">
+              <h4>Schema</h4>
+              <p class="file">app/schemas/product.py</p>
+              <p>
+                Pydantic classes defining what the API accepts and returns. Sits
+                alongside the others rather than under them — see section 06.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout good">
+          <span class="k">A practical way to use this</span>
+          <p>
+            When Claude Code produces a file and you're lost, ask
+            <b>"which layer is this, and what's its one job?"</b> A router file
+            doing SQL, or a service raising <code>HTTPException</code>, is a
+            sign the layers have bled together — which is worth pushing back on,
+            because that's exactly what makes code hard to follow.
+          </p>
+        </div>
+      </section>
+
+      <section id="schemas">
+        <div class="sec-head">
+          <span class="sec-num">06</span>
+          <h2>Models vs schemas</h2>
+        </div>
+        <p class="lede">
+          The distinction that confuses almost everyone at this point: you now
+          have <b>two</b> classes that both look like "a product."
+        </p>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width: 24%"></th>
+              <th>SQLAlchemy model</th>
+              <th>Pydantic schema</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="m">Describes</td>
+              <td>A database table</td>
+              <td>A JSON shape</td>
+            </tr>
+            <tr>
+              <td class="m">Lives in</td>
+              <td><code>models/</code></td>
+              <td><code>schemas/</code></td>
+            </tr>
+            <tr>
+              <td class="m">Job</td>
+              <td>Read and write rows</td>
+              <td>Validate input, shape output</td>
+            </tr>
+            <tr>
+              <td class="m">Contains</td>
+              <td>Every column</td>
+              <td>Only fields the API should expose</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          They're separate on purpose. The model has columns the outside world
+          must never see — most obviously <code>users.password_hash</code>. If
+          your endpoint returned model objects directly, that hash would go out
+          over the wire. The schema is what stops it, structurally rather than
+          by remembering.
+        </p>
+        <pre><span class="c-muted"># schemas/product.py</span>
+<span class="c-server">class</span> ProductOut(BaseModel):
+    id: int
+    name: str
+    slug: str
+    base_price: Decimal
+    <span class="c-muted"># description, is_active, created_at deliberately omitted</span>
+
+    model_config = ConfigDict(from_attributes=<span class="c-server">True</span>)  <span class="c-muted"># read from ORM objects</span></pre>
+        <p>
+          Declaring <code>response_model=ProductOut</code> on the route makes
+          FastAPI enforce it: anything not in the schema is stripped from the
+          response, whether you remembered or not. It also documents itself in
+          <code>/docs</code> automatically.
+        </p>
+        <div class="callout">
+          <span class="k"
+            >Why there are usually three schemas per resource</span
+          >
+          <p>
+            <code>ProductCreate</code> (what a POST accepts),
+            <code>ProductUpdate</code> (what a PATCH accepts — all fields
+            optional), and <code>ProductOut</code> (what gets returned). They
+            differ genuinely: a client must not send <code>id</code> or
+            <code>created_at</code>, but the response should include them.
+          </p>
+        </div>
+      </section>
+
+      <section id="loading">
+        <div class="sec-head">
+          <span class="sec-num">07</span>
+          <h2>How relationships load</h2>
+        </div>
+        <p class="lede">
+          Your model says a product <em>has</em> variants. The question
+          SQLAlchemy has to answer is <b>when</b> to fetch them — and the
+          default answer causes the problem in the next section.
+        </p>
+        <pre><span class="c-muted"># This line does not run a query. It defines a relationship.</span>
+<span class="c-server">class</span> Product(Base):
+    variants = relationship("ProductVariant", back_populates="product")</pre>
+        <p>
+          By default this is <b>lazy</b>: the variants are fetched only when you
+          first touch <code>product.variants</code>, in a separate query, at
+          that moment. Convenient in a script; disastrous in a loop.
+        </p>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width: 22%">Strategy</th>
+              <th>Behaviour</th>
+              <th>Use when</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="m">lazy (default)</td>
+              <td>One extra query, on first access, per parent object.</td>
+              <td>
+                You touch a single object and might not need the relationship at
+                all.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">selectinload</td>
+              <td>
+                Two queries total: parents, then all children in one
+                <code>WHERE id IN (...)</code>.
+              </td>
+              <td class="yes">
+                <b>The usual right answer</b> for lists — clean and predictable.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">joinedload</td>
+              <td>
+                One query with a JOIN; parent columns repeat per child row.
+              </td>
+              <td>
+                Fetching one object with a small related set. Wasteful across a
+                big list.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="nplus1">
+        <div class="sec-head">
+          <span class="sec-num">08</span>
+          <h2>The N+1 problem</h2>
+        </div>
+        <p class="lede">
+          The most common performance bug in ORM code, and the one Claude Code
+          was almost certainly guarding against. The code looks completely
+          innocent.
+        </p>
+
+        <pre><span class="c-risk">products = session.query(Product).all()</span>        <span class="c-muted"># 1 query</span>
+<span class="c-server">for</span> p <span class="c-server">in</span> products:
+    <span class="c-risk">print(p.variants)</span>                          <span class="c-muted"># 1 query — EACH TIME ROUND</span></pre>
+
+        <pre class="flow"><b>WITHOUT eager loading — your 3 seeded products</b>
+
+  SELECT * FROM products;                                  <span class="c-muted">← 1</span>
+    SELECT * FROM product_variants WHERE product_id = 1;   <span class="c-risk">← +1</span>
+    SELECT * FROM product_variants WHERE product_id = 2;   <span class="c-risk">← +1</span>
+    SELECT * FROM product_variants WHERE product_id = 3;   <span class="c-risk">← +1</span>
+                                                    <b>total: 4 queries</b>
+
+  With 200 products:                               <b>total: 201 queries</b>
+  ────────────────────────────────────────────────────────────────────
+<b>WITH selectinload(Product.variants)</b>
+
+  SELECT * FROM products;                                  <span class="c-muted">← 1</span>
+  SELECT * FROM product_variants WHERE product_id IN (1,2,3);  <span class="c-safe">← 1</span>
+                                                    <b>total: 2 queries</b>
+
+  With 200 products:                                 <b>total: 2 queries</b></pre>
+
+        <p>
+          "N+1" is literal: one query for the parents, plus N more — one per
+          parent. The fix is to tell SQLAlchemy up front that you'll need the
+          children:
+        </p>
+        <pre><span class="c-server">from</span> sqlalchemy.orm <span class="c-server">import</span> selectinload
+
+products = session.scalars(
+    select(Product).options(<span class="c-safe">selectinload(Product.variants)</span>)
+).all()</pre>
+
+        <div class="callout warn">
+          <span class="k">Why it hides so well</span>
+          <p>
+            Nothing errors. Nothing looks wrong. With your 3 seeded products
+            it's 4 queries instead of 2 — imperceptible. The bug only surfaces
+            in production with a real catalogue, as a page that mysteriously
+            takes four seconds.
+          </p>
+          <p>
+            This is the tradeoff of an ORM, stated plainly: it hides SQL so well
+            that you can write hundreds of queries without noticing. That's
+            exactly why turning on <code>echo=True</code> and
+            <em>watching</em> the SQL is worth doing early.
+          </p>
+        </div>
+        <div class="callout good">
+          <span class="k">Try it yourself</span>
+          <p>
+            Set <code>echo=True</code> on your engine, hit the product-list
+            endpoint, and count the <code>SELECT</code> statements in your
+            terminal. Then add <code>selectinload</code> and count again. Seeing
+            4 drop to 2 makes this concrete in a way no explanation does.
+          </p>
+        </div>
+      </section>
+
+      <section id="paging">
+        <div class="sec-head">
+          <span class="sec-num">09</span>
+          <h2>Pagination and filtering</h2>
+        </div>
+        <p class="lede">
+          A product list endpoint must never return the whole table. With 3 rows
+          that feels absurd; the habit is what matters.
+        </p>
+        <pre>
+GET /products?limit=20&amp;offset=40&amp;category=t-shirts&amp;sort=price_asc</pre
+        >
+        <table class="tbl">
+          <tbody>
+            <tr>
+              <td class="m" style="width: 130px">limit</td>
+              <td>
+                How many rows. <b>Always give it a default and a maximum</b> —
+                otherwise <code>?limit=1000000</code> is a free
+                denial-of-service.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">offset</td>
+              <td>How many to skip. Page 3 of 20 is <code>offset=40</code>.</td>
+            </tr>
+            <tr>
+              <td class="m">category</td>
+              <td>Optional filter. Absent means no filtering, not an error.</td>
+            </tr>
+            <tr>
+              <td class="m">sort</td>
+              <td>
+                Validate against a fixed allowed list — never interpolate it
+                into SQL.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          Return the total alongside the page, so a client can render "page 3 of
+          12" without guessing:
+        </p>
+        <pre>
+{
+  "items": [ ... 20 products ... ],
+  "total": 237,
+  "limit": 20,
+  "offset": 40
+}</pre
+        >
+        <div class="callout">
+          <span class="k">ORDER BY is not optional here</span>
+          <p>
+            From the SQL exercises: without <code>ORDER BY</code>, PostgreSQL
+            makes no guarantee about row order. With pagination that becomes a
+            visible bug — the same product can appear on page 1 and page 2,
+            while another never appears at all.
+            <b>Any paginated query needs a deterministic sort</b>, ideally
+            ending in a unique tiebreaker like <code>id</code>.
+          </p>
+        </div>
+      </section>
+
+      <section id="cte">
+        <div class="sec-head">
+          <span class="sec-num">10</span>
+          <h2>CTEs — and whether you need one</h2>
+        </div>
+        <p class="lede">
+          A Common Table Expression is a named temporary result set defined at
+          the top of a query with <code>WITH</code>. Two distinct uses, and only
+          one of them is advanced.
+        </p>
+        <pre><span class="c-server">WITH</span> low_stock <span class="c-server">AS</span> (
+    SELECT variant_id, quantity_available
+    FROM inventory
+    WHERE quantity_available &lt; 10
+)
+SELECT v.sku, l.quantity_available
+FROM low_stock l
+JOIN product_variants v ON v.id = l.variant_id;</pre>
+        <p>
+          That's the plain use: a named subquery, purely for readability. It
+          does nothing a nested subquery couldn't, it just reads better when a
+          query gets long.
+        </p>
+
+        <h3>Recursive CTEs — the actually-advanced version</h3>
+        <p>
+          A <code>WITH RECURSIVE</code> CTE can walk a tree of unknown depth —
+          the tool for "give me this category and every descendant, however deep
+          the nesting goes." That's a genuine capability plain SQL lacks, and
+          it's why CTEs get raised alongside category hierarchies.
+        </p>
+
+        <div class="callout warn">
+          <span class="k">Push back on this one</span>
+          <p>
+            Your category tree is <b>three rows, two levels deep</b>: Apparel,
+            with T-Shirts and Accessories beneath it. Recursion solves a problem
+            you do not have.
+          </p>
+          <p>
+            A recursive CTE for that is exactly the "generalize ahead of need"
+            pattern <code>CLAUDE.md</code> rules out. A plain self-join —
+            <b
+              >exercise 18 in your SQL workbook, which you have already
+              written</b
+            >
+            — returns the same result and is code you can read.
+          </p>
+          <p>
+            Worth asking Claude Code directly:
+            <i
+              >"Given we have 3 categories and 2 levels, is a recursive CTE
+              necessary for step 2, or does a self-join cover it?"</i
+            >
+            If the honest answer is that recursion is for arbitrary depth we
+            don't have, that's a chunk of complexity you can drop today and add
+            the day a store actually needs five-level nesting.
+          </p>
+        </div>
+        <p>
+          <b>Not knowing CTEs is not blocking you.</b> They're a
+          query-readability tool, and the recursive form solves a structural
+          problem your data doesn't currently have. File it under "understood,
+          deferred."
+        </p>
+      </section>
+
+      <section id="worked">
+        <div class="sec-head">
+          <span class="sec-num">11</span>
+          <h2>A worked endpoint</h2>
+        </div>
+        <p class="lede">
+          Every concept above, in one small function. Read it once now; it'll
+          make more sense after you've written your own.
+        </p>
+        <pre><span class="c-muted"># app/routers/products.py</span>
+
+<span class="c-client">@router.get(</span>
+    <span class="c-client">"/products/{slug}"</span>,          <span class="c-muted"># ← §02 path parameter</span>
+    response_model=ProductOut,      <span class="c-muted"># ← §06 output contract</span>
+<span class="c-client">)</span>
+<span class="c-server">async def</span> get_product(
+    slug: str,                      <span class="c-muted"># ← path param, required</span>
+    session: Session = Depends(get_session),
+):
+    product = products_service.get_by_slug(session, slug)   <span class="c-muted"># ← §05 thin router</span>
+
+    <span class="c-server">if</span> product <span class="c-server">is None</span>:
+        <span class="c-server">raise</span> HTTPException(<span class="c-risk">404</span>, "Product not found")   <span class="c-muted"># ← §03 one thing, absent</span>
+
+    <span class="c-server">return</span> product          <span class="c-muted"># ← §06 Pydantic strips anything not in ProductOut</span>
+
+
+<span class="c-muted"># app/services/products.py — knows nothing about HTTP</span>
+
+<span class="c-server">def</span> get_by_slug(session: Session, slug: str) -> Product | <span class="c-server">None</span>:
+    stmt = (
+        select(Product)
+        .where(Product.slug == slug, Product.is_active.is_(<span class="c-server">True</span>))
+        .options(<span class="c-safe">selectinload(Product.variants)</span>)    <span class="c-muted"># ← §08 avoids N+1</span>
+    )
+    <span class="c-server">return</span> session.scalars(stmt).first()</pre>
+        <p>
+          Eleven lines of router, six of service. The router speaks HTTP and
+          nothing else; the service speaks the database and nothing else. Every
+          concept in this document appears exactly once.
+        </p>
+        <div class="callout good">
+          <span class="k">How to work through step 2</span>
+          <p>
+            <b>Build one endpoint end to end before starting the next.</b> Get
+            <code>GET /products/{slug}</code> working, test it in
+            <code>/docs</code>, and understand every line of it. The second
+            endpoint reuses 80% of the same shapes, and the fifth is nearly
+            mechanical.
+          </p>
+          <p>
+            Trying to understand all of step 2 at once is what makes it feel
+            impossible. Trying to understand one endpoint is a normal afternoon.
+          </p>
+        </div>
+      </section>
+
+      <section id="glossary">
+        <div class="sec-head">
+          <span class="sec-num">12</span>
+          <h2>Glossary</h2>
+        </div>
+        <table class="tbl">
+          <tbody>
+            <tr>
+              <td class="m" style="width: 220px">Endpoint</td>
+              <td>One URL + one HTTP method, handled by one function.</td>
+            </tr>
+            <tr>
+              <td class="m">Route / path operation</td>
+              <td>FastAPI's terms for the same thing.</td>
+            </tr>
+            <tr>
+              <td class="m">Router</td>
+              <td>A group of related endpoints in one file.</td>
+            </tr>
+            <tr>
+              <td class="m">REST</td>
+              <td>
+                Representational State Transfer — the convention of URLs as
+                nouns and HTTP methods as verbs.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Resource</td>
+              <td>A thing the API exposes: a product, an order, a category.</td>
+            </tr>
+            <tr>
+              <td class="m">Path parameter</td>
+              <td>
+                Required value inside the URL path, identifying one specific
+                thing.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Query parameter</td>
+              <td>Optional value after <code>?</code>, modifying the view.</td>
+            </tr>
+            <tr>
+              <td class="m">Slug</td>
+              <td>Lowercase hyphenated URL-safe identifier.</td>
+            </tr>
+            <tr>
+              <td class="m">Serialisation</td>
+              <td>Turning Python objects into JSON.</td>
+            </tr>
+            <tr>
+              <td class="m">Schema (Pydantic)</td>
+              <td>A class defining an accepted or returned JSON shape.</td>
+            </tr>
+            <tr>
+              <td class="m">Model (SQLAlchemy)</td>
+              <td>A class mapping to a database table.</td>
+            </tr>
+            <tr>
+              <td class="m">ORM</td>
+              <td>
+                Object-Relational Mapper — SQLAlchemy, translating objects to
+                SQL.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Lazy loading</td>
+              <td>Fetching a relationship only when first accessed.</td>
+            </tr>
+            <tr>
+              <td class="m">Eager loading</td>
+              <td>Fetching a relationship up front, deliberately.</td>
+            </tr>
+            <tr>
+              <td class="m">N+1 problem</td>
+              <td>
+                One query for parents plus one per parent, from lazy loading in
+                a loop.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">selectinload / joinedload</td>
+              <td>SQLAlchemy's two main eager-loading strategies.</td>
+            </tr>
+            <tr>
+              <td class="m">Pagination</td>
+              <td>Returning a bounded slice of a collection.</td>
+            </tr>
+            <tr>
+              <td class="m">CTE</td>
+              <td>
+                Common Table Expression — a named temporary result set via
+                <code>WITH</code>.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Recursive CTE</td>
+              <td>
+                A CTE that references itself, for walking trees of unknown
+                depth.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Dependency injection</td>
+              <td>
+                FastAPI's <code>Depends()</code> — declaring what a route needs
+                and letting the framework supply it.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Idempotent</td>
+              <td>
+                Repeating the request has the same effect as doing it once. GET,
+                PUT, and DELETE should be; POST usually isn't.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <footer>
+        <span>Manitou — building API endpoints</span>
+        <span>Companion to PROJECT_PLAN.md §5, Phase 2</span>
+      </footer>
+    </div>
+
+    <script>
+      (function () {
+        var links = Array.prototype.slice.call(
+          document.querySelectorAll(".toc a"),
+        );
+        var sections = links.map(function (a) {
+          return document.querySelector(a.getAttribute("href"));
+        });
+        function sync() {
+          var pos = window.scrollY + 130,
+            idx = 0;
+          for (var i = 0; i < sections.length; i++) {
+            if (sections[i] && sections[i].offsetTop <= pos) idx = i;
+          }
+          links.forEach(function (a, i) {
+            a.classList.toggle("on", i === idx);
+          });
+        }
+        var ticking = false;
+        window.addEventListener(
+          "scroll",
+          function () {
+            if (!ticking) {
+              window.requestAnimationFrame(function () {
+                sync();
+                ticking = false;
+              });
+              ticking = true;
+            }
+          },
+          { passive: true },
+        );
+        sync();
+      })();
+    </script>
+  </body>
+</html>

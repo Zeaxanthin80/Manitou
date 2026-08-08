@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker &amp; PostgreSQL — Layer Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#0E141B;
+  --surface:#161F29;
+  --surface-2:#1D2833;
+  --line:#2A3947;
+  --ink:#E6EDF4;
+  --muted:#8496A6;
+  --docker:#4DB6E2;
+  --pg:#D4A32C;
+  --both:#8FA98B;
+  --display:"Barlow Condensed",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+body{
+  margin:0;background:var(--ground);color:var(--ink);
+  font-family:var(--body);font-size:16px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px 96px}
+
+/* ---------- masthead ---------- */
+.masthead{padding:72px 0 40px;border-bottom:1px solid var(--line)}
+.eyebrow{
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 18px;
+}
+h1{
+  font-family:var(--display);font-weight:700;font-size:clamp(44px,8vw,86px);
+  line-height:.92;letter-spacing:-.01em;margin:0 0 20px;text-transform:uppercase;
+}
+h1 .sep{color:var(--muted);font-weight:500}
+.standfirst{max-width:62ch;color:var(--muted);font-size:17px;margin:0}
+.standfirst strong{color:var(--ink);font-weight:500}
+
+/* ---------- legend ---------- */
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin:28px 0 0}
+.tag{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:5px 10px;border:1px solid var(--line);border-radius:2px;color:var(--muted);
+  display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
+}
+.dot{width:7px;height:7px;border-radius:50%;flex:none}
+.dot.used{background:var(--both)}
+.dot.later{background:var(--pg)}
+.dot.no{background:var(--line);border:1px solid var(--muted)}
+
+/* ---------- section ---------- */
+section{padding:64px 0 0;scroll-margin-top:20px}
+.sec-head{display:flex;align-items:baseline;gap:16px;margin:0 0 8px}
+.sec-num{
+  font-family:var(--mono);font-size:12px;color:var(--muted);
+  border:1px solid var(--line);padding:3px 8px;border-radius:2px;flex:none;
+}
+h2{
+  font-family:var(--display);font-weight:600;text-transform:uppercase;
+  font-size:clamp(26px,4vw,38px);line-height:1.05;letter-spacing:.01em;margin:0;
+}
+.lede{max-width:66ch;color:var(--muted);margin:14px 0 0}
+h3{
+  font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+  font-size:17px;margin:40px 0 12px;color:var(--ink);
+}
+p{max-width:68ch}
+a{color:var(--docker)}
+strong{font-weight:600}
+code{
+  font-family:var(--mono);font-size:.88em;background:var(--surface-2);
+  border:1px solid var(--line);padding:1px 5px;border-radius:2px;color:var(--ink);
+}
+
+/* ---------- strata: the signature ---------- */
+.strata{margin:28px 0 0;border-top:1px solid var(--line)}
+.stratum{
+  display:grid;grid-template-columns:64px 1fr;gap:0;
+  border-bottom:1px solid var(--line);background:var(--surface);
+  transition:background .18s ease;
+}
+.stratum:hover,.stratum:focus-within{background:var(--surface-2)}
+.depth{
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  padding:20px 0 20px 16px;border-right:1px solid var(--line);
+  display:flex;flex-direction:column;gap:6px;align-items:flex-start;
+}
+.depth .rule{width:22px;height:1px;background:var(--line)}
+.stratum-body{padding:18px 20px}
+.stratum-top{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:8px}
+.name{
+  font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:.02em;
+  text-transform:uppercase;
+}
+.cmd{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.what{margin:0 0 10px;max-width:70ch}
+.rel{
+  margin:0;padding-left:14px;border-left:2px solid var(--line);
+  color:var(--muted);font-size:14.5px;max-width:70ch;
+}
+.rel b{color:var(--ink);font-weight:500}
+.status{
+  font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  padding:4px 8px;border-radius:2px;margin-left:auto;white-space:nowrap;
+}
+.status.used{color:var(--both);border:1px solid rgba(143,169,139,.4)}
+.status.later{color:var(--pg);border:1px solid rgba(212,163,44,.35)}
+.status.no{color:var(--muted);border:1px solid var(--line)}
+.d-docker .name{color:var(--docker)}
+.d-pg .name{color:var(--pg)}
+
+/* ---------- callout ---------- */
+.callout{
+  border:1px solid var(--line);border-left:3px solid var(--docker);
+  background:var(--surface);padding:20px 22px;margin:32px 0 0;border-radius:2px;
+}
+.callout.pg{border-left-color:var(--pg)}
+.callout .k{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);display:block;margin-bottom:8px;
+}
+.callout p{margin:0;max-width:70ch}
+.callout p + p{margin-top:12px}
+
+/* ---------- diagram ---------- */
+.diagram{
+  font-family:var(--mono);font-size:13px;line-height:1.85;color:var(--muted);
+  background:var(--surface);border:1px solid var(--line);border-radius:2px;
+  padding:22px;margin:26px 0 0;overflow-x:auto;white-space:pre;
+}
+.diagram b{color:var(--ink);font-weight:500}
+.diagram .c-docker{color:var(--docker)}
+.diagram .c-pg{color:var(--pg)}
+
+/* ---------- table ---------- */
+.tbl{width:100%;border-collapse:collapse;margin:24px 0 0;font-size:15px}
+.tbl th{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);text-align:left;padding:0 16px 10px 0;border-bottom:1px solid var(--line);
+  font-weight:400;
+}
+.tbl td{padding:14px 16px 14px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl tr:last-child td{border-bottom:none}
+.tbl .m{font-family:var(--mono);font-size:13px;color:var(--ink)}
+
+/* ---------- takeaway ---------- */
+.takeaway{
+  margin:56px 0 0;padding:28px 0 0;border-top:1px solid var(--line);
+}
+.takeaway .q{
+  font-family:var(--display);font-weight:600;text-transform:uppercase;
+  font-size:clamp(20px,3vw,27px);line-height:1.25;max-width:24ch;margin:0 0 6px;
+}
+.takeaway .split{display:grid;gap:28px;grid-template-columns:1fr 1fr}
+.takeaway .a{color:var(--muted);margin:0;font-size:15px}
+.k-docker .q{color:var(--docker)}
+.k-pg .q{color:var(--pg)}
+
+/* ---------- footer ---------- */
+footer{
+  margin-top:80px;padding-top:24px;border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:11.5px;color:var(--muted);
+  display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;
+}
+
+/* ---------- toc ---------- */
+.toc{
+  position:sticky;top:0;z-index:10;background:rgba(14,20,27,.92);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--line);
+  display:flex;gap:2px;overflow-x:auto;padding:10px 0;margin-bottom:-1px;
+}
+.toc a{
+  font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);text-decoration:none;padding:6px 12px;border-radius:2px;white-space:nowrap;
+}
+.toc a:hover,.toc a:focus-visible{color:var(--ink);background:var(--surface-2)}
+.toc a.on{color:var(--ink);background:var(--surface-2)}
+
+:focus-visible{outline:2px solid var(--docker);outline-offset:2px}
+
+@media (max-width:720px){
+  .stratum{grid-template-columns:44px 1fr}
+  .depth{padding:16px 0 16px 10px;font-size:10px}
+  .takeaway .split{grid-template-columns:1fr}
+  .status{margin-left:0}
+  .masthead{padding:48px 0 32px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Manitou · Working reference</p>
+    <h1>Docker <span class="sep">&amp;</span><br>PostgreSQL</h1>
+    <p class="standfirst">Two ecosystems, a pile of similar-sounding names. This maps each component to
+      <strong>what it actually is</strong> and <strong>what it sits on top of</strong> — plus whether you've
+      already used it, or it's still ahead of you.</p>
+    <div class="legend">
+      <span class="tag"><span class="dot used"></span>Already used</span>
+      <span class="tag"><span class="dot later"></span>Ahead of you</span>
+      <span class="tag"><span class="dot no"></span>Not needed here</span>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Sections">
+    <a href="#docker">Docker</a>
+    <a href="#docker-layers">Docker layers</a>
+    <a href="#descent">Chain of command</a>
+    <a href="#postgres">PostgreSQL</a>
+    <a href="#pg-layers">Postgres layers</a>
+    <a href="#together">Together</a>
+    <a href="#aws">Local → AWS</a>
+  </nav>
+
+  <section id="docker">
+    <div class="sec-head"><span class="sec-num">01</span><h2>What Docker solves</h2></div>
+    <p class="lede">"Works on my machine" used to be a real plague. You install PostgreSQL 14, a teammate has 16,
+      production runs 15 — each with slightly different config. Bugs appear only in certain environments, and setup
+      is pages of "install X, then Y, then hope."</p>
+    <p>Docker's idea: package an application together with its <strong>entire runtime environment</strong> — OS
+      libraries, dependencies, exact versions — into one portable unit that runs identically on your laptop, a
+      teammate's Windows machine, or an AWS server.</p>
+
+    <h3>Image vs. container</h3>
+    <p>The distinction that trips everyone up. An <strong>image</strong> is a frozen, read-only blueprint — like a
+      recipe, or a class in code. A <strong>container</strong> is a running instance of that image — the actual dish,
+      or an object instantiated from the class.</p>
+
+    <div class="callout">
+      <span class="k">You've already lived this</span>
+      <p><code>postgres:16-alpine</code> in your compose file is the <b>image</b> — a pre-built package Docker
+        downloads from Docker Hub. Running <code>docker compose up</code> started a <b>container</b> from it, which
+        is why <code>docker ps</code> shows a running process.</p>
+      <p>You could start five containers from that one image. Each would be an independent, isolated Postgres server.
+        You never "installed Postgres" in the traditional sense — you ran a known-good pre-built package.</p>
+    </div>
+
+    <h3>Three words worth knowing</h3>
+    <table class="tbl">
+      <tr>
+        <td class="m" style="width:150px">Dockerfile</td>
+        <td>Instructions for <em>building</em> a custom image. You'll write one in Phase 6 to package FastAPI. You
+          haven't needed one yet because Postgres ships a pre-built image.</td>
+      </tr>
+      <tr>
+        <td class="m">Volume</td>
+        <td>Persistent storage that survives the container being deleted. Exactly what <code>manitou_pgdata</code>
+          does — without it, removing the container would wipe every row you seeded.</td>
+      </tr>
+      <tr>
+        <td class="m">Registry</td>
+        <td>Where images are stored and distributed. Docker Hub is the public one; AWS ECR is the one you'll push
+          your own image to.</td>
+      </tr>
+    </table>
+  </section>
+
+  <section id="docker-layers">
+    <div class="sec-head"><span class="sec-num">02</span><h2>The Docker components</h2></div>
+    <p class="lede">Read top to bottom as "furthest from the metal" to "closest to it." Everything above the Engine
+      is ultimately a way of talking to the Engine.</p>
+
+    <div class="strata">
+      <article class="stratum d-docker">
+        <div class="depth"><span>L1</span><span class="rule"></span></div>
+        <div class="stratum-body">
+          <div class="stratum-top"><span class="name">Docker Desktop</span><span class="status used">Used</span></div>
+          <p class="what">A full application bundling Engine, CLI, Compose, and Buildx, plus a GUI — and on Mac and
+            Windows, a lightweight Linux VM, since those systems have no Linux kernel to run containers natively.</p>
+          <p class="rel">The "everything included" package. On Linux you don't strictly need it — Engine and CLI
+            install directly — but it's a common convenience layer, which is how <b>you have it on Ubuntu</b>.</p>
+        </div>
+      </article>
+
+      <article class="stratum d-docker">
+        <div class="depth"><span>L2</span><span class="rule"></span></div>
+        <div class="stratum-body">
+          <div class="stratum-top"><span class="name">Docker Compose</span><span class="cmd">docker compose</span><span class="status used">Used</span></div>
+          <p class="what">A CLI plugin that reads your YAML file and tells the Engine to start and stop
+            <em>multiple</em> containers together, on one machine.</p>
+          <p class="rel">Sits on top of the CLI and Engine — a coordinator, not a separate runtime. <b>Note the
+            space:</b> <code>docker compose</code> is the current V2 plugin. The hyphenated
+            <code>docker-compose</code> is the retired V1 standalone binary, which is why it wasn't found on your
+            machine.</p>
+        </div>
+      </article>
+
+      <article class="stratum d-docker">
+        <div class="depth"><span>L2</span><span class="rule"></span></div>
+        <div class="stratum-body">
+          <div class="stratum-top"><span class="name">Docker Build</span><span class="cmd">docker build · Buildx · BuildKit</span><span class="status later">Phase 6</span></div>
+          <p class="what">The subsystem that turns a Dockerfile into an image. <code>docker build</code> is the
+            command, BuildKit is the modern engine behind it, Buildx is the plugin adding features like
+            multi-platform builds.</p>
+          <p class="rel">You meet this when you <b>package your FastAPI app</b>. Untouched so far because Postgres's
+            image was already built for you.</p>
+        </div>
+      </article>
+
+      <article class="stratum d-docker">
+        <div class="depth"><span>L3</span><span class="rule"></span></div>
+        <div class="stratum-body">
+          <div class="stratum-top"><span class="name">Docker CLI</span><span class="cmd">docker</span><span class="status used">Used</span></div>
+          <p class="what">The command-line client that sends instructions to the Engine over an API.</p>
+          <p class="rel">What you type. It does <b>nothing on its own</b> without an Engine to talk to.</p>
+        </div>
+      </article>
+
+      <article class="stratum d-docker">
+        <div class="depth"><span>L4</span><span class="rule"></span></div>
+        <div class="stratum-body">
+          <div class="stratum-top"><span class="name">Docker Engine</span><span class="cmd">dockerd</span><span class="status used">Used</span></div>
+          <p class="what">The background daemon that actually builds, runs, and manages containers.</p>
+          <p class="rel">The bottom of the stack. <b>Everything else is a way of talking to this.</b></p>
+        </div>
+      </article>
+
+      <article class="stratum d-docker">
+        <div class="depth"><span>EXT</span><span class="rule"></span></div>
+        <div class="stratum-body">
+          <div class="stratum-top"><span class="name">Docker Hub</span><span class="status used">Used</span></div>
+          <p class="what">The public registry storing images — where <code>postgres:16-alpine</code> actually lives
+            and gets downloaded from.</p>
+          <p class="rel">A storage and distribution service, <b>unrelated to running anything</b>. Off to the side of
+            the stack, not part of it.</p>
+        </div>
+      </article>
+
+      <article class="stratum">
+        <div class="depth"><span>—</span><span class="rule"></span></div>
+        <div class="stratum-body">
+          <div class="stratum-top"><span class="name" style="color:var(--muted)">Kubernetes</span><span class="status no">Not needed</span></div>
+          <p class="what"><strong>Not a Docker product at all.</strong> A separate project, originally Google's, for
+            orchestrating containers across <em>many</em> machines — auto-scaling, self-healing, cluster load
+            balancing.</p>
+          <p class="rel">Compose orchestrates containers on <b>one</b> machine for local dev; Kubernetes orchestrates
+            across a fleet. They get conflated because Docker Desktop bundles an optional single-node Kubernetes.
+            <b>You won't need it</b> — AWS ECS Express Mode does that job for you, one level removed
+            (App Runner filled this role until it closed to new customers in April 2026).</p>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section id="descent">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Chain of command</h2></div>
+    <p class="lede">What happens between typing a command and a container existing.</p>
+    <div class="diagram"><b>You type a command</b>
+   │
+   ├─▶ <span class="c-docker">Docker CLI</span>  (or Compose, calling the CLI's API)
+        │
+        ├─▶ <span class="c-docker">Docker Engine</span>  (the daemon doing the actual work)
+             │
+             ├─▶ creates / runs a <b>container</b>, from an <b>image</b>
+                  │
+                  └─▶ image was either pulled from <span class="c-docker">Docker Hub</span>
+                      or built by you via <span class="c-docker">Docker Build</span></div>
+  </section>
+
+  <section id="postgres">
+    <div class="sec-head"><span class="sec-num">04</span><h2>What PostgreSQL is</h2></div>
+    <p class="lede">Docker is just the delivery mechanism. The actual thing running inside that container is
+      PostgreSQL — a relational database management system.</p>
+    <p><strong>"Relational"</strong> means data lives in tables of rows and columns, and tables reference each other
+      through keys — exactly what Section 6 of your plan describes. A <code>product_variants</code> row points at a
+      <code>products</code> row via <code>product_id</code>. The <em>relationships between tables</em> are as much
+      part of the design as the tables themselves.</p>
+
+    <h3>Why Postgres, out of the many options</h3>
+    <table class="tbl">
+      <tr>
+        <td class="m" style="width:190px">ACID transactions</td>
+        <td>A set of changes either all happen or none do. Exactly why checkout wraps "create order + decrement
+          inventory + record payment" in one transaction — if payment fails, you don't want a half-finished order
+          sitting in the database.</td>
+      </tr>
+      <tr>
+        <td class="m">Data integrity</td>
+        <td>Foreign keys, unique constraints, and not-null rules are enforced <em>by the database itself</em>, not
+          trusted to application code. If your API has a bug and inserts an order pointing at a nonexistent product,
+          Postgres refuses.</td>
+      </tr>
+      <tr>
+        <td class="m">JSONB</td>
+        <td>The flexible, semi-structured side — what <code>product_variants.attributes</code> uses so different
+          store types define their own variant dimensions without a schema change.</td>
+      </tr>
+      <tr>
+        <td class="m">Extensions</td>
+        <td>Optional modules that add capability to the server itself: PostGIS for geographic data,
+          <code>pg_stat_statements</code> for query performance. Not relevant yet — just know the server is
+          extensible beyond core SQL.</td>
+      </tr>
+    </table>
+  </section>
+
+  <section id="pg-layers">
+    <div class="sec-head"><span class="sec-num">05</span><h2>The PostgreSQL components</h2></div>
+    <p class="lede">Simpler than Docker: there's one server, and many ways to reach it. Everything below the server
+      is a client of some kind.</p>
+
+    <div class="strata">
+      <article class="stratum d-pg">
+        <div class="depth"><span>SRV</span><span class="rule"></span></div>
+        <div class="stratum-body">
+          <div class="stratum-top"><span class="name">PostgreSQL server</span><span class="cmd">the "backend" · postgres process</span><span class="status used">Used</span></div>
+          <p class="what">The actual database engine — stores data, enforces constraints, executes SQL.</p>
+          <p class="rel"><b>The one thing every client below connects to.</b> In your setup it's the process running
+            inside the <code>manitou_db</code> container, listening on port 5432.</p>
+        </div>
+      </article>
+
+      <article class="stratum d-pg">
+        <div class="depth"><span>CLI</span><span class="rule"></span></div>
+        <div class="stratum-body">
+          <div class="stratum-top"><span class="name">psql</span><span class="status used">Used</span></div>
+          <p class="what">The official command-line client — the one you installed via
+            <code>postgresql-client</code>.</p>
+          <p class="rel">A client, nothing more. Types SQL, gets answers back. <b>Deliberately not the full
+            <code>postgresql</code> package</b>, which would have started a second, competing server on port 5432.</p>
+        </div>
+      </article>
+
+      <article class="stratum d-pg">
+        <div class="depth"><span>GUI</span><span class="rule"></span></div>
+        <div class="stratum-body">
+          <div class="stratum-top"><span class="name">GUI clients</span><span class="cmd">pgAdmin · TablePlus · DBeaver</span><span class="status no">Optional</span></div>
+          <p class="what">Visual alternatives to typing raw SQL.</p>
+          <p class="rel">Also just clients — <b>same wire protocol as psql</b>, different interface.</p>
+        </div>
+      </article>
+
+      <article class="stratum d-pg">
+        <div class="depth"><span>DRV</span><span class="rule"></span></div>
+        <div class="stratum-body">
+          <div class="stratum-top"><span class="name">Driver</span><span class="cmd">psycopg2</span><span class="status used">Used</span></div>
+          <p class="what">The library your <em>application</em> calls to connect programmatically. Not interactive,
+            not for humans.</p>
+          <p class="rel">What SQLAlchemy uses under the hood to actually send SQL over the network. You installed it
+            but <b>will rarely import it directly</b>.</p>
+        </div>
+      </article>
+
+      <article class="stratum d-pg">
+        <div class="depth"><span>ORM</span><span class="rule"></span></div>
+        <div class="stratum-body">
+          <div class="stratum-top"><span class="name">SQLAlchemy</span><span class="status later">Phase 1</span></div>
+          <p class="what">A Python abstraction that lets you write model classes instead of raw SQL strings.</p>
+          <p class="rel">Sits on top of psycopg2 — <b>translates your models into SQL</b> and sends it via the
+            driver.</p>
+        </div>
+      </article>
+
+      <article class="stratum d-pg">
+        <div class="depth"><span>MIG</span><span class="rule"></span></div>
+        <div class="stratum-body">
+          <div class="stratum-top"><span class="name">Alembic</span><span class="status later">Phase 1</span></div>
+          <p class="what">Manages versioned schema changes — every new table, column, or index becomes a migration
+            file committed to Git.</p>
+          <p class="rel">Sits on top of SQLAlchemy specifically. <b>The reason your local schema and RDS schema stay
+            identical</b> in Phase 6.</p>
+        </div>
+      </article>
+    </div>
+
+    <div class="callout pg">
+      <span class="k">The key insight</span>
+      <p>psql, pgAdmin, psycopg2, and SQLAlchemy can all connect to the <b>same running server at the same
+        time</b>, because they all speak the same underlying wire protocol.</p>
+      <p>That's why you can have psql open in one terminal running queries by hand while your FastAPI app is
+        connected via SQLAlchemy — one Postgres process, many clients, no conflict.</p>
+    </div>
+  </section>
+
+  <section id="together">
+    <div class="sec-head"><span class="sec-num">06</span><h2>How they fit together</h2></div>
+    <p class="lede">Docker isn't part of PostgreSQL, and PostgreSQL isn't part of Docker. They're independent tools
+      that happen to compose well.</p>
+
+    <div class="diagram">Your laptop
+├── <span class="c-docker">Docker container</span> "manitou_db"
+│    └── <span class="c-pg">PostgreSQL server</span>, listening on port 5432
+│            ▲                                    ▲
+│            │                                    │
+├── <b>psql</b> ──────┘                                    │
+│    (you, typing SQL by hand)                     │
+│                                                  │
+└── <b>FastAPI app</b> (in your venv) ─── SQLAlchemy ── psycopg2 ──┘</div>
+
+    <div class="callout">
+      <span class="k">Where the boundary sits</span>
+      <p>Docker's job <b>ends</b> at "there is a Postgres server running and reachable on port 5432." What happens
+        inside — tables, rows, queries, constraints — is pure PostgreSQL, with zero Docker-specific behavior.</p>
+      <p>That's the whole value: the <b>exact same</b> Postgres, behaving the <b>exact same</b> way, whether it's
+        containerized on your laptop or a managed RDS instance. Nothing about your SQL, your SQLAlchemy models, or
+        your Alembic migrations needs to know Docker is involved.</p>
+    </div>
+
+    <div class="takeaway">
+      <div class="split">
+        <div class="k-docker">
+          <p class="q">How do I run this reliably, anywhere?</p>
+          <p class="a">Docker's question.</p>
+        </div>
+        <div class="k-pg">
+          <p class="q">How do I store and query structured data safely?</p>
+          <p class="a">PostgreSQL's question.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="aws">
+    <div class="sec-head"><span class="sec-num">07</span><h2>Local → AWS</h2></div>
+    <p class="lede">Which AWS service replaces which local piece, for when Phase 6 arrives.</p>
+    <table class="tbl">
+      <thead>
+        <tr><th>Local, now</th><th>AWS, Phase 6</th><th>Shared role</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="m">Docker Hub</td>
+          <td class="m">ECR</td>
+          <td>Where images live</td>
+        </tr>
+        <tr>
+          <td class="m">docker compose up</td>
+          <td class="m">ECS Express Mode</td>
+          <td>Runs the container</td>
+        </tr>
+        <tr>
+          <td class="m">Postgres in a container</td>
+          <td class="m">RDS</td>
+          <td>Runs the PostgreSQL server</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout pg">
+      <span class="k">The row worth sitting with</span>
+      <p><b>RDS is not a different database.</b> It's the identical PostgreSQL engine, with AWS handling patching,
+        backups, and uptime instead of Docker handling containerization.</p>
+      <p>Nothing about your schema, models, or migrations changes when you move from one to the other. That's the
+        point of Section 6.11 in the plan — and why developing locally against Docker is a faithful rehearsal for
+        production, not an approximation of it.</p>
+    </div>
+  </section>
+
+  <footer>
+    <span>Manitou — Docker &amp; PostgreSQL layer reference</span>
+    <span>Companion to PROJECT_PLAN.md</span>
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var sections = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+
+  function sync(){
+    var pos = window.scrollY + 120;
+    var idx = 0;
+    for (var i = 0; i < sections.length; i++){
+      if (sections[i] && sections[i].offsetTop <= pos) idx = i;
+    }
+    links.forEach(function(a, i){ a.classList.toggle('on', i === idx); });
+  }
+
+  var ticking = false;
+  window.addEventListener('scroll', function(){
+    if (!ticking){
+      window.requestAnimationFrame(function(){ sync(); ticking = false; });
+      ticking = true;
+    }
+  }, { passive: true });
+
+  sync();
+})();
+</script>
+</body>
+</html>

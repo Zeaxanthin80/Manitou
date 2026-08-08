@@ -166,6 +166,8 @@ Manitou/
 ├── design-tokens.json     # single source of truth for color, type, spacing (Section 4.3)
 ├── .gitignore             # excludes .venv/, __pycache__/, .env, node_modules/
 ├── docker-compose.yml     # local PostgreSQL for development
+├── docs/                  # project artifacts — ER diagram, per-phase build journals
+│   └── reference/         # HTML concept references and exercises, named p<phase>-<task>-
 ├── backend/               # FastAPI app
 │   ├── .venv/             # virtual environment — NEVER committed to Git
 │   ├── .env.example       # template of required env vars (safe to commit)

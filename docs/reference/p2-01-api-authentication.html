@@ -1,0 +1,1962 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>API Authentication — Manitou Reference</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ground: #0e141b;
+        --surface: #161f29;
+        --surface-2: #1d2833;
+        --line: #2a3947;
+        --ink: #e6edf4;
+        --muted: #8496a6;
+        --client: #4db6e2; /* cyan  — client side */
+        --server: #d4a32c; /* amber — server side */
+        --safe: #8fa98b; /* green — recommended */
+        --risk: #d9775b; /* clay  — hazard */
+        --display: "Barlow Condensed", system-ui, sans-serif;
+        --body: "IBM Plex Sans", system-ui, sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+        font-family: var(--body);
+        font-size: 16px;
+        line-height: 1.65;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 24px 96px;
+      }
+
+      .masthead {
+        padding: 72px 0 40px;
+        border-bottom: 1px solid var(--line);
+      }
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 18px;
+      }
+      h1 {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: clamp(44px, 8vw, 86px);
+        line-height: 0.92;
+        letter-spacing: -0.01em;
+        margin: 0 0 20px;
+        text-transform: uppercase;
+      }
+      h1 .sep {
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .standfirst {
+        max-width: 64ch;
+        color: var(--muted);
+        font-size: 17px;
+        margin: 0;
+      }
+      .standfirst strong {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 28px 0 0;
+      }
+      .tag {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 5px 10px;
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        color: var(--muted);
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        white-space: nowrap;
+      }
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex: none;
+      }
+      .dot.c {
+        background: var(--client);
+      }
+      .dot.s {
+        background: var(--server);
+      }
+      .dot.g {
+        background: var(--safe);
+      }
+      .dot.r {
+        background: var(--risk);
+      }
+
+      .toc {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: rgba(14, 20, 27, 0.92);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 2px;
+        overflow-x: auto;
+        padding: 10px 0;
+        margin-bottom: -1px;
+      }
+      .toc a {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-decoration: none;
+        padding: 6px 12px;
+        border-radius: 2px;
+        white-space: nowrap;
+      }
+      .toc a:hover,
+      .toc a:focus-visible {
+        color: var(--ink);
+        background: var(--surface-2);
+      }
+      .toc a.on {
+        color: var(--ink);
+        background: var(--surface-2);
+      }
+
+      section {
+        padding: 64px 0 0;
+        scroll-margin-top: 20px;
+      }
+      .sec-head {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        margin: 0 0 8px;
+      }
+      .sec-num {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        padding: 3px 8px;
+        border-radius: 2px;
+        flex: none;
+      }
+      h2 {
+        font-family: var(--display);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: clamp(26px, 4vw, 38px);
+        line-height: 1.05;
+        letter-spacing: 0.01em;
+        margin: 0;
+      }
+      h3 {
+        font-family: var(--display);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 17px;
+        margin: 36px 0 12px;
+      }
+      .lede {
+        max-width: 68ch;
+        color: var(--muted);
+        margin: 14px 0 0;
+      }
+      p {
+        max-width: 70ch;
+      }
+      code {
+        font-family: var(--mono);
+        font-size: 0.88em;
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        padding: 1px 5px;
+        border-radius: 2px;
+        color: var(--ink);
+      }
+
+      pre {
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.7;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        padding: 16px 18px;
+        margin: 20px 0;
+        overflow-x: auto;
+        color: var(--ink);
+      }
+      pre.flow {
+        color: var(--muted);
+        white-space: pre;
+        font-size: 12.5px;
+      }
+      pre b {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .c-client {
+        color: var(--client);
+      }
+      .c-server {
+        color: var(--server);
+      }
+      .c-safe {
+        color: var(--safe);
+      }
+      .c-risk {
+        color: var(--risk);
+      }
+      .c-muted {
+        color: var(--muted);
+      }
+
+      /* JWT anatomy — signature element */
+      .jwt {
+        border: 1px solid var(--line);
+        background: var(--surface);
+        border-radius: 2px;
+        padding: 24px;
+        margin: 24px 0;
+      }
+      .jwt-str {
+        font-family: var(--mono);
+        font-size: 15px;
+        word-break: break-all;
+        line-height: 2;
+        margin-bottom: 24px;
+      }
+      .jwt-str .h {
+        color: var(--risk);
+      }
+      .jwt-str .p {
+        color: var(--server);
+      }
+      .jwt-str .s {
+        color: var(--client);
+      }
+      .jwt-str .dotsep {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .jwt-parts {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+      }
+      .jwt-part {
+        border-top: 2px solid;
+        padding-top: 12px;
+      }
+      .jwt-part:nth-child(1) {
+        border-color: var(--risk);
+      }
+      .jwt-part:nth-child(2) {
+        border-color: var(--server);
+      }
+      .jwt-part:nth-child(3) {
+        border-color: var(--client);
+      }
+      .jwt-part h4 {
+        font-family: var(--display);
+        text-transform: uppercase;
+        font-size: 15px;
+        letter-spacing: 0.05em;
+        margin: 0 0 6px;
+        font-weight: 600;
+      }
+      .jwt-part p {
+        font-size: 13.5px;
+        color: var(--muted);
+        margin: 0;
+      }
+      .jwt-part pre {
+        font-size: 11.5px;
+        padding: 10px 12px;
+        margin: 10px 0 0;
+        background: var(--ground);
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        background: var(--surface);
+        border-radius: 2px;
+        margin: 24px 0 0;
+        overflow: hidden;
+      }
+      .card-head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface-2);
+      }
+      .card-title {
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 19px;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+      }
+      .badge {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 4px 8px;
+        border-radius: 2px;
+        margin-left: auto;
+        white-space: nowrap;
+      }
+      .badge.rec {
+        color: var(--safe);
+        border: 1px solid rgba(143, 169, 139, 0.45);
+      }
+      .badge.alt {
+        color: var(--muted);
+        border: 1px solid var(--line);
+      }
+      .card-body {
+        padding: 20px;
+      }
+      .card-body > *:first-child {
+        margin-top: 0;
+      }
+      .card-body > *:last-child {
+        margin-bottom: 0;
+      }
+
+      .callout {
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--client);
+        background: var(--surface);
+        padding: 18px 22px;
+        margin: 26px 0;
+        border-radius: 2px;
+      }
+      .callout.warn {
+        border-left-color: var(--risk);
+      }
+      .callout.good {
+        border-left-color: var(--safe);
+      }
+      .callout .k {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        display: block;
+        margin-bottom: 8px;
+      }
+      .callout p {
+        margin: 0;
+        max-width: 72ch;
+      }
+      .callout p + p {
+        margin-top: 12px;
+      }
+
+      .tbl {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 24px 0;
+        font-size: 15px;
+      }
+      .tbl th {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-align: left;
+        padding: 0 16px 10px 0;
+        border-bottom: 1px solid var(--line);
+        font-weight: 400;
+      }
+      .tbl td {
+        padding: 13px 16px 13px 0;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      .tbl tr:last-child td {
+        border-bottom: none;
+      }
+      .tbl .m {
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--ink);
+      }
+      .yes {
+        color: #a8c7a3 !important;
+      }
+      .no {
+        color: #e89478 !important;
+      }
+
+      .dont {
+        border-left: 3px solid var(--risk);
+        padding: 0 0 0 18px;
+        margin: 20px 0;
+      }
+      .dont h4 {
+        font-family: var(--display);
+        text-transform: uppercase;
+        font-size: 16px;
+        letter-spacing: 0.04em;
+        margin: 0 0 6px;
+        font-weight: 600;
+        color: var(--risk);
+      }
+      .dont p {
+        margin: 0 0 4px;
+        font-size: 14.5px;
+        color: var(--muted);
+      }
+
+      footer {
+        margin-top: 80px;
+        padding-top: 24px;
+        border-top: 1px solid var(--line);
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--muted);
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      :focus-visible {
+        outline: 2px solid var(--client);
+        outline-offset: 2px;
+      }
+
+      @media (max-width: 760px) {
+        .masthead {
+          padding: 48px 0 32px;
+        }
+        .jwt-parts {
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+        .badge {
+          margin-left: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="masthead">
+        <p class="eyebrow">Manitou · Phase 2, task 1 · Reference</p>
+        <h1>API<br />Authentication</h1>
+        <p class="standfirst">
+          How a stateless API knows who you are. Covers the
+          <strong>credential exchange</strong>, the
+          <strong>anatomy of a JWT</strong>, the
+          <strong>login endpoint decision</strong>, and the parts that actually
+          get people breached — token storage and lifetime.
+        </p>
+        <div class="legend">
+          <span class="tag"><span class="dot c"></span>Client side</span>
+          <span class="tag"><span class="dot s"></span>Server side</span>
+          <span class="tag"><span class="dot g"></span>Recommended</span>
+          <span class="tag"><span class="dot r"></span>Hazard</span>
+        </div>
+      </header>
+
+      <nav class="toc" aria-label="Sections">
+        <a href="#problem">The problem</a>
+        <a href="#authn">AuthN vs AuthZ</a>
+        <a href="#handshake">The handshake</a>
+        <a href="#jwt">JWT anatomy</a>
+        <a href="#bearer">Bearer scheme</a>
+        <a href="#decision">The decision</a>
+        <a href="#hashing">Password hashing</a>
+        <a href="#register">Registration</a>
+        <a href="#roles">Role checks</a>
+        <a href="#lifetime">Token lifetime</a>
+        <a href="#storage">Storage</a>
+        <a href="#attacks">Attack surface</a>
+        <a href="#sessions">JWT vs sessions</a>
+        <a href="#dont">Anti-patterns</a>
+        <a href="#glossary">Glossary</a>
+      </nav>
+
+      <section id="problem">
+        <div class="sec-head">
+          <span class="sec-num">00</span>
+          <h2>The problem</h2>
+        </div>
+        <p class="lede">
+          <strong>HTTP is stateless.</strong> Every request arrives at your
+          server with no memory of any request before it. The server has no
+          inherent idea that the request asking for <code>/orders</code> came
+          from the same person who logged in thirty seconds ago.
+        </p>
+        <p>
+          That's not a flaw — it's what lets a server handle thousands of
+          unrelated requests without tracking who's "connected." But it means
+          <b>identity must be re-proven on every single request</b>.
+        </p>
+        <p>
+          The naïve fix is to send the email and password with every request.
+          That's catastrophic: the password crosses the network hundreds of
+          times per session, ends up in logs and browser history, and has to be
+          held in memory by the client the whole time. The entire field of API
+          authentication exists to avoid that.
+        </p>
+        <div class="callout">
+          <span class="k">The core idea</span>
+          <p>
+            Prove who you are <b>once</b>, with the real credentials. Receive a
+            <b>token</b> — a temporary, limited, revocable stand-in. Send the
+            token, not the password, on everything after that.
+          </p>
+        </div>
+      </section>
+
+      <section id="authn">
+        <div class="sec-head">
+          <span class="sec-num">01</span>
+          <h2>AuthN vs AuthZ</h2>
+        </div>
+        <p class="lede">
+          Two words that look alike, get abbreviated alike, and mean different
+          things. Manitou needs both.
+        </p>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width: 34%">Concept</th>
+              <th>Question it answers</th>
+              <th>In Manitou</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="m">Authentication (AuthN)</td>
+              <td><b>Who are you?</b> Verifying identity.</td>
+              <td>
+                Email + password checked against
+                <code>users.password_hash</code>
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Authorization (AuthZ)</td>
+              <td><b>What are you allowed to do?</b> Verifying permission.</td>
+              <td>
+                The <code>role</code> column — <code>customer</code> vs
+                <code>admin</code>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          A logged-in customer is <b>authenticated</b> but not
+          <b>authorized</b> to reach the vendor portal. Both checks run on every
+          protected request: first "is this token valid?", then "does this role
+          permit this action?"
+        </p>
+        <p>
+          Phase 2 task 1 builds both — JWT issuing covers AuthN, the role check
+          covers AuthZ. Phase 4's <code>/admin</code> gate is pure AuthZ layered
+          on top.
+        </p>
+      </section>
+
+      <section id="handshake">
+        <div class="sec-head">
+          <span class="sec-num">02</span>
+          <h2>The handshake</h2>
+        </div>
+        <p class="lede">
+          The full exchange, once at login and then on every request afterwards.
+        </p>
+        <pre class="flow"><b>STEP 1 — LOGIN (once per session)</b>
+
+  <span class="c-client">Client</span>                                      <span class="c-server">API</span>                        <span class="c-server">Database</span>
+    │                                          │                             │
+    │  POST /auth/login                        │                             │
+    │  { email, password }                     │                             │
+    ├─────────────────────────────────────────▶│                             │
+    │                                          │  SELECT ... WHERE email=?   │
+    │                                          ├────────────────────────────▶│
+    │                                          │◀────────────────────────────┤
+    │                                          │  row with password_hash     │
+    │                                          │                             │
+    │                              <b>bcrypt.checkpw(sent, stored)</b>              │
+    │                                          │                             │
+    │                              <b>sign JWT with server secret</b>               │
+    │  { access_token: "eyJ...",               │                             │
+    │    token_type: "bearer" }                │                             │
+    │◀─────────────────────────────────────────┤                             │
+
+<b>STEP 2 — EVERY REQUEST AFTERWARDS</b>
+
+  <span class="c-client">Client</span>                                      <span class="c-server">API</span>
+    │                                          │
+    │  GET /orders                             │
+    │  Authorization: Bearer eyJ...            │
+    ├─────────────────────────────────────────▶│
+    │                            <b>verify signature — no DB hit</b>
+    │                            <b>read user_id + role from payload</b>
+    │                            <b>check role permits this route</b>
+    │  200 OK  { orders: [...] }               │
+    │◀─────────────────────────────────────────┤</pre>
+        <div class="callout good">
+          <span class="k">Why this scales</span>
+          <p>
+            Step 2 involves <b>no database lookup to establish identity</b>. The
+            token is signed, so the server verifies it mathematically using its
+            own secret. That's the central advantage of JWTs over server-side
+            sessions — and also the source of their central drawback (see
+            section 12).
+          </p>
+        </div>
+      </section>
+
+      <section id="jwt">
+        <div class="sec-head">
+          <span class="sec-num">03</span>
+          <h2>JWT anatomy</h2>
+        </div>
+        <p class="lede">
+          A JSON Web Token is three Base64url-encoded segments joined by dots.
+          It looks like noise; it isn't. Anyone can read it.
+        </p>
+
+        <div class="jwt">
+          <div class="jwt-str">
+            <span class="h">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9</span
+            ><span class="dotsep">.</span
+            ><span class="p"
+              >eyJzdWIiOiIxIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzY3MjI1NjAwfQ</span
+            ><span class="dotsep">.</span
+            ><span class="s">4pcPyMD09olPSyXnrXCjTwXyr4qJj1hFYXWvGCJhLPo</span>
+          </div>
+          <div class="jwt-parts">
+            <div class="jwt-part">
+              <h4>Header</h4>
+              <p>Which algorithm signed this, and what type of token it is.</p>
+              <pre>
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}</pre
+              >
+            </div>
+            <div class="jwt-part">
+              <h4>Payload (claims)</h4>
+              <p>
+                Who the user is and what they're permitted.
+                <b>Readable by anyone.</b>
+              </p>
+              <pre>
+{
+  "sub": "1",
+  "role": "admin",
+  "exp": 1767225600
+}</pre
+              >
+            </div>
+            <div class="jwt-part">
+              <h4>Signature</h4>
+              <p>
+                HMAC of the first two parts, using the server's secret. Proves
+                nothing was altered.
+              </p>
+              <pre>
+HMACSHA256(
+  b64(header) + "." +
+  b64(payload),
+  JWT_SECRET
+)</pre
+              >
+            </div>
+          </div>
+        </div>
+
+        <div class="callout warn">
+          <span class="k"
+            >The most misunderstood point in this entire document</span
+          >
+          <p>
+            <b>A JWT is signed, not encrypted.</b> Base64 is encoding, not
+            encryption — anyone holding the token can decode the payload and
+            read every claim in it. Paste one into jwt.io and you'll see your
+            own <code>user_id</code> and <code>role</code> in plain text.
+          </p>
+          <p>
+            What the signature guarantees is <b>integrity</b>, not secrecy:
+            nobody can change <code>"role": "customer"</code> to
+            <code>"role": "admin"</code>, because they'd need
+            <code>JWT_SECRET</code> to produce a matching signature.
+            <b>Never put anything confidential in a payload</b> — no passwords,
+            no card details, no personal data you wouldn't hand to the token's
+            holder.
+          </p>
+        </div>
+
+        <h3>Standard claims worth knowing</h3>
+        <table class="tbl">
+          <tbody>
+            <tr>
+              <td class="m" style="width: 120px">sub</td>
+              <td>
+                <b>Subject</b> — who the token is about. Manitou puts
+                <code>users.id</code> here.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">exp</td>
+              <td>
+                <b>Expiry</b> — Unix timestamp after which the token must be
+                rejected. Non-negotiable; always set it.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">iat</td>
+              <td><b>Issued at</b> — when the token was created.</td>
+            </tr>
+            <tr>
+              <td class="m">jti</td>
+              <td>
+                <b>JWT ID</b> — a unique identifier, used if you ever build a
+                revocation blocklist.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">role</td>
+              <td>
+                A <b>custom claim</b>. Not part of the spec — Manitou's own
+                addition, driving the AuthZ check.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>HS256 vs RS256</h3>
+        <p>
+          <b>HS256</b> is symmetric: one secret both signs and verifies. Simple,
+          fast, and correct when the same service does both — which is exactly
+          Manitou's shape, one API issuing and verifying its own tokens.
+          <b>RS256</b> is asymmetric: a private key signs, a public key
+          verifies. That matters when several independent services need to
+          verify tokens without being trusted to issue them.
+          <b>Use HS256 here</b>; reach for RS256 only if the architecture ever
+          splits.
+        </p>
+      </section>
+
+      <section id="bearer">
+        <div class="sec-head">
+          <span class="sec-num">04</span>
+          <h2>The Bearer scheme</h2>
+        </div>
+        <p class="lede">
+          How the token actually travels on each request. This part is
+          standardised (RFC 6750) and identical for web, Android, and iOS.
+        </p>
+        <pre>GET /orders HTTP/1.1
+Host: api.manitou.example
+<b>Authorization: Bearer eyJhbGciOiJIUzI1NiIs...</b>
+Accept: application/json</pre>
+        <p>
+          "Bearer" means precisely what it says:
+          <b>whoever bears this token is treated as the user</b>. There's no
+          second factor, no device binding, no challenge. The token
+          <em>is</em> the credential.
+        </p>
+        <p>
+          Two consequences follow directly, and they drive most of the rest of
+          this document:
+        </p>
+        <table class="tbl">
+          <tbody>
+            <tr>
+              <td class="m" style="width: 180px">Transport must be HTTPS</td>
+              <td>
+                A bearer token sent over plain HTTP is readable by anyone on the
+                network path, and replayable by them. Section 8 of
+                PROJECT_PLAN.md requires HTTPS everywhere for exactly this
+                reason.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Storage matters enormously</td>
+              <td>
+                A stolen token is a stolen session. Where the client keeps it is
+                a security decision, not a convenience one — see section 10.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          <span class="k">Naming detail</span>
+          <p>
+            The header is <code>Authorization</code>, even though it carries
+            authentication. A historical misnomer, baked into HTTP since the
+            1990s and never going to change. Don't let it confuse the
+            AuthN/AuthZ distinction from section 01.
+          </p>
+        </div>
+      </section>
+
+      <section id="decision">
+        <div class="sec-head">
+          <span class="sec-num">05</span>
+          <h2>The decision</h2>
+        </div>
+        <p class="lede">
+          Both options below produce the same JWT and use the same Bearer scheme
+          afterwards. The only question is
+          <b>how the login request itself is packaged</b>.
+        </p>
+
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Option 1 — JSON body</span
+            ><span class="badge rec">Recommended</span>
+          </div>
+          <div class="card-body">
+            <pre>
+POST /auth/login
+Content-Type: <b>application/json</b>
+
+{ "email": "admin@manitou.local", "password": "admin" }
+
+→ { "access_token": "eyJ...", "token_type": "bearer" }</pre
+            >
+            <p>
+              Ordinary JSON in, ordinary JSON out — identical in shape to every
+              other endpoint in the API.
+            </p>
+            <table class="tbl">
+              <tbody>
+                <tr>
+                  <td class="m yes" style="width: 150px">Consistent</td>
+                  <td>
+                    Same content type as register, products, cart, checkout. No
+                    exception for any client to remember.
+                  </td>
+                </tr>
+                <tr>
+                  <td class="m yes">No dependency</td>
+                  <td>
+                    Needs nothing beyond what's already in
+                    <code>requirements.txt</code>.
+                  </td>
+                </tr>
+                <tr>
+                  <td class="m yes">Natural field names</td>
+                  <td>
+                    The field is called <code>email</code>, because it is one.
+                  </td>
+                </tr>
+                <tr>
+                  <td class="m no">Manual in /docs</td>
+                  <td>
+                    Call login, copy the <code>access_token</code>, paste into
+                    Swagger's Authorize box. Once per session.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Option 2 — OAuth2 password form</span
+            ><span class="badge alt">FastAPI standard</span>
+          </div>
+          <div class="card-body">
+            <pre>
+POST /auth/login
+Content-Type: <b>application/x-www-form-urlencoded</b>
+
+username=admin@manitou.local&amp;password=admin</pre
+            >
+            <p>
+              FastAPI's built-in <code>OAuth2PasswordRequestForm</code>,
+              modelled on the OAuth2 spec's password grant.
+            </p>
+            <table class="tbl">
+              <tbody>
+                <tr>
+                  <td class="m yes" style="width: 150px">Nicer /docs</td>
+                  <td>
+                    Swagger's Authorize button becomes a real login form and
+                    applies the token automatically.
+                  </td>
+                </tr>
+                <tr>
+                  <td class="m no">Inconsistent</td>
+                  <td>
+                    Form-encoded, while the rest of the API is JSON. Web,
+                    Android, and iOS each need a special case for this one call.
+                  </td>
+                </tr>
+                <tr>
+                  <td class="m no">Extra dependency</td>
+                  <td>
+                    Requires <code>python-multipart</code> to parse form data.
+                  </td>
+                </tr>
+                <tr>
+                  <td class="m no">Misleading field</td>
+                  <td>
+                    The field must be named <code>username</code> even though it
+                    holds an email.
+                  </td>
+                </tr>
+                <tr>
+                  <td class="m no">Solves a bigger problem</td>
+                  <td>
+                    OAuth2 exists for delegated third-party authorization —
+                    grant types, scopes, external identity providers. Manitou
+                    has none of that.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="callout good">
+          <span class="k">Why Option 1 for Manitou</span>
+          <p>
+            The <code>/docs</code> inconvenience costs a few seconds, once per
+            session, only during development. The client inconsistency is
+            permanent and spans three separate codebases. Section 2 of
+            PROJECT_PLAN.md makes one uniform API contract the architectural
+            centrepiece — an exception at the front door undercuts it.
+          </p>
+          <p>
+            Reaching for the OAuth2 machinery here is also precisely the
+            "generalize ahead of need" pattern <code>CLAUDE.md</code> rules out.
+            If Manitou ever adds "Sign in with Google," that's a real OAuth2
+            flow — and it would be built then, deliberately, not approximated
+            now.
+          </p>
+        </div>
+      </section>
+
+      <section id="hashing">
+        <div class="sec-head">
+          <span class="sec-num">06</span>
+          <h2>Password hashing</h2>
+        </div>
+        <p class="lede">
+          What happens on the server side of that first login — and the one part
+          of authentication where getting it wrong is unrecoverable.
+        </p>
+
+        <h3>Hashing is not encryption</h3>
+        <p>
+          Encryption is reversible by design: with the key, you recover the
+          original. Hashing is <b>deliberately one-way</b> — there is no
+          operation that turns a hash back into the password. Verification works
+          by hashing the submitted password again and comparing the results.
+        </p>
+        <p>
+          This means that if your database is stolen, the attacker gets no
+          passwords — only hashes that must be brute-forced one at a time. That
+          property is the entire point.
+        </p>
+
+        <h3>Why bcrypt, not SHA-256</h3>
+        <p>
+          SHA-256 is a hash, but the wrong kind here: it's built to be
+          <b>fast</b>, which is exactly wrong for passwords. Fast hashing means
+          an attacker with a stolen database can test billions of guesses per
+          second. bcrypt is <b>deliberately slow</b>, and tunably so.
+        </p>
+        <pre><b>$2b$12$</b>LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKyF3XGvA1Kk8Vy
+<span class="c-server">└┬┘└┬┘</span> <span class="c-client">└──────────────────┬─────────────────────────────────┘</span>
+ │  │                     │
+ │  │                     └── 22-char salt + 31-char hash
+ │  └── cost factor: 2¹² = 4,096 rounds
+ └── algorithm variant (bcrypt 2b)</pre>
+        <table class="tbl">
+          <tbody>
+            <tr>
+              <td class="m" style="width: 150px">Salt</td>
+              <td>
+                A random value generated per password and stored
+                <em>inside</em> the hash string. Two users with the identical
+                password get completely different hashes — which defeats
+                precomputed rainbow tables and stops an attacker learning that
+                two accounts share a password.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Cost factor</td>
+              <td>
+                Each increment <b>doubles</b> the work. Cost 12 is a reasonable
+                current default. You raise it over the years as hardware
+                improves — the tunability is why bcrypt has aged well.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Fixed 60 chars</td>
+              <td>
+                Every bcrypt hash is exactly 60 characters, whatever the
+                password's length. Useful as a sanity check.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          <span class="k">You have already seen this</span>
+          <p>
+            Challenge C5 in the SQL exercises inspects exactly this:
+            <code>LEFT(password_hash, 7)</code> returns <code>$2b$12$</code> and
+            <code>LENGTH()</code> returns 60 — the algorithm variant, the cost
+            factor, and the fixed width, read straight off your seeded admin
+            row.
+          </p>
+        </div>
+        <div class="callout warn">
+          <span class="k">Timing</span>
+          <p>
+            Always use the library's own comparison function
+            (<code>bcrypt.checkpw</code>), never <code>==</code> on hash
+            strings. Proper implementations compare in <b>constant time</b>, so
+            an attacker can't learn how much of a guess was correct by measuring
+            how long the rejection took.
+          </p>
+        </div>
+      </section>
+
+      <section id="register">
+        <div class="sec-head">
+          <span class="sec-num">07</span>
+          <h2>Registration</h2>
+        </div>
+        <p class="lede">
+          Creating the account that login later authenticates. Shorter than
+          login, with one security decision that matters more than all the rest
+          combined.
+        </p>
+
+        <pre
+          class="flow"
+        >  <span class="c-client">Client</span>                                      <span class="c-server">API</span>                        <span class="c-server">Database</span>
+    │                                          │                             │
+    │  POST /auth/register                     │                             │
+    │  { email, password, full_name }          │                             │
+    ├─────────────────────────────────────────▶│                             │
+    │                          <b>1. validate shape (Pydantic)</b>                  │
+    │                          <b>2. hash password (bcrypt)</b>                     │
+    │                          <b>3. force role = "customer"</b>                    │
+    │                                          │  INSERT INTO users ...      │
+    │                                          ├────────────────────────────▶│
+    │                                          │                             │
+    │                                          │◀────────────────────────────┤
+    │                                          │  unique violation on email? │
+    │                          <b>4. map DB error → 409 Conflict</b>                │
+    │  201 Created                             │                             │
+    │  { id, email, full_name, role }          │                             │
+    │◀─────────────────────────────────────────┤                             │</pre>
+
+        <h3>The one rule that matters most</h3>
+        <div class="callout warn">
+          <span class="k"
+            >Never accept <code>role</code> from the request body</span
+          >
+          <p>
+            If the registration endpoint reads <code>role</code> from client
+            input, anyone can POST
+            <code>{"email": "...", "password": "...", "role": "admin"}</code>
+            and grant themselves the vendor portal. This is not a hypothetical —
+            it is one of the most common real-world API vulnerabilities, usually
+            introduced by passing the whole request body straight into the model
+            constructor.
+          </p>
+          <p>
+            <b>The role is assigned by the server, always.</b> Public
+            registration hardcodes <code>role="customer"</code>. The Pydantic
+            schema for the request must not contain a <code>role</code> field at
+            all — that way the value cannot arrive even if someone sends it.
+          </p>
+        </div>
+        <p>
+          In Manitou there is exactly one admin, created by
+          <code>seed.py</code>. There is no public path to becoming one, which
+          is the correct shape for a single-vendor store — the scope boundary in
+          Section 1 of PROJECT_PLAN.md doing quiet security work.
+        </p>
+
+        <h3>Validation belongs in the schema</h3>
+        <p>
+          Pydantic enforces the request shape before your endpoint code runs, so
+          invalid input never reaches the database. A registration schema
+          typically constrains:
+        </p>
+        <table class="tbl">
+          <tbody>
+            <tr>
+              <td class="m" style="width: 170px">Email format</td>
+              <td>
+                Pydantic's <code>EmailStr</code> validates the shape. Normalise
+                to lowercase before storing — otherwise
+                <code>Jose@x.com</code> and <code>jose@x.com</code> become two
+                accounts, since the unique constraint is case-sensitive.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Password length</td>
+              <td>
+                A minimum (8–12 characters is a reasonable floor). Length
+                matters far more than forced symbol/number rules, which mostly
+                push people toward predictable substitutions.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Maximum length</td>
+              <td>
+                Cap it (say 128). bcrypt silently truncates input beyond 72
+                bytes — an unexpected behaviour worth guarding against
+                explicitly rather than discovering later.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">No <code>role</code> field</td>
+              <td>Its absence from the schema is the enforcement mechanism.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Duplicate emails, and an honest tension</h3>
+        <p>
+          The <code>users.email</code> unique constraint from Section 6.5 means
+          a duplicate registration raises a database integrity error. Catch it
+          and return <b>409 Conflict</b> rather than letting a 500 escape.
+        </p>
+        <div class="callout">
+          <span class="k">A genuine conflict with §13</span>
+          <p>
+            The anti-patterns section says never reveal whether an email exists
+            — yet registration inherently must: "this email is already taken"
+            <em>is</em> that disclosure. There's no clean way around it, because
+            the user genuinely needs to know why their signup failed.
+          </p>
+          <p>
+            The standard resolution is asymmetric handling. <b>Login</b> stays
+            deliberately vague ("invalid email or password").
+            <b>Registration</b> is allowed to be specific, because the
+            alternative is an unusable signup form. High-security products avoid
+            it by always returning success and sending an email that says either
+            "confirm your account" or "you already have one" — a real technique,
+            and more machinery than Manitou needs.
+          </p>
+        </div>
+
+        <h3>Two smaller decisions</h3>
+        <table class="tbl">
+          <tbody>
+            <tr>
+              <td class="m" style="width: 220px">Auto-login after register?</td>
+              <td>
+                Returning a JWT straight from <code>/auth/register</code> saves
+                the user an immediate second step. Returning only the created
+                user, and requiring a separate <code>/auth/login</code> call,
+                keeps each endpoint doing one thing and keeps token issuing in
+                one place. Either is defensible —
+                <b>pick one and be consistent</b>, since the mobile apps in
+                Phase 7 will assume whatever the web client does.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">What to return</td>
+              <td>
+                <b>Never</b> include <code>password_hash</code> in a response.
+                Use a separate Pydantic response model that simply omits it —
+                relying on remembering to strip it manually is how it eventually
+                leaks.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="roles">
+        <div class="sec-head">
+          <span class="sec-num">08</span>
+          <h2>Enforcing the role</h2>
+        </div>
+        <p class="lede">
+          The AuthZ half of task 1, and the mechanism the entire Phase 4 vendor
+          portal rests on. In FastAPI this is dependency injection, which makes
+          the check reusable rather than repeated.
+        </p>
+
+        <h3>The chain</h3>
+        <pre class="flow">  Request with <b>Authorization: Bearer eyJ...</b>
+       │
+       ▼
+  <b>get_token</b>          extract the header, strip the "Bearer " prefix
+       │                  missing/malformed ──▶ <span class="c-risk">401</span>
+       ▼
+  <b>get_current_user</b>   verify signature, check exp, read "sub" claim
+       │                  invalid/expired ──▶ <span class="c-risk">401</span>
+       │                  load the user row from the database
+       ▼
+  <b>require_admin</b>      compare role against what the route demands
+       │                  authenticated but wrong role ──▶ <span class="c-risk">403</span>
+       ▼
+  <span class="c-safe">endpoint runs</span></pre>
+
+        <p>
+          Each layer depends on the one above it, so a route declares only the
+          level it needs — and the checks below come along automatically.
+        </p>
+
+        <pre># app/deps.py — the shape, not the finished code
+
+<span class="c-server">async def</span> get_current_user(token: str = Depends(oauth2_scheme)) -> User:
+    <span class="c-muted">"""401 if the token is missing, malformed, expired, or forged."""</span>
+    payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
+    user = session.get(User, int(payload["sub"]))
+    <span class="c-server">if</span> user <span class="c-server">is None</span>:
+        <span class="c-server">raise</span> HTTPException(401, "Could not validate credentials")
+    <span class="c-server">return</span> user
+
+
+<span class="c-server">async def</span> require_admin(user: User = Depends(get_current_user)) -> User:
+    <span class="c-muted">"""403 if authenticated but not an admin."""</span>
+    <span class="c-server">if</span> user.role != "admin":
+        <span class="c-server">raise</span> HTTPException(403, "Admin access required")
+    <span class="c-server">return</span> user</pre>
+
+        <p>
+          Routes then declare their requirement rather than implementing it:
+        </p>
+        <pre><span class="c-client">@router.get("/orders")</span>                       <span class="c-muted"># any logged-in user</span>
+<span class="c-server">async def</span> my_orders(user: User = Depends(get_current_user)):
+    <span class="c-server">return</span> orders_for(user.id)
+
+<span class="c-client">@router.post("/admin/products")</span>              <span class="c-muted"># admin only</span>
+<span class="c-server">async def</span> create_product(user: User = Depends(require_admin)):
+    ...</pre>
+
+        <h3>401 vs 403 — a distinction worth getting right</h3>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width: 22%">Status</th>
+              <th>Means</th>
+              <th>Client should</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="m">401 Unauthorized</td>
+              <td>
+                Not authenticated. No token, malformed token, bad signature, or
+                expired.
+              </td>
+              <td>Redirect to login, or refresh the token and retry.</td>
+            </tr>
+            <tr>
+              <td class="m">403 Forbidden</td>
+              <td>Authenticated fine, but this role isn't permitted here.</td>
+              <td>
+                Show a "not allowed" message. Logging in again won't help.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          Note the naming is backwards from the concepts in §01:
+          <b>401 is about authentication</b> despite being called
+          "Unauthorized," and <b>403 is about authorization</b>. Another
+          historical HTTP misnomer, like the <code>Authorization</code> header
+          itself. Getting these right matters practically — the Phase 3 web
+          client needs to distinguish "your session expired, log in again" from
+          "you're not an admin," and it does so purely from the status code.
+        </p>
+
+        <div class="callout warn">
+          <span class="k"
+            >Read the role from the token, never from the request</span
+          >
+          <p>
+            <code>get_current_user</code> takes the user id from the
+            <b>verified</b> JWT payload, then loads the role from the database.
+            A route that trusted <code>?role=admin</code>, a request body field,
+            or a custom header would be trivially bypassable.
+          </p>
+          <p>
+            <b>A design choice worth making deliberately:</b> the role can come
+            from the token claim directly, or be re-read from the database on
+            each request. The claim is faster (no query); the database is
+            fresher. If an admin is demoted, a role baked into their token stays
+            <code>admin</code> until it expires — the same revocation problem
+            from §09, in a different costume. Re-reading from the database
+            avoids it, at the cost of one lookup per request. For Manitou's
+            scale, the database read is cheap and the correctness is worth it.
+          </p>
+        </div>
+
+        <div class="callout good">
+          <span class="k">Why this belongs in one place</span>
+          <p>
+            Writing the token check inline in each endpoint means every new
+            route is a chance to forget it — and a forgotten check is an open
+            door with no error to notice. A dependency makes the secure path the
+            default and the omission visible: a route with no
+            <code>Depends</code> is obviously public, at a glance.
+          </p>
+          <p>
+            This is also what §13's "checking the role only in the UI" warns
+            against. Phase 4 hides the admin link from customers, but that's
+            presentation. <code>require_admin</code> is the actual control, and
+            it holds even when someone calls the API directly with curl.
+          </p>
+        </div>
+      </section>
+
+      <section id="lifetime">
+        <div class="sec-head">
+          <span class="sec-num">09</span>
+          <h2>Token lifetime</h2>
+        </div>
+        <p class="lede">
+          The unavoidable tension: short-lived tokens are safer, and long-lived
+          tokens are pleasanter. The standard resolution is to use two tokens
+          with different jobs.
+        </p>
+
+        <h3>The tension</h3>
+        <p>
+          A JWT's central feature — the server verifies it without a database
+          lookup — creates its central problem:
+          <b>a JWT cannot be un-issued</b>. Once signed, it is valid until
+          <code>exp</code> passes, regardless of what happens afterwards. Change
+          your password, delete your account, get your laptop stolen: any
+          already-issued token keeps working until it expires. That's why
+          <code>exp</code> is not optional, and why it should be short.
+        </p>
+
+        <h3>Access token + refresh token</h3>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width: 26%"></th>
+              <th>Access token</th>
+              <th>Refresh token</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="m">Lifetime</td>
+              <td>Minutes (15–60 typical)</td>
+              <td>Days to weeks</td>
+            </tr>
+            <tr>
+              <td class="m">Sent</td>
+              <td>On every request</td>
+              <td>Only to <code>/auth/refresh</code></td>
+            </tr>
+            <tr>
+              <td class="m">Purpose</td>
+              <td>Prove identity to the API</td>
+              <td>Obtain a new access token</td>
+            </tr>
+            <tr>
+              <td class="m">Stored server-side?</td>
+              <td>No</td>
+              <td><b>Yes</b> — so it can be revoked</td>
+            </tr>
+            <tr>
+              <td class="m">Exposure</td>
+              <td>High — travels constantly</td>
+              <td>Low — travels rarely</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          The refresh token is deliberately stored in the database, which
+          restores the revocation ability JWTs lack. Logging out, or a password
+          change, deletes the refresh token row — so the session dies within one
+          access-token lifetime rather than lasting weeks.
+        </p>
+        <p>
+          <b>Refresh token rotation</b> is the standard hardening: each refresh
+          issues a new refresh token and invalidates the old one. If a rotated
+          token is ever replayed, that's proof of theft, and the whole token
+          family can be revoked.
+        </p>
+
+        <div class="callout">
+          <span class="k">Scope note for Phase 2</span>
+          <p>
+            Task 1 asks for access tokens only — refresh tokens are not in the
+            Phase 2 checklist. That's a reasonable starting point: a single
+            access token with a sensible <code>exp</code> is a complete, working
+            auth system. Refresh tokens are a natural Phase 8 hardening item,
+            and the place to add them is when session expiry genuinely becomes
+            annoying — not before.
+          </p>
+        </div>
+      </section>
+
+      <section id="storage">
+        <div class="sec-head">
+          <span class="sec-num">10</span>
+          <h2>Where the client keeps it</h2>
+        </div>
+        <p class="lede">
+          The token is a bearer credential, so this is the highest-stakes
+          client-side decision in the whole system. There is no option with no
+          downside.
+        </p>
+
+        <h3>Web (Phase 3)</h3>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width: 24%">Option</th>
+              <th>Vulnerable to</th>
+              <th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="m">localStorage</td>
+              <td>
+                <b class="no">XSS.</b> Any injected JavaScript — from your code
+                or any dependency — can read it and exfiltrate it.
+              </td>
+              <td>Common, convenient, and the weakest choice.</td>
+            </tr>
+            <tr>
+              <td class="m">sessionStorage</td>
+              <td>
+                <b class="no">XSS</b>, identically. Only benefit is that it
+                clears when the tab closes.
+              </td>
+              <td>Marginally better than localStorage. Same core flaw.</td>
+            </tr>
+            <tr>
+              <td class="m">In-memory (JS variable)</td>
+              <td>
+                Nothing persistent — but lost on every refresh, so it needs a
+                refresh token to be usable.
+              </td>
+              <td>Good, paired with a refresh token in a cookie.</td>
+            </tr>
+            <tr>
+              <td class="m">httpOnly cookie</td>
+              <td>
+                <b class="no">CSRF</b> — but that is well-mitigated by
+                <code>SameSite=Strict</code> or <code>Lax</code>.
+                <b class="yes">Unreadable by JavaScript</b>, so XSS cannot steal
+                it.
+              </td>
+              <td>
+                <b class="yes">Strongest default</b> for a browser client.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout warn">
+          <span class="k">The tradeoff, stated plainly</span>
+          <p>
+            You are choosing which attack to defend against. <b>XSS</b> means an
+            attacker runs JavaScript in your page; <b>CSRF</b> means a malicious
+            site triggers requests using cookies the browser sends
+            automatically.
+          </p>
+          <p>
+            CSRF has a complete, standard, one-flag mitigation
+            (<code>SameSite</code>). XSS has no equivalent single fix — if
+            arbitrary JavaScript runs in your page, anything JavaScript can read
+            is gone. That asymmetry is why httpOnly cookies generally win: you
+            trade an unsolved problem for a solved one.
+          </p>
+        </div>
+
+        <h3>Mobile (Phase 7)</h3>
+        <p>
+          Native apps have no browser storage and no XSS surface, but they do
+          have device theft and rooted devices. Both platforms provide OS-level
+          encrypted stores backed by hardware:
+        </p>
+        <table class="tbl">
+          <tbody>
+            <tr>
+              <td class="m" style="width: 170px">iOS (Swift)</td>
+              <td>
+                <b>Keychain Services</b> — encrypted, hardware-backed, survives
+                reinstall if configured. Never <code>UserDefaults</code>, which
+                is plain text.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Android (Kotlin)</td>
+              <td>
+                <b>EncryptedSharedPreferences</b> backed by the
+                <b>Android Keystore</b>. Never plain
+                <code>SharedPreferences</code>.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          The mistake to avoid on both platforms is the easy one: writing the
+          token to whatever simple key-value store the SDK offers by default,
+          which is unencrypted and readable on a compromised device.
+        </p>
+      </section>
+
+      <section id="attacks">
+        <div class="sec-head">
+          <span class="sec-num">11</span>
+          <h2>Attack surface</h2>
+        </div>
+        <p class="lede">What actually goes wrong, and what stops it.</p>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width: 22%">Attack</th>
+              <th>How it works</th>
+              <th>Defence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="m">Credential stuffing</td>
+              <td>
+                Attacker replays email/password pairs leaked from other breaches
+                against your login endpoint.
+              </td>
+              <td>
+                <b>Rate limiting</b> on <code>/auth/login</code> (Phase 8),
+                account lockout, and eventually MFA.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Brute force</td>
+              <td>Automated guessing against one account.</td>
+              <td>
+                Rate limiting plus bcrypt's deliberate slowness, which caps
+                attempts per second.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Token theft (XSS)</td>
+              <td>
+                Injected JavaScript reads the token from browser storage and
+                sends it elsewhere.
+              </td>
+              <td>
+                httpOnly cookies, a Content Security Policy, and escaping all
+                user-rendered content.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Token replay</td>
+              <td>Token captured in transit and reused by the attacker.</td>
+              <td>
+                <b>HTTPS everywhere</b>, plus short <code>exp</code> to bound
+                the damage window.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">CSRF</td>
+              <td>
+                A malicious page triggers authenticated requests using cookies
+                the browser attaches automatically.
+              </td>
+              <td>
+                <code>SameSite=Strict</code> or <code>Lax</code>; CSRF tokens
+                for anything sensitive.
+              </td>
+            </tr>
+            <tr>
+              <td class="m"><code>alg: none</code></td>
+              <td>
+                Attacker resubmits a token with the algorithm set to "none,"
+                hoping the server skips verification.
+              </td>
+              <td>
+                Pin the expected algorithm explicitly when decoding. Any current
+                library defaults to safe behaviour — never disable it.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">User enumeration</td>
+              <td>
+                Login errors that distinguish "no such email" from "wrong
+                password" let an attacker map valid accounts.
+              </td>
+              <td>Return one identical generic error for both cases.</td>
+            </tr>
+            <tr>
+              <td class="m">Secret leakage</td>
+              <td>
+                <code>JWT_SECRET</code> committed to Git; anyone holding it can
+                forge any token, including admin ones.
+              </td>
+              <td>
+                Section 4.2 of PROJECT_PLAN.md — <code>.env</code> locally,
+                Secrets Manager in production, never in Git.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="sessions">
+        <div class="sec-head">
+          <span class="sec-num">12</span>
+          <h2>JWT vs server sessions</h2>
+        </div>
+        <p class="lede">
+          The alternative approach, and an honest account of what Manitou gives
+          up by not using it.
+        </p>
+        <p>
+          With <b>server-side sessions</b>, the server stores session state (in
+          memory, Redis, or a table) and hands the client only an opaque random
+          ID. Every request looks that ID up.
+        </p>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width: 26%"></th>
+              <th>JWT (Manitou's choice)</th>
+              <th>Server sessions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="m">Verification</td>
+              <td class="yes">No lookup — signature check only</td>
+              <td>Store lookup per request</td>
+            </tr>
+            <tr>
+              <td class="m">Revocation</td>
+              <td class="no">Hard — valid until <code>exp</code></td>
+              <td class="yes">Instant — delete the row</td>
+            </tr>
+            <tr>
+              <td class="m">Horizontal scaling</td>
+              <td class="yes">Trivial — any instance can verify</td>
+              <td>Needs shared session storage</td>
+            </tr>
+            <tr>
+              <td class="m">Mobile clients</td>
+              <td class="yes">Natural fit — just a header</td>
+              <td>Workable but cookie-oriented</td>
+            </tr>
+            <tr>
+              <td class="m">Payload visibility</td>
+              <td class="no">Claims readable by the holder</td>
+              <td class="yes">Opaque ID reveals nothing</td>
+            </tr>
+            <tr>
+              <td class="m">Size on the wire</td>
+              <td>Hundreds of bytes, every request</td>
+              <td class="yes">A short ID</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          <span class="k">Honest assessment for Manitou</span>
+          <p>
+            JWTs are the right call here mainly because of
+            <b>the mobile apps</b>: one identical auth mechanism serves the web,
+            Android, and iOS clients, which is the same reasoning behind the
+            one-API architecture in Section 2.
+          </p>
+          <p>
+            But the revocation weakness is real, not theoretical. "Log out
+            everywhere" and "lock a compromised account immediately" are
+            genuinely harder with JWTs, and the honest fix is a refresh-token
+            table — which quietly reintroduces some of the server-side state
+            JWTs were supposed to avoid. That is the standard, accepted
+            compromise, not a flaw unique to this design.
+          </p>
+        </div>
+      </section>
+
+      <section id="dont">
+        <div class="sec-head">
+          <span class="sec-num">13</span>
+          <h2>Anti-patterns</h2>
+        </div>
+        <p class="lede">
+          Concrete mistakes, roughly in order of how damaging they are.
+        </p>
+
+        <div class="dont">
+          <h4>Storing passwords reversibly</h4>
+          <p>
+            Plain text, encrypted, or hashed with a fast algorithm like MD5 or
+            SHA-256. Unrecoverable once breached, and it exposes every user who
+            reused that password elsewhere. Use bcrypt (or argon2/scrypt).
+          </p>
+        </div>
+        <div class="dont">
+          <h4>Putting secrets in the payload</h4>
+          <p>
+            Base64 is not encryption. Anything in the claims is readable by
+            whoever holds the token.
+          </p>
+        </div>
+        <div class="dont">
+          <h4>Omitting <code>exp</code></h4>
+          <p>
+            A token with no expiry is a permanent credential you cannot
+            withdraw.
+          </p>
+        </div>
+        <div class="dont">
+          <h4>Committing <code>JWT_SECRET</code></h4>
+          <p>
+            Anyone with the secret forges admin tokens at will. And if it is
+            ever committed, rotating it is the only fix — deleting it in a later
+            commit leaves it in Git history.
+          </p>
+        </div>
+        <div class="dont">
+          <h4>Trusting client-supplied roles</h4>
+          <p>
+            The role must come from the <b>verified token</b>, never from a
+            request body or query parameter. A client that can say
+            <code>?role=admin</code> is not an access control system.
+          </p>
+        </div>
+        <div class="dont">
+          <h4>Distinguishing login failure reasons</h4>
+          <p>
+            "Email not found" versus "incorrect password" hands an attacker a
+            list of valid accounts. One generic message for both.
+          </p>
+        </div>
+        <div class="dont">
+          <h4>Logging tokens or passwords</h4>
+          <p>
+            They end up in CloudWatch in plain text, readable by anyone with log
+            access, retained indefinitely.
+          </p>
+        </div>
+        <div class="dont">
+          <h4>Checking the role only in the UI</h4>
+          <p>
+            Hiding the admin link is presentation, not security. Every protected
+            endpoint enforces its own role check server-side, because clients
+            can call the API directly.
+          </p>
+        </div>
+      </section>
+
+      <section id="glossary">
+        <div class="sec-head">
+          <span class="sec-num">14</span>
+          <h2>Glossary</h2>
+        </div>
+        <table class="tbl">
+          <tbody>
+            <tr>
+              <td class="m" style="width: 230px">AuthN (Authentication)</td>
+              <td>Verifying who someone is.</td>
+            </tr>
+            <tr>
+              <td class="m">AuthZ (Authorization)</td>
+              <td>Verifying what they are permitted to do.</td>
+            </tr>
+            <tr>
+              <td class="m">JWT (JSON Web Token)</td>
+              <td>
+                A signed, self-contained token carrying identity claims.
+                Pronounced "jot."
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Claim</td>
+              <td>
+                One key/value fact inside a JWT payload, e.g.
+                <code>role: admin</code>.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Bearer token</td>
+              <td>A credential where mere possession grants access.</td>
+            </tr>
+            <tr>
+              <td class="m">HMAC</td>
+              <td>
+                Hash-based Message Authentication Code — the keyed hash
+                producing a JWT signature.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">HS256 / RS256</td>
+              <td>
+                Symmetric (shared secret) and asymmetric (key pair) JWT signing
+                algorithms.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Salt</td>
+              <td>
+                Random per-password value making identical passwords hash
+                differently.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Cost factor</td>
+              <td>
+                bcrypt's tunable work parameter; each increment doubles the time
+                to hash.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Access token</td>
+              <td>Short-lived token sent on every request.</td>
+            </tr>
+            <tr>
+              <td class="m">Refresh token</td>
+              <td>
+                Long-lived, revocable token used only to obtain new access
+                tokens.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">XSS</td>
+              <td>
+                Cross-Site Scripting — attacker-controlled JavaScript executing
+                in your page.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">CSRF</td>
+              <td>
+                Cross-Site Request Forgery — a third-party site triggering
+                authenticated requests.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">httpOnly</td>
+              <td>Cookie flag making a cookie unreadable by JavaScript.</td>
+            </tr>
+            <tr>
+              <td class="m">SameSite</td>
+              <td>
+                Cookie flag restricting cross-site sending; the primary CSRF
+                mitigation.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">OAuth2</td>
+              <td>
+                A delegated-authorization framework — for third-party access,
+                not simple login.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">MFA</td>
+              <td>
+                Multi-Factor Authentication — requiring a second proof beyond a
+                password.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <footer>
+        <span>Manitou — API authentication reference</span>
+        <span>Companion to PROJECT_PLAN.md §8</span>
+      </footer>
+    </div>
+
+    <script>
+      (function () {
+        var links = Array.prototype.slice.call(
+          document.querySelectorAll(".toc a"),
+        );
+        var sections = links.map(function (a) {
+          return document.querySelector(a.getAttribute("href"));
+        });
+        function sync() {
+          var pos = window.scrollY + 130,
+            idx = 0;
+          for (var i = 0; i < sections.length; i++) {
+            if (sections[i] && sections[i].offsetTop <= pos) idx = i;
+          }
+          links.forEach(function (a, i) {
+            a.classList.toggle("on", i === idx);
+          });
+        }
+        var ticking = false;
+        window.addEventListener(
+          "scroll",
+          function () {
+            if (!ticking) {
+              window.requestAnimationFrame(function () {
+                sync();
+                ticking = false;
+              });
+              ticking = true;
+            }
+          },
+          { passive: true },
+        );
+        sync();
+      })();
+    </script>
+  </body>
+</html>
