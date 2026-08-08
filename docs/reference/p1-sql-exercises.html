@@ -1,313 +1,735 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SQL Exercises — Manitou Phase 1</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-:root{
-  --ground:#0E141B; --surface:#161F29; --surface-2:#1D2833; --line:#2A3947;
-  --ink:#E6EDF4; --muted:#8496A6; --docker:#4DB6E2; --pg:#D4A32C; --both:#8FA98B;
-  --display:"Barlow Condensed",system-ui,sans-serif;
-  --body:"IBM Plex Sans",system-ui,sans-serif;
-  --mono:"IBM Plex Mono",ui-monospace,monospace;
-}
-*{box-sizing:border-box}
-html{scroll-behavior:smooth}
-@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
-body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);
-  font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
-.wrap{max-width:1080px;margin:0 auto;padding:0 24px 96px}
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SQL Exercises — Manitou Phase 1</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ground: #0e141b;
+        --surface: #161f29;
+        --surface-2: #1d2833;
+        --line: #2a3947;
+        --ink: #e6edf4;
+        --muted: #8496a6;
+        --docker: #4db6e2;
+        --pg: #d4a32c;
+        --both: #8fa98b;
+        --display: "Barlow Condensed", system-ui, sans-serif;
+        --body: "IBM Plex Sans", system-ui, sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+        font-family: var(--body);
+        font-size: 16px;
+        line-height: 1.65;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 24px 96px;
+      }
 
-.masthead{padding:72px 0 40px;border-bottom:1px solid var(--line)}
-.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
-  color:var(--muted);margin:0 0 18px}
-h1{font-family:var(--display);font-weight:700;font-size:clamp(44px,8vw,86px);
-  line-height:.92;letter-spacing:-.01em;margin:0 0 20px;text-transform:uppercase}
-h1 .sep{color:var(--muted);font-weight:500}
-.standfirst{max-width:62ch;color:var(--muted);font-size:17px;margin:0}
-.standfirst strong{color:var(--ink);font-weight:500}
+      .masthead {
+        padding: 72px 0 40px;
+        border-bottom: 1px solid var(--line);
+      }
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 18px;
+      }
+      h1 {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: clamp(44px, 8vw, 86px);
+        line-height: 0.92;
+        letter-spacing: -0.01em;
+        margin: 0 0 20px;
+        text-transform: uppercase;
+      }
+      h1 .sep {
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .standfirst {
+        max-width: 62ch;
+        color: var(--muted);
+        font-size: 17px;
+        margin: 0;
+      }
+      .standfirst strong {
+        color: var(--ink);
+        font-weight: 500;
+      }
 
-.notice{border:1px solid var(--line);border-left:3px solid var(--both);
-  background:var(--surface);padding:16px 20px;margin:28px 0 0;border-radius:2px}
-.notice p{margin:0;font-size:14.5px;color:var(--muted);max-width:74ch}
-.notice p + p{margin-top:10px}
-.notice b{color:var(--ink);font-weight:500}
-.notice.warn{border-left-color:var(--pg)}
+      .notice {
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--both);
+        background: var(--surface);
+        padding: 16px 20px;
+        margin: 28px 0 0;
+        border-radius: 2px;
+      }
+      .notice p {
+        margin: 0;
+        font-size: 14.5px;
+        color: var(--muted);
+        max-width: 74ch;
+      }
+      .notice p + p {
+        margin-top: 10px;
+      }
+      .notice b {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .notice.warn {
+        border-left-color: var(--pg);
+      }
 
-.toc{position:sticky;top:0;z-index:10;background:rgba(14,20,27,.92);backdrop-filter:blur(8px);
-  border-bottom:1px solid var(--line);display:flex;gap:2px;overflow-x:auto;padding:10px 0;margin-bottom:-1px}
-.toc a{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
-  color:var(--muted);text-decoration:none;padding:6px 12px;border-radius:2px;white-space:nowrap}
-.toc a:hover,.toc a:focus-visible{color:var(--ink);background:var(--surface-2)}
-.toc a.on{color:var(--ink);background:var(--surface-2)}
+      .toc {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: rgba(14, 20, 27, 0.92);
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 2px;
+        overflow-x: auto;
+        padding: 10px 0;
+        margin-bottom: -1px;
+      }
+      .toc a {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-decoration: none;
+        padding: 6px 12px;
+        border-radius: 2px;
+        white-space: nowrap;
+      }
+      .toc a:hover,
+      .toc a:focus-visible {
+        color: var(--ink);
+        background: var(--surface-2);
+      }
+      .toc a.on {
+        color: var(--ink);
+        background: var(--surface-2);
+      }
 
-section{padding:64px 0 0;scroll-margin-top:20px}
-.sec-head{display:flex;align-items:baseline;gap:16px;margin:0 0 8px}
-.sec-num{font-family:var(--mono);font-size:12px;color:var(--muted);
-  border:1px solid var(--line);padding:3px 8px;border-radius:2px;flex:none}
-h2{font-family:var(--display);font-weight:600;text-transform:uppercase;
-  font-size:clamp(26px,4vw,38px);line-height:1.05;letter-spacing:.01em;margin:0}
-.lede{max-width:66ch;color:var(--muted);margin:14px 0 0}
-p{max-width:68ch}
-code{font-family:var(--mono);font-size:.88em;background:var(--surface-2);
-  border:1px solid var(--line);padding:1px 5px;border-radius:2px;color:var(--ink)}
+      section {
+        padding: 64px 0 0;
+        scroll-margin-top: 20px;
+      }
+      .sec-head {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        margin: 0 0 8px;
+      }
+      .sec-num {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        padding: 3px 8px;
+        border-radius: 2px;
+        flex: none;
+      }
+      h2 {
+        font-family: var(--display);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: clamp(26px, 4vw, 38px);
+        line-height: 1.05;
+        letter-spacing: 0.01em;
+        margin: 0;
+      }
+      .lede {
+        max-width: 66ch;
+        color: var(--muted);
+        margin: 14px 0 0;
+      }
+      p {
+        max-width: 68ch;
+      }
+      code {
+        font-family: var(--mono);
+        font-size: 0.88em;
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        padding: 1px 5px;
+        border-radius: 2px;
+        color: var(--ink);
+      }
 
-.ex{border:1px solid var(--line);background:var(--surface);border-radius:2px;margin:24px 0 0;overflow:hidden}
-.ex-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-  padding:16px 20px;border-bottom:1px solid var(--line);background:var(--surface-2)}
-.ex-n{font-family:var(--mono);font-size:12px;color:var(--ground);background:var(--pg);
-  padding:3px 9px;border-radius:2px;font-weight:500;flex:none}
-.ex-title{font-family:var(--display);font-weight:600;font-size:20px;
-  text-transform:uppercase;letter-spacing:.02em}
-.concept{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--docker);border:1px solid rgba(77,182,226,.35);padding:4px 8px;
-  border-radius:2px;margin-left:auto;white-space:nowrap}
-.ex-body{padding:20px}
-.ex-body > p{margin:0 0 16px}
-.ex-body > p:last-child{margin-bottom:0}
+      .ex {
+        border: 1px solid var(--line);
+        background: var(--surface);
+        border-radius: 2px;
+        margin: 24px 0 0;
+        overflow: hidden;
+      }
+      .ex-head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface-2);
+      }
+      .ex-n {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--ground);
+        background: var(--pg);
+        padding: 3px 9px;
+        border-radius: 2px;
+        font-weight: 500;
+        flex: none;
+      }
+      .ex-title {
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 20px;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+      }
+      .concept {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--docker);
+        border: 1px solid rgba(77, 182, 226, 0.35);
+        padding: 4px 8px;
+        border-radius: 2px;
+        margin-left: auto;
+        white-space: nowrap;
+      }
+      .ex-body {
+        padding: 20px;
+      }
+      .ex-body > p {
+        margin: 0 0 16px;
+      }
+      .ex-body > p:last-child {
+        margin-bottom: 0;
+      }
 
-pre{font-family:var(--mono);font-size:13.5px;line-height:1.7;background:var(--ground);
-  border:1px solid var(--line);border-radius:2px;padding:16px 18px;margin:0 0 16px;
-  overflow-x:auto;color:var(--ink)}
-pre.out{color:var(--muted);font-size:12.5px;line-height:1.6;border-left:3px solid var(--both)}
-.label{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--muted);display:block;margin:0 0 8px}
-.kw{color:var(--pg)}
-.str{color:var(--both)}
+      pre {
+        font-family: var(--mono);
+        font-size: 13.5px;
+        line-height: 1.7;
+        background: var(--ground);
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        padding: 16px 18px;
+        margin: 0 0 16px;
+        overflow-x: auto;
+        color: var(--ink);
+      }
+      pre.out {
+        color: var(--muted);
+        font-size: 12.5px;
+        line-height: 1.6;
+        border-left: 3px solid var(--both);
+      }
+      .label {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        display: block;
+        margin: 0 0 8px;
+      }
+      .kw {
+        color: var(--pg);
+      }
+      .str {
+        color: var(--both);
+      }
 
-.syntax{border-left:2px solid var(--line);padding:2px 0 2px 16px;margin:0 0 16px}
-.syntax dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:8px 16px;align-items:baseline}
-.syntax dt{font-family:var(--mono);font-size:13px;color:var(--docker);white-space:nowrap}
-.syntax dd{margin:0;color:var(--muted);font-size:14.5px}
+      .syntax {
+        border-left: 2px solid var(--line);
+        padding: 2px 0 2px 16px;
+        margin: 0 0 16px;
+      }
+      .syntax dl {
+        margin: 0;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 8px 16px;
+        align-items: baseline;
+      }
+      .syntax dt {
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--docker);
+        white-space: nowrap;
+      }
+      .syntax dd {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14.5px;
+      }
 
-.challenge{border-left:3px solid var(--docker)}
-.challenge .ex-n{background:var(--docker)}
-.reveal{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
-  background:transparent;color:var(--docker);border:1px solid rgba(77,182,226,.4);
-  padding:8px 14px;border-radius:2px;cursor:pointer;transition:background .15s ease}
-.reveal:hover,.reveal:focus-visible{background:var(--surface-2)}
-.answer[hidden]{display:none}
-.answer{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+      .challenge {
+        border-left: 3px solid var(--docker);
+      }
+      .challenge .ex-n {
+        background: var(--docker);
+      }
+      .reveal {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        background: transparent;
+        color: var(--docker);
+        border: 1px solid rgba(77, 182, 226, 0.4);
+        padding: 8px 14px;
+        border-radius: 2px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      .reveal:hover,
+      .reveal:focus-visible {
+        background: var(--surface-2);
+      }
+      .answer[hidden] {
+        display: none;
+      }
+      .answer {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+      }
 
-.tbl{width:100%;border-collapse:collapse;margin:24px 0 0;font-size:15px}
-.tbl th{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--muted);text-align:left;padding:0 16px 10px 0;border-bottom:1px solid var(--line);font-weight:400}
-.tbl td{padding:12px 16px 12px 0;border-bottom:1px solid var(--line);vertical-align:top}
-.tbl tr:last-child td{border-bottom:none}
-.tbl .m{font-family:var(--mono);font-size:13px;color:var(--ink);white-space:nowrap}
+      .tbl {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 24px 0 0;
+        font-size: 15px;
+      }
+      .tbl th {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-align: left;
+        padding: 0 16px 10px 0;
+        border-bottom: 1px solid var(--line);
+        font-weight: 400;
+      }
+      .tbl td {
+        padding: 12px 16px 12px 0;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      .tbl tr:last-child td {
+        border-bottom: none;
+      }
+      .tbl .m {
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--ink);
+        white-space: nowrap;
+      }
 
-footer{margin-top:80px;padding-top:24px;border-top:1px solid var(--line);
-  font-family:var(--mono);font-size:11.5px;color:var(--muted);
-  display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
-:focus-visible{outline:2px solid var(--docker);outline-offset:2px}
+      footer {
+        margin-top: 80px;
+        padding-top: 24px;
+        border-top: 1px solid var(--line);
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--muted);
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      :focus-visible {
+        outline: 2px solid var(--docker);
+        outline-offset: 2px;
+      }
 
-@media (max-width:720px){
-  .masthead{padding:48px 0 32px}
-  .concept{margin-left:0}
-  .syntax dl{grid-template-columns:1fr;gap:4px 0}
-  .syntax dd{margin-bottom:8px}
-}
-</style>
-</head>
-<body>
-<div class="wrap">
+      @media (max-width: 720px) {
+        .masthead {
+          padding: 48px 0 32px;
+        }
+        .concept {
+          margin-left: 0;
+        }
+        .syntax dl {
+          grid-template-columns: 1fr;
+          gap: 4px 0;
+        }
+        .syntax dd {
+          margin-bottom: 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="masthead">
+        <p class="eyebrow">
+          Manitou · Phase 1, step 7 · Companion to the Docker &amp; PostgreSQL
+          reference
+        </p>
+        <h1>SQL <span class="sep">/</span><br />Exercises</h1>
+        <p class="standfirst">
+          Worked queries against <strong>your actual seeded data</strong>, from
+          reading a single table to aggregating across three. Every expected
+          output below is computed from <code>seed.py</code> — these are the
+          exact rows you should see.
+        </p>
+        <div class="notice">
+          <p>
+            <b>Your seed data at a glance:</b> 3 categories (Apparel, with
+            T-Shirts and Accessories as children), 3 products,
+            <b>7 variants</b>, 7 inventory rows, 3 product images, 1 admin user.
+            Orders, carts, addresses, and payments are all empty.
+          </p>
+          <p>
+            <b>On row order:</b> without an <code>ORDER BY</code>, PostgreSQL
+            makes no guarantee about the order rows come back in. Outputs below
+            assume insertion order, which is what you'll normally see on a
+            freshly seeded table — but if your rows appear in a different order,
+            that isn't a bug.
+          </p>
+        </div>
+      </header>
 
-  <header class="masthead">
-    <p class="eyebrow">Manitou · Phase 1, step 7 · Companion to the Docker &amp; PostgreSQL reference</p>
-    <h1>SQL <span class="sep">/</span><br>Exercises</h1>
-    <p class="standfirst">Worked queries against <strong>your actual seeded data</strong>, from reading a single
-      table to aggregating across three. Every expected output below is computed from
-      <code>seed.py</code> — these are the exact rows you should see.</p>
-    <div class="notice">
-      <p><b>Your seed data at a glance:</b> 3 categories (Apparel, with T-Shirts and Accessories as children),
-        3 products, <b>7 variants</b>, 7 inventory rows, 3 product images, 1 admin user. Orders, carts, addresses,
-        and payments are all empty.</p>
-      <p><b>On row order:</b> without an <code>ORDER BY</code>, PostgreSQL makes no guarantee about the order rows
-        come back in. Outputs below assume insertion order, which is what you'll normally see on a freshly seeded
-        table — but if your rows appear in a different order, that isn't a bug.</p>
-    </div>
-  </header>
+      <nav class="toc" aria-label="Sections">
+        <a href="#connect">Connect</a>
+        <a href="#reading">Reading rows</a>
+        <a href="#filtering">Filtering</a>
+        <a href="#jsonb">JSONB</a>
+        <a href="#joins">Joins</a>
+        <a href="#aggregates">Aggregates</a>
+        <a href="#cte">CTEs</a>
+        <a href="#challenges">Challenges</a>
+        <a href="#meta">psql commands</a>
+      </nav>
 
-  <nav class="toc" aria-label="Sections">
-    <a href="#connect">Connect</a>
-    <a href="#reading">Reading rows</a>
-    <a href="#filtering">Filtering</a>
-    <a href="#jsonb">JSONB</a>
-    <a href="#joins">Joins</a>
-    <a href="#aggregates">Aggregates</a>
-    <a href="#cte">CTEs</a>
-    <a href="#challenges">Challenges</a>
-    <a href="#meta">psql commands</a>
-  </nav>
+      <section id="connect">
+        <div class="sec-head">
+          <span class="sec-num">00</span>
+          <h2>Connect</h2>
+        </div>
+        <p class="lede">
+          Everything below runs at the <code>manitou=#</code> prompt. Type each
+          one yourself rather than pasting — the point of step 7 is building
+          muscle memory, not confirming the queries work.
+        </p>
+        <pre>psql -h localhost -p 5432 -U manitou -d manitou</pre>
+        <p>
+          Every statement ends with a semicolon. If your prompt changes to
+          <code>manitou-#</code>, psql is waiting for you to finish the
+          statement — type <code>;</code> and press enter.
+        </p>
+      </section>
 
-  <section id="connect">
-    <div class="sec-head"><span class="sec-num">00</span><h2>Connect</h2></div>
-    <p class="lede">Everything below runs at the <code>manitou=#</code> prompt. Type each one yourself rather than
-      pasting — the point of step 7 is building muscle memory, not confirming the queries work.</p>
-    <pre>psql -h localhost -p 5432 -U manitou -d manitou</pre>
-    <p>Every statement ends with a semicolon. If your prompt changes to <code>manitou-#</code>, psql is waiting for
-      you to finish the statement — type <code>;</code> and press enter.</p>
-  </section>
+      <section id="reading">
+        <div class="sec-head">
+          <span class="sec-num">01</span>
+          <h2>Reading rows</h2>
+        </div>
+        <p class="lede">
+          The four clauses that make up almost every query you'll ever write.
+        </p>
 
-  <section id="reading">
-    <div class="sec-head"><span class="sec-num">01</span><h2>Reading rows</h2></div>
-    <p class="lede">The four clauses that make up almost every query you'll ever write.</p>
-
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">01</span><span class="ex-title">Everything in a table</span><span class="concept">SELECT *</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> * <span class="kw">FROM</span> categories;</pre>
-        <div class="syntax"><dl>
-          <dt>SELECT</dt><dd>which columns you want back</dd>
-          <dt>*</dt><dd>all of them</dd>
-          <dt>FROM</dt><dd>which table to read</dd>
-        </dl></div>
-        <span class="label">Expected</span>
-        <pre class="out"> id |    name     |    slug     | parent_id
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">01</span
+            ><span class="ex-title">Everything in a table</span
+            ><span class="concept">SELECT *</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> * <span class="kw">FROM</span> categories;</pre>
+            <div class="syntax">
+              <dl>
+                <dt>SELECT</dt>
+                <dd>which columns you want back</dd>
+                <dt>*</dt>
+                <dd>all of them</dd>
+                <dt>FROM</dt>
+                <dd>which table to read</dd>
+              </dl>
+            </div>
+            <span class="label">Expected</span>
+            <pre class="out">
+ id |    name     |    slug     | parent_id
 ----+-------------+-------------+-----------
   1 | Apparel     | apparel     |
   2 | T-Shirts    | t-shirts    |         1
   3 | Accessories | accessories |         1
-(3 rows)</pre>
-        <p>Note <code>parent_id</code>: Apparel is a top-level category (NULL parent), while T-Shirts and
-          Accessories both point back at it. That's a table referencing <em>itself</em> — the self-referencing
-          foreign key from Section 6.3. Exercise 18 queries it properly.</p>
-      </div>
-    </article>
+(3 rows)</pre
+            >
+            <p>
+              Note <code>parent_id</code>: Apparel is a top-level category (NULL
+              parent), while T-Shirts and Accessories both point back at it.
+              That's a table referencing <em>itself</em> — the self-referencing
+              foreign key from Section 6.3. Exercise 18 queries it properly.
+            </p>
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">02</span><span class="ex-title">Specific columns</span><span class="concept">Column list</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> name, slug, base_price <span class="kw">FROM</span> products;</pre>
-        <span class="label">Expected</span>
-        <pre class="out">        name        |        slug        | base_price
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">02</span
+            ><span class="ex-title">Specific columns</span
+            ><span class="concept">Column list</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> name, slug, base_price <span class="kw">FROM</span> products;</pre>
+            <span class="label">Expected</span>
+            <pre class="out">
+        name        |        slug        | base_price
 --------------------+--------------------+------------
  Classic Cotton Tee | classic-cotton-tee |      24.00
  Graphic Print Tee  | graphic-print-tee  |      29.00
  Canvas Tote Bag    | canvas-tote-bag    |      18.00
-(3 rows)</pre>
-        <p>Prices display as <code>24.00</code>, not <code>23.999999</code> — that's <code>numeric(10,2)</code>
-          doing its job. Your seed script passes <code>Decimal("24.00")</code> rather than a float for the same
-          reason: floats can't represent money exactly.</p>
-      </div>
-    </article>
+(3 rows)</pre
+            >
+            <p>
+              Prices display as <code>24.00</code>, not <code>23.999999</code> —
+              that's <code>numeric(10,2)</code> doing its job. Your seed script
+              passes <code>Decimal("24.00")</code> rather than a float for the
+              same reason: floats can't represent money exactly.
+            </p>
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">03</span><span class="ex-title">Sorting results</span><span class="concept">ORDER BY</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> name, base_price <span class="kw">FROM</span> products <span class="kw">ORDER BY</span> base_price <span class="kw">DESC</span>;</pre>
-        <div class="syntax"><dl>
-          <dt>ORDER BY</dt><dd>which column to sort on</dd>
-          <dt>DESC</dt><dd>highest first; <code>ASC</code> or nothing = lowest first</dd>
-        </dl></div>
-        <span class="label">Expected</span>
-        <pre class="out">        name        | base_price
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">03</span
+            ><span class="ex-title">Sorting results</span
+            ><span class="concept">ORDER BY</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> name, base_price <span class="kw">FROM</span> products <span class="kw">ORDER BY</span> base_price <span class="kw">DESC</span>;</pre>
+            <div class="syntax">
+              <dl>
+                <dt>ORDER BY</dt>
+                <dd>which column to sort on</dd>
+                <dt>DESC</dt>
+                <dd>
+                  highest first; <code>ASC</code> or nothing = lowest first
+                </dd>
+              </dl>
+            </div>
+            <span class="label">Expected</span>
+            <pre class="out">
+        name        | base_price
 --------------------+------------
  Graphic Print Tee  |      29.00
  Classic Cotton Tee |      24.00
  Canvas Tote Bag    |      18.00
-(3 rows)</pre>
-      </div>
-    </article>
+(3 rows)</pre
+            >
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">04</span><span class="ex-title">Capping results</span><span class="concept">LIMIT</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> name, base_price <span class="kw">FROM</span> products
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">04</span
+            ><span class="ex-title">Capping results</span
+            ><span class="concept">LIMIT</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> name, base_price <span class="kw">FROM</span> products
 <span class="kw">ORDER BY</span> base_price <span class="kw">DESC</span>
 <span class="kw">LIMIT</span> <span class="str">2</span>;</pre>
-        <p>Trivial at 3 products, essential in Phase 2 — every catalog endpoint will paginate with
-          <code>LIMIT</code> and <code>OFFSET</code> rather than returning everything.</p>
-        <span class="label">Expected</span>
-        <pre class="out">        name        | base_price
+            <p>
+              Trivial at 3 products, essential in Phase 2 — every catalog
+              endpoint will paginate with <code>LIMIT</code> and
+              <code>OFFSET</code> rather than returning everything.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+        name        | base_price
 --------------------+------------
  Graphic Print Tee  |      29.00
  Classic Cotton Tee |      24.00
-(2 rows)</pre>
-      </div>
-    </article>
-  </section>
+(2 rows)</pre
+            >
+          </div>
+        </article>
+      </section>
 
-  <section id="filtering">
-    <div class="sec-head"><span class="sec-num">02</span><h2>Filtering</h2></div>
-    <p class="lede">Narrowing which rows come back — <code>WHERE</code> and its variations.</p>
+      <section id="filtering">
+        <div class="sec-head">
+          <span class="sec-num">02</span>
+          <h2>Filtering</h2>
+        </div>
+        <p class="lede">
+          Narrowing which rows come back — <code>WHERE</code> and its
+          variations.
+        </p>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">05</span><span class="ex-title">Basic condition</span><span class="concept">WHERE</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> name, unit_of_measure <span class="kw">FROM</span> products
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">05</span
+            ><span class="ex-title">Basic condition</span
+            ><span class="concept">WHERE</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> name, unit_of_measure <span class="kw">FROM</span> products
 <span class="kw">WHERE</span> unit_of_measure = <span class="str">'each'</span>;</pre>
-        <p>Returns everything — your seed script never sets <code>unit_of_measure</code>, so all three products get
-          the column default. Worth running to see the mechanics, and to confirm the Section 1.1 default actually
-          applied.</p>
-        <p><b>String literals use single quotes</b> in SQL — <code>'each'</code>, never <code>"each"</code>. Double
-          quotes mean an identifier (a column or table name), which is a different thing entirely.</p>
-        <span class="label">Expected</span>
-        <pre class="out">        name        | unit_of_measure
+            <p>
+              Returns everything — your seed script never sets
+              <code>unit_of_measure</code>, so all three products get the column
+              default. Worth running to see the mechanics, and to confirm the
+              Section 1.1 default actually applied.
+            </p>
+            <p>
+              <b>String literals use single quotes</b> in SQL —
+              <code>'each'</code>, never <code>"each"</code>. Double quotes mean
+              an identifier (a column or table name), which is a different thing
+              entirely.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+        name        | unit_of_measure
 --------------------+-----------------
  Classic Cotton Tee | each
  Graphic Print Tee  | each
  Canvas Tote Bag    | each
-(3 rows)</pre>
-      </div>
-    </article>
+(3 rows)</pre
+            >
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">06</span><span class="ex-title">Combining conditions</span><span class="concept">AND · OR</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> name, base_price <span class="kw">FROM</span> products
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">06</span
+            ><span class="ex-title">Combining conditions</span
+            ><span class="concept">AND · OR</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> name, base_price <span class="kw">FROM</span> products
 <span class="kw">WHERE</span> is_active = <span class="kw">true</span>
   <span class="kw">AND</span> base_price &lt; <span class="str">20.00</span>;</pre>
-        <p>Operators work as expected: <code>=</code>, <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>,
-          <code>&gt;=</code>, and <code>&lt;&gt;</code> or <code>!=</code> for "not equal."</p>
-        <span class="label">Expected</span>
-        <pre class="out">      name       | base_price
+            <p>
+              Operators work as expected: <code>=</code>, <code>&lt;</code>,
+              <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>, and
+              <code>&lt;&gt;</code> or <code>!=</code> for "not equal."
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+      name       | base_price
 -----------------+------------
  Canvas Tote Bag |      18.00
-(1 row)</pre>
-      </div>
-    </article>
+(1 row)</pre
+            >
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">07</span><span class="ex-title">Pattern matching</span><span class="concept">LIKE · ILIKE</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> name, slug <span class="kw">FROM</span> products
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">07</span
+            ><span class="ex-title">Pattern matching</span
+            ><span class="concept">LIKE · ILIKE</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> name, slug <span class="kw">FROM</span> products
 <span class="kw">WHERE</span> name <span class="kw">ILIKE</span> <span class="str">'%tee%'</span>;</pre>
-        <div class="syntax"><dl>
-          <dt>LIKE</dt><dd>pattern match, case-sensitive</dd>
-          <dt>ILIKE</dt><dd>same, case-<em>insensitive</em> — a PostgreSQL extension, not standard SQL</dd>
-          <dt>%</dt><dd>wildcard: any sequence of characters</dd>
-          <dt>_</dt><dd>wildcard: exactly one character</dd>
-        </dl></div>
-        <p>The crude version of the Phase 2 product search. Try <code>LIKE</code> instead of <code>ILIKE</code> and
-          you'll get <b>zero rows</b> — your product names capitalise "Tee", so a case-sensitive match on
-          <code>'%tee%'</code> finds nothing.</p>
-        <span class="label">Expected</span>
-        <pre class="out">        name        |        slug
+            <div class="syntax">
+              <dl>
+                <dt>LIKE</dt>
+                <dd>pattern match, case-sensitive</dd>
+                <dt>ILIKE</dt>
+                <dd>
+                  same, case-<em>insensitive</em> — a PostgreSQL extension, not
+                  standard SQL
+                </dd>
+                <dt>%</dt>
+                <dd>wildcard: any sequence of characters</dd>
+                <dt>_</dt>
+                <dd>wildcard: exactly one character</dd>
+              </dl>
+            </div>
+            <p>
+              The crude version of the Phase 2 product search. Try
+              <code>LIKE</code> instead of <code>ILIKE</code> and you'll get
+              <b>zero rows</b> — your product names capitalise "Tee", so a
+              case-sensitive match on <code>'%tee%'</code> finds nothing.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+        name        |        slug
 --------------------+--------------------
  Classic Cotton Tee | classic-cotton-tee
  Graphic Print Tee  | graphic-print-tee
-(2 rows)</pre>
-      </div>
-    </article>
+(2 rows)</pre
+            >
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">08</span><span class="ex-title">Missing values</span><span class="concept">IS NULL</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> sku, variant_name, price_override <span class="kw">FROM</span> product_variants
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">08</span
+            ><span class="ex-title">Missing values</span
+            ><span class="concept">IS NULL</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> sku, variant_name, price_override <span class="kw">FROM</span> product_variants
 <span class="kw">WHERE</span> price_override <span class="kw">IS NULL</span>;</pre>
-        <p><b>The trap worth internalizing now:</b> <code>= NULL</code> never matches anything, even genuinely null
-          values. NULL means "unknown," and comparing anything to unknown yields unknown, not true. Use
-          <code>IS NULL</code> / <code>IS NOT NULL</code>.</p>
-        <p>Per Section 6.3, a null override means the variant falls back to its product's
-          <code>base_price</code> — so this finds every normally-priced variant. Only the Large / Navy graphic tee
-          has an override.</p>
-        <span class="label">Expected</span>
-        <pre class="out">      sku      |  variant_name   | price_override
+            <p>
+              <b>The trap worth internalizing now:</b> <code>= NULL</code> never
+              matches anything, even genuinely null values. NULL means
+              "unknown," and comparing anything to unknown yields unknown, not
+              true. Use <code>IS NULL</code> / <code>IS NOT NULL</code>.
+            </p>
+            <p>
+              Per Section 6.3, a null override means the variant falls back to
+              its product's <code>base_price</code> — so this finds every
+              normally-priced variant. Only the Large / Navy graphic tee has an
+              override.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+      sku      |  variant_name   | price_override
 ---------------+-----------------+----------------
  TEE-CLS-S-BLK | Small / Black   |
  TEE-CLS-M-BLK | Medium / Black  |
@@ -315,27 +737,45 @@ footer{margin-top:80px;padding-top:24px;border-top:1px solid var(--line);
  TEE-CLS-M-WHT | Medium / White  |
  TEE-GRA-M-NVY | Medium / Navy   |
  BAG-TOTE-STD  | Canvas Tote Bag |
-(6 rows)</pre>
-        <p>The blank column is how psql renders NULL — indistinguishable from an empty string at a glance. Run
-          <code>\pset null '(null)'</code> to make the difference visible.</p>
-      </div>
-    </article>
-  </section>
+(6 rows)</pre
+            >
+            <p>
+              The blank column is how psql renders NULL — indistinguishable from
+              an empty string at a glance. Run
+              <code>\pset null '(null)'</code> to make the difference visible.
+            </p>
+          </div>
+        </article>
+      </section>
 
-  <section id="jsonb">
-    <div class="sec-head"><span class="sec-num">03</span><h2>Querying JSONB</h2></div>
-    <p class="lede">Reaching inside the <code>attributes</code> column — the Section 1.1 reusability seam, made
-      concrete.</p>
+      <section id="jsonb">
+        <div class="sec-head">
+          <span class="sec-num">03</span>
+          <h2>Querying JSONB</h2>
+        </div>
+        <p class="lede">
+          Reaching inside the <code>attributes</code> column — the Section 1.1
+          reusability seam, made concrete.
+        </p>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">09</span><span class="ex-title">All attributes, side by side</span><span class="concept">Raw view</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> sku, variant_name, attributes <span class="kw">FROM</span> product_variants <span class="kw">ORDER BY</span> id;</pre>
-        <p>Before filtering on anything, just look at the raw column. This is your actual answer to "what does the
-          single-item product's <code>attributes</code> look like next to the others" — six populated objects, then
-          one empty one, in the order <code>seed.py</code> inserted them.</p>
-        <span class="label">Expected</span>
-        <pre class="out">      sku      |  variant_name   |          attributes
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">09</span
+            ><span class="ex-title">All attributes, side by side</span
+            ><span class="concept">Raw view</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> sku, variant_name, attributes <span class="kw">FROM</span> product_variants <span class="kw">ORDER BY</span> id;</pre>
+            <p>
+              Before filtering on anything, just look at the raw column. This is
+              your actual answer to "what does the single-item product's
+              <code>attributes</code> look like next to the others" — six
+              populated objects, then one empty one, in the order
+              <code>seed.py</code> inserted them.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+      sku      |  variant_name   |          attributes
 ---------------+-----------------+---------------------------------
  TEE-CLS-S-BLK | Small / Black   | {"size": "S", "color": "Black"}
  TEE-CLS-M-BLK | Medium / Black  | {"size": "M", "color": "Black"}
@@ -344,50 +784,91 @@ footer{margin-top:80px;padding-top:24px;border-top:1px solid var(--line);
  TEE-GRA-M-NVY | Medium / Navy   | {"size": "M", "color": "Navy"}
  TEE-GRA-L-NVY | Large / Navy    | {"size": "L", "color": "Navy"}
  BAG-TOTE-STD  | Canvas Tote Bag | {}
-(7 rows)</pre>
-        <p>The tote's <code>{}</code> isn't a NULL, a missing column, or an error — it's a genuinely valid, empty
-          JSON object. That's the mechanism behind Section 1.1's reusability seam: the column always exists and is
-          always valid JSONB, whether a store type needs zero attribute dimensions (this tote), two (these tees), or
-          five (a grocery item with weight, brand, and organic status).</p>
-        <p><b>One incidental detail worth noticing:</b> every object prints as <code>size</code> before
-          <code>color</code>, even though nothing guarantees that ordering. JSONB doesn't preserve insertion order —
-          internally it normalizes key order by length, then alphabetically. "size" (4 letters) sorts before
-          "color" (5 letters) every time, regardless of how the Python dict in <code>seed.py</code> was written.</p>
-      </div>
-    </article>
+(7 rows)</pre
+            >
+            <p>
+              The tote's <code>{}</code> isn't a NULL, a missing column, or an
+              error — it's a genuinely valid, empty JSON object. That's the
+              mechanism behind Section 1.1's reusability seam: the column always
+              exists and is always valid JSONB, whether a store type needs zero
+              attribute dimensions (this tote), two (these tees), or five (a
+              grocery item with weight, brand, and organic status).
+            </p>
+            <p>
+              <b>One incidental detail worth noticing:</b> every object prints
+              as <code>size</code> before <code>color</code>, even though
+              nothing guarantees that ordering. JSONB doesn't preserve insertion
+              order — internally it normalizes key order by length, then
+              alphabetically. "size" (4 letters) sorts before "color" (5
+              letters) every time, regardless of how the Python dict in
+              <code>seed.py</code> was written.
+            </p>
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">10</span><span class="ex-title">Extract a JSON key</span><span class="concept">-&gt;&gt; operator</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> variant_name, attributes <span class="kw">FROM</span> product_variants
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">10</span
+            ><span class="ex-title">Extract a JSON key</span
+            ><span class="concept">-&gt;&gt; operator</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> variant_name, attributes <span class="kw">FROM</span> product_variants
 <span class="kw">WHERE</span> attributes-&gt;&gt;<span class="str">'color'</span> = <span class="str">'Black'</span>;</pre>
-        <div class="syntax"><dl>
-          <dt>-&gt;&gt;</dt><dd>extract a JSON value <b>as text</b> — use this for comparisons</dd>
-          <dt>-&gt;</dt><dd>extract as <b>JSONB</b> — use when chaining into nested objects</dd>
-        </dl></div>
-        <p>This pulls <code>"color"</code> out of <code>{"size": "S", "color": "Black"}</code> and filters on it,
-          even though no <code>color</code> column exists.</p>
-        <p><b>Try <code>'black'</code> lowercase and you get zero rows.</b> JSONB values are case-sensitive strings,
-          and your seed data capitalises them. This is exactly the consistency problem Section 6.4 warns about — the
-          database will not catch it for you, which is why the API layer has to validate attribute values.</p>
-        <span class="label">Expected</span>
-        <pre class="out">  variant_name  |          attributes
+            <div class="syntax">
+              <dl>
+                <dt>-&gt;&gt;</dt>
+                <dd>
+                  extract a JSON value <b>as text</b> — use this for comparisons
+                </dd>
+                <dt>-&gt;</dt>
+                <dd>
+                  extract as <b>JSONB</b> — use when chaining into nested
+                  objects
+                </dd>
+              </dl>
+            </div>
+            <p>
+              This pulls <code>"color"</code> out of
+              <code>{"size": "S", "color": "Black"}</code> and filters on it,
+              even though no <code>color</code> column exists.
+            </p>
+            <p>
+              <b>Try <code>'black'</code> lowercase and you get zero rows.</b>
+              JSONB values are case-sensitive strings, and your seed data
+              capitalises them. This is exactly the consistency problem Section
+              6.4 warns about — the database will not catch it for you, which is
+              why the API layer has to validate attribute values.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+  variant_name  |          attributes
 ----------------+--------------------------------
  Small / Black  | {"size": "S", "color": "Black"}
  Medium / Black | {"size": "M", "color": "Black"}
-(2 rows)</pre>
-      </div>
-    </article>
+(2 rows)</pre
+            >
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">11</span><span class="ex-title">Key existence</span><span class="concept">? operator</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> sku, attributes <span class="kw">FROM</span> product_variants
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">11</span
+            ><span class="ex-title">Key existence</span
+            ><span class="concept">? operator</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> sku, attributes <span class="kw">FROM</span> product_variants
 <span class="kw">WHERE</span> attributes ? <span class="str">'size'</span>;</pre>
-        <p><code>?</code> asks whether a top-level key <em>exists at all</em>, whatever its value. Six of your seven
-          variants have one — the tote's default variant carries <code>{}</code>, so it's excluded.</p>
-        <span class="label">Expected</span>
-        <pre class="out">      sku      |           attributes
+            <p>
+              <code>?</code> asks whether a top-level key
+              <em>exists at all</em>, whatever its value. Six of your seven
+              variants have one — the tote's default variant carries
+              <code>{}</code>, so it's excluded.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+      sku      |           attributes
 ---------------+--------------------------------
  TEE-CLS-S-BLK | {"size": "S", "color": "Black"}
  TEE-CLS-M-BLK | {"size": "M", "color": "Black"}
@@ -395,53 +876,88 @@ footer{margin-top:80px;padding-top:24px;border-top:1px solid var(--line);
  TEE-CLS-M-WHT | {"size": "M", "color": "White"}
  TEE-GRA-M-NVY | {"size": "M", "color": "Navy"}
  TEE-GRA-L-NVY | {"size": "L", "color": "Navy"}
-(6 rows)</pre>
-        <p><b>This is the single-item path in action.</b> Your seed comment explains it: the tote gets one default
-          variant with empty attributes rather than zero variants, because inventory and cart items both hang off
-          <code>product_variants</code>. A storefront checks exactly this — no attribute keys means render no
-          size/colour picker.</p>
-      </div>
-    </article>
+(6 rows)</pre
+            >
+            <p>
+              <b>This is the single-item path in action.</b> Your seed comment
+              explains it: the tote gets one default variant with empty
+              attributes rather than zero variants, because inventory and cart
+              items both hang off <code>product_variants</code>. A storefront
+              checks exactly this — no attribute keys means render no
+              size/colour picker.
+            </p>
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">12</span><span class="ex-title">Distinct values inside JSON</span><span class="concept">DISTINCT</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT DISTINCT</span> attributes-&gt;&gt;<span class="str">'size'</span> <span class="kw">AS</span> size
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">12</span
+            ><span class="ex-title">Distinct values inside JSON</span
+            ><span class="concept">DISTINCT</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT DISTINCT</span> attributes-&gt;&gt;<span class="str">'size'</span> <span class="kw">AS</span> size
 <span class="kw">FROM</span> product_variants
 <span class="kw">WHERE</span> attributes ? <span class="str">'size'</span>
 <span class="kw">ORDER BY</span> size;</pre>
-        <div class="syntax"><dl>
-          <dt>DISTINCT</dt><dd>collapse duplicate rows into one</dd>
-          <dt>AS</dt><dd>rename a column in the output — needed here, since the raw expression makes an ugly header</dd>
-        </dl></div>
-        <p>How a storefront builds a size filter without hardcoding options: ask the data what sizes exist. A candle
-          store cloning Manitou runs the identical query against <code>'scent'</code>.</p>
-        <span class="label">Expected</span>
-        <pre class="out"> size
+            <div class="syntax">
+              <dl>
+                <dt>DISTINCT</dt>
+                <dd>collapse duplicate rows into one</dd>
+                <dt>AS</dt>
+                <dd>
+                  rename a column in the output — needed here, since the raw
+                  expression makes an ugly header
+                </dd>
+              </dl>
+            </div>
+            <p>
+              How a storefront builds a size filter without hardcoding options:
+              ask the data what sizes exist. A candle store cloning Manitou runs
+              the identical query against <code>'scent'</code>.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+ size
 ------
  L
  M
  S
-(3 rows)</pre>
-        <p>Note the sort is <b>alphabetical</b>, not L/M/S by garment size — the values are text, so Postgres has no
-          idea Small precedes Medium. Real size ordering needs a sort key stored separately, which is a genuine
-          limitation of the JSONB approach worth remembering for Phase 3.</p>
-      </div>
-    </article>
+(3 rows)</pre
+            >
+            <p>
+              Note the sort is <b>alphabetical</b>, not L/M/S by garment size —
+              the values are text, so Postgres has no idea Small precedes
+              Medium. Real size ordering needs a sort key stored separately,
+              which is a genuine limitation of the JSONB approach worth
+              remembering for Phase 3.
+            </p>
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">13</span><span class="ex-title">The vanishing row</span><span class="concept">jsonb_object_keys()</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> sku, jsonb_object_keys(attributes) <span class="kw">AS</span> attr_key
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">13</span
+            ><span class="ex-title">The vanishing row</span
+            ><span class="concept">jsonb_object_keys()</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> sku, jsonb_object_keys(attributes) <span class="kw">AS</span> attr_key
 <span class="kw">FROM</span> product_variants
 <span class="kw">ORDER BY</span> sku;</pre>
-        <p>The real gotcha the tote's empty <code>{}</code> creates. <code>jsonb_object_keys()</code> is a
-          <b>set-returning function</b> — for each row, it produces one output row <em>per key</em> in the object.
-          A variant with two attributes produces two output rows. A variant with zero attributes produces
-          <b>zero</b> output rows, which means the whole source row disappears from the result — not as a NULL, not
-          flagged in any way, just absent.</p>
-        <span class="label">Expected</span>
-        <pre class="out">      sku      | attr_key
+            <p>
+              The real gotcha the tote's empty <code>{}</code> creates.
+              <code>jsonb_object_keys()</code> is a
+              <b>set-returning function</b> — for each row, it produces one
+              output row <em>per key</em> in the object. A variant with two
+              attributes produces two output rows. A variant with zero
+              attributes produces <b>zero</b> output rows, which means the whole
+              source row disappears from the result — not as a NULL, not flagged
+              in any way, just absent.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+      sku      | attr_key
 ---------------+----------
  TEE-CLS-M-BLK | size
  TEE-CLS-M-BLK | color
@@ -455,33 +971,60 @@ footer{margin-top:80px;padding-top:24px;border-top:1px solid var(--line);
  TEE-GRA-L-NVY | color
  TEE-GRA-M-NVY | size
  TEE-GRA-M-NVY | color
-(12 rows)</pre>
-        <p><b>Look at the sort order and count the rows.</b> Sorted alphabetically by SKU, <code>BAG-TOTE-STD</code>
-          should appear first — "B" sorts before "T". It doesn't appear at all. Compare this to exercise 11's
-          <code>?</code> operator, which excluded the tote through an explicit <code>WHERE</code> filter you could
-          read and reason about. Here nothing filtered it — a function just quietly produced no rows for that
-          input, which is a much easier bug to miss in real code. An admin screen built carelessly on this pattern
-          would simply never show the tote in a "browse by attribute" list, with no error anywhere to find.</p>
-      </div>
-    </article>
-  </section>
+(12 rows)</pre
+            >
+            <p>
+              <b>Look at the sort order and count the rows.</b> Sorted
+              alphabetically by SKU, <code>BAG-TOTE-STD</code>
+              should appear first — "B" sorts before "T". It doesn't appear at
+              all. Compare this to exercise 11's
+              <code>?</code> operator, which excluded the tote through an
+              explicit <code>WHERE</code> filter you could read and reason
+              about. Here nothing filtered it — a function just quietly produced
+              no rows for that input, which is a much easier bug to miss in real
+              code. An admin screen built carelessly on this pattern would
+              simply never show the tote in a "browse by attribute" list, with
+              no error anywhere to find.
+            </p>
+          </div>
+        </article>
+      </section>
 
-  <section id="joins">
-    <div class="sec-head"><span class="sec-num">04</span><h2>Joins</h2></div>
-    <p class="lede">Where the relational schema from Section 6 earns itself.</p>
+      <section id="joins">
+        <div class="sec-head">
+          <span class="sec-num">04</span>
+          <h2>Joins</h2>
+        </div>
+        <p class="lede">
+          Where the relational schema from Section 6 earns itself.
+        </p>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">14</span><span class="ex-title">Two tables</span><span class="concept">INNER JOIN</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> p.name <span class="kw">AS</span> product, v.variant_name, v.sku
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">14</span><span class="ex-title">Two tables</span
+            ><span class="concept">INNER JOIN</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> p.name <span class="kw">AS</span> product, v.variant_name, v.sku
 <span class="kw">FROM</span> products p
 <span class="kw">JOIN</span> product_variants v <span class="kw">ON</span> v.product_id = p.id;</pre>
-        <div class="syntax"><dl>
-          <dt>p · v</dt><dd>table aliases — shorthand so you're not typing <code>product_variants.variant_name</code> repeatedly</dd>
-          <dt>ON</dt><dd>the relationship: match each variant to its parent product via the foreign key</dd>
-        </dl></div>
-        <span class="label">Expected</span>
-        <pre class="out">      product       |  variant_name   |      sku
+            <div class="syntax">
+              <dl>
+                <dt>p · v</dt>
+                <dd>
+                  table aliases — shorthand so you're not typing
+                  <code>product_variants.variant_name</code> repeatedly
+                </dd>
+                <dt>ON</dt>
+                <dd>
+                  the relationship: match each variant to its parent product via
+                  the foreign key
+                </dd>
+              </dl>
+            </div>
+            <span class="label">Expected</span>
+            <pre class="out">
+      product       |  variant_name   |      sku
 --------------------+-----------------+---------------
  Classic Cotton Tee | Small / Black   | TEE-CLS-S-BLK
  Classic Cotton Tee | Medium / Black  | TEE-CLS-M-BLK
@@ -490,24 +1033,36 @@ footer{margin-top:80px;padding-top:24px;border-top:1px solid var(--line);
  Graphic Print Tee  | Medium / Navy   | TEE-GRA-M-NVY
  Graphic Print Tee  | Large / Navy    | TEE-GRA-L-NVY
  Canvas Tote Bag    | Canvas Tote Bag | BAG-TOTE-STD
-(7 rows)</pre>
-        <p>All three products appear, because your seed script gives every product at least one variant. Exercise 16
-          shows where an INNER JOIN <em>does</em> silently drop rows in your data.</p>
-      </div>
-    </article>
+(7 rows)</pre
+            >
+            <p>
+              All three products appear, because your seed script gives every
+              product at least one variant. Exercise 16 shows where an INNER
+              JOIN <em>does</em> silently drop rows in your data.
+            </p>
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">15</span><span class="ex-title">Three tables</span><span class="concept">Chained JOIN</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> p.name <span class="kw">AS</span> product, v.variant_name, i.quantity_available
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">15</span
+            ><span class="ex-title">Three tables</span
+            ><span class="concept">Chained JOIN</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> p.name <span class="kw">AS</span> product, v.variant_name, i.quantity_available
 <span class="kw">FROM</span> products p
 <span class="kw">JOIN</span> product_variants v <span class="kw">ON</span> v.product_id = p.id
 <span class="kw">JOIN</span> inventory i <span class="kw">ON</span> i.variant_id = v.id
 <span class="kw">ORDER BY</span> p.name, v.variant_name;</pre>
-        <p>Joins chain — each adds a table by naming how it connects to something already in the query. Close to what
-          your Phase 2 product-detail endpoint will return.</p>
-        <span class="label">Expected</span>
-        <pre class="out">      product       |  variant_name   | quantity_available
+            <p>
+              Joins chain — each adds a table by naming how it connects to
+              something already in the query. Close to what your Phase 2
+              product-detail endpoint will return.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+      product       |  variant_name   | quantity_available
 --------------------+-----------------+--------------------
  Canvas Tote Bag    | Canvas Tote Bag |                 40
  Classic Cotton Tee | Medium / Black  |                  3
@@ -516,184 +1071,298 @@ footer{margin-top:80px;padding-top:24px;border-top:1px solid var(--line);
  Classic Cotton Tee | Small / White   |                 12
  Graphic Print Tee  | Large / Navy    |                  7
  Graphic Print Tee  | Medium / Navy   |                 18
-(7 rows)</pre>
-        <p>Your seed data deliberately includes an <b>out-of-stock</b> variant (Medium / White, 0) and one
-          <b>below its reorder level</b> (Medium / Black, 3). Both exist so the Phase 4 vendor portal has something
-          real to flag.</p>
-      </div>
-    </article>
+(7 rows)</pre
+            >
+            <p>
+              Your seed data deliberately includes an
+              <b>out-of-stock</b> variant (Medium / White, 0) and one
+              <b>below its reorder level</b> (Medium / Black, 3). Both exist so
+              the Phase 4 vendor portal has something real to flag.
+            </p>
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">16</span><span class="ex-title">Keeping unmatched rows</span><span class="concept">LEFT JOIN</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> c.name <span class="kw">AS</span> category, p.name <span class="kw">AS</span> product
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">16</span
+            ><span class="ex-title">Keeping unmatched rows</span
+            ><span class="concept">LEFT JOIN</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> c.name <span class="kw">AS</span> category, p.name <span class="kw">AS</span> product
 <span class="kw">FROM</span> categories c
 <span class="kw">LEFT JOIN</span> products p <span class="kw">ON</span> p.category_id = c.id
 <span class="kw">ORDER BY</span> c.id;</pre>
-        <p><b>The single most important join to understand.</b> A <code>LEFT JOIN</code> keeps every row from the
-          left table even when nothing matches on the right, filling the missing columns with NULL.</p>
-        <span class="label">Expected</span>
-        <pre class="out">  category   |      product
+            <p>
+              <b>The single most important join to understand.</b> A
+              <code>LEFT JOIN</code> keeps every row from the left table even
+              when nothing matches on the right, filling the missing columns
+              with NULL.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+  category   |      product
 -------------+--------------------
  Apparel     |
  T-Shirts    | Classic Cotton Tee
  T-Shirts    | Graphic Print Tee
  Accessories | Canvas Tote Bag
-(4 rows)</pre>
-        <p><b>Apparel is the row that matters here.</b> It's a parent category holding no products directly — so a
-          plain <code>JOIN</code> would return only 3 rows and Apparel would vanish. A category navigation menu built
-          on an INNER JOIN would silently lose every empty category.</p>
-      </div>
-    </article>
+(4 rows)</pre
+            >
+            <p>
+              <b>Apparel is the row that matters here.</b> It's a parent
+              category holding no products directly — so a plain
+              <code>JOIN</code> would return only 3 rows and Apparel would
+              vanish. A category navigation menu built on an INNER JOIN would
+              silently lose every empty category.
+            </p>
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">17</span><span class="ex-title">Finding the gaps</span><span class="concept">LEFT JOIN + IS NULL</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> c.name <span class="kw">AS</span> empty_category
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">17</span
+            ><span class="ex-title">Finding the gaps</span
+            ><span class="concept">LEFT JOIN + IS NULL</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> c.name <span class="kw">AS</span> empty_category
 <span class="kw">FROM</span> categories c
 <span class="kw">LEFT JOIN</span> products p <span class="kw">ON</span> p.category_id = c.id
 <span class="kw">WHERE</span> p.id <span class="kw">IS NULL</span>;</pre>
-        <p>Combining the last two ideas gives a genuinely useful pattern: find left-side rows with <em>no</em> match
-          on the right. A vendor-portal integrity check might run exactly this.</p>
-        <span class="label">Expected</span>
-        <pre class="out"> empty_category
+            <p>
+              Combining the last two ideas gives a genuinely useful pattern:
+              find left-side rows with <em>no</em> match on the right. A
+              vendor-portal integrity check might run exactly this.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+ empty_category
 ----------------
  Apparel
-(1 row)</pre>
-      </div>
-    </article>
+(1 row)</pre
+            >
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">18</span><span class="ex-title">A table joined to itself</span><span class="concept">SELF JOIN</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> child.name <span class="kw">AS</span> category, parent.name <span class="kw">AS</span> parent_category
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">18</span
+            ><span class="ex-title">A table joined to itself</span
+            ><span class="concept">SELF JOIN</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> child.name <span class="kw">AS</span> category, parent.name <span class="kw">AS</span> parent_category
 <span class="kw">FROM</span> categories child
 <span class="kw">LEFT JOIN</span> categories parent <span class="kw">ON</span> child.parent_id = parent.id
 <span class="kw">ORDER BY</span> child.id;</pre>
-        <p>Because <code>categories.parent_id</code> points back at <code>categories.id</code>, you join the table
-          to <em>itself</em> — using two different aliases so Postgres can tell the two copies apart. This is how
-          breadcrumb navigation gets built.</p>
-        <span class="label">Expected</span>
-        <pre class="out">  category   | parent_category
+            <p>
+              Because <code>categories.parent_id</code> points back at
+              <code>categories.id</code>, you join the table to
+              <em>itself</em> — using two different aliases so Postgres can tell
+              the two copies apart. This is how breadcrumb navigation gets
+              built.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+  category   | parent_category
 -------------+-----------------
  Apparel     |
  T-Shirts    | Apparel
  Accessories | Apparel
-(3 rows)</pre>
-        <p><code>LEFT JOIN</code> again matters: Apparel has no parent, so an INNER JOIN would drop the top-level
-          category entirely and your breadcrumbs would lose their root.</p>
-      </div>
-    </article>
-  </section>
+(3 rows)</pre
+            >
+            <p>
+              <code>LEFT JOIN</code> again matters: Apparel has no parent, so an
+              INNER JOIN would drop the top-level category entirely and your
+              breadcrumbs would lose their root.
+            </p>
+          </div>
+        </article>
+      </section>
 
-  <section id="aggregates">
-    <div class="sec-head"><span class="sec-num">05</span><h2>Aggregates</h2></div>
-    <p class="lede">Collapsing many rows into a summary — counts, sums, averages, and grouping.</p>
+      <section id="aggregates">
+        <div class="sec-head">
+          <span class="sec-num">05</span>
+          <h2>Aggregates</h2>
+        </div>
+        <p class="lede">
+          Collapsing many rows into a summary — counts, sums, averages, and
+          grouping.
+        </p>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">19</span><span class="ex-title">Counting rows</span><span class="concept">COUNT</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> product_variants;</pre>
-        <p><code>COUNT(*)</code> counts rows; <code>COUNT(column)</code> counts only rows where that column is
-          <em>not</em> null. Try <code>COUNT(price_override)</code> for contrast — you'll get 1, not 7.</p>
-        <span class="label">Expected</span>
-        <pre class="out"> count
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">19</span
+            ><span class="ex-title">Counting rows</span
+            ><span class="concept">COUNT</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT COUNT</span>(*) <span class="kw">FROM</span> product_variants;</pre>
+            <p>
+              <code>COUNT(*)</code> counts rows;
+              <code>COUNT(column)</code> counts only rows where that column is
+              <em>not</em> null. Try <code>COUNT(price_override)</code> for
+              contrast — you'll get 1, not 7.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+ count
 -------
      7
-(1 row)</pre>
-      </div>
-    </article>
+(1 row)</pre
+            >
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">20</span><span class="ex-title">Sum and average</span><span class="concept">SUM · AVG · MIN · MAX</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span>
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">20</span
+            ><span class="ex-title">Sum and average</span
+            ><span class="concept">SUM · AVG · MIN · MAX</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span>
   <span class="kw">SUM</span>(quantity_available) <span class="kw">AS</span> total_units,
   <span class="kw">AVG</span>(quantity_available) <span class="kw">AS</span> avg_per_variant,
   <span class="kw">MIN</span>(quantity_available) <span class="kw">AS</span> lowest,
   <span class="kw">MAX</span>(quantity_available) <span class="kw">AS</span> highest
 <span class="kw">FROM</span> inventory;</pre>
-        <span class="label">Expected</span>
-        <pre class="out"> total_units |   avg_per_variant   | lowest | highest
+            <span class="label">Expected</span>
+            <pre class="out">
+ total_units |   avg_per_variant   | lowest | highest
 -------------+---------------------+--------+---------
          105 | 15.0000000000000000 |      0 |      40
-(1 row)</pre>
-        <p><code>AVG</code> returns full numeric precision — wrap it as <code>ROUND(AVG(...), 2)</code> for
-          something readable. <code>MIN</code> of 0 is your deliberately out-of-stock variant.</p>
-      </div>
-    </article>
+(1 row)</pre
+            >
+            <p>
+              <code>AVG</code> returns full numeric precision — wrap it as
+              <code>ROUND(AVG(...), 2)</code> for something readable.
+              <code>MIN</code> of 0 is your deliberately out-of-stock variant.
+            </p>
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">21</span><span class="ex-title">Aggregate per group</span><span class="concept">GROUP BY</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> c.name <span class="kw">AS</span> category, <span class="kw">COUNT</span>(p.id) <span class="kw">AS</span> product_count
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">21</span
+            ><span class="ex-title">Aggregate per group</span
+            ><span class="concept">GROUP BY</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> c.name <span class="kw">AS</span> category, <span class="kw">COUNT</span>(p.id) <span class="kw">AS</span> product_count
 <span class="kw">FROM</span> categories c
 <span class="kw">LEFT JOIN</span> products p <span class="kw">ON</span> p.category_id = c.id
 <span class="kw">GROUP BY</span> c.id, c.name
 <span class="kw">ORDER BY</span> product_count <span class="kw">DESC</span>;</pre>
-        <div class="syntax"><dl>
-          <dt>GROUP BY</dt><dd>collapse rows into one per distinct value — here, one row per category</dd>
-        </dl></div>
-        <p><b>The rule that catches everyone:</b> every column in <code>SELECT</code> must either appear in
-          <code>GROUP BY</code> or be wrapped in an aggregate. Otherwise Postgres has no way to know which of the
-          grouped values to show, so it errors rather than guessing.</p>
-        <p>Also note <code>COUNT(p.id)</code>, not <code>COUNT(*)</code> — <code>COUNT(*)</code> would count the
-          LEFT JOIN's NULL row and report Apparel as having 1 product instead of 0.</p>
-        <span class="label">Expected</span>
-        <pre class="out">  category   | product_count
+            <div class="syntax">
+              <dl>
+                <dt>GROUP BY</dt>
+                <dd>
+                  collapse rows into one per distinct value — here, one row per
+                  category
+                </dd>
+              </dl>
+            </div>
+            <p>
+              <b>The rule that catches everyone:</b> every column in
+              <code>SELECT</code> must either appear in <code>GROUP BY</code> or
+              be wrapped in an aggregate. Otherwise Postgres has no way to know
+              which of the grouped values to show, so it errors rather than
+              guessing.
+            </p>
+            <p>
+              Also note <code>COUNT(p.id)</code>, not <code>COUNT(*)</code> —
+              <code>COUNT(*)</code> would count the LEFT JOIN's NULL row and
+              report Apparel as having 1 product instead of 0.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+  category   | product_count
 -------------+---------------
  T-Shirts    |             2
  Accessories |             1
  Apparel     |             0
-(3 rows)</pre>
-      </div>
-    </article>
+(3 rows)</pre
+            >
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">22</span><span class="ex-title">Filtering groups</span><span class="concept">HAVING</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">SELECT</span> p.name <span class="kw">AS</span> product, <span class="kw">SUM</span>(i.quantity_available) <span class="kw">AS</span> total_stock
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">22</span
+            ><span class="ex-title">Filtering groups</span
+            ><span class="concept">HAVING</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">SELECT</span> p.name <span class="kw">AS</span> product, <span class="kw">SUM</span>(i.quantity_available) <span class="kw">AS</span> total_stock
 <span class="kw">FROM</span> products p
 <span class="kw">JOIN</span> product_variants v <span class="kw">ON</span> v.product_id = p.id
 <span class="kw">JOIN</span> inventory i <span class="kw">ON</span> i.variant_id = v.id
 <span class="kw">GROUP BY</span> p.id, p.name
 <span class="kw">HAVING</span> <span class="kw">SUM</span>(i.quantity_available) &gt; <span class="str">30</span>
 <span class="kw">ORDER BY</span> total_stock <span class="kw">DESC</span>, product;</pre>
-        <div class="syntax"><dl>
-          <dt>WHERE</dt><dd>filters <b>individual rows</b>, before grouping</dd>
-          <dt>HAVING</dt><dd>filters <b>groups</b>, after aggregating</dd>
-        </dl></div>
-        <p>The most common SQL interview question there is, and the reason is practical: you cannot use
-          <code>SUM()</code> in a <code>WHERE</code> clause, because at that point grouping hasn't happened and the
-          sum doesn't exist yet.</p>
-        <span class="label">Expected</span>
-        <pre class="out">      product       | total_stock
+            <div class="syntax">
+              <dl>
+                <dt>WHERE</dt>
+                <dd>filters <b>individual rows</b>, before grouping</dd>
+                <dt>HAVING</dt>
+                <dd>filters <b>groups</b>, after aggregating</dd>
+              </dl>
+            </div>
+            <p>
+              The most common SQL interview question there is, and the reason is
+              practical: you cannot use <code>SUM()</code> in a
+              <code>WHERE</code> clause, because at that point grouping hasn't
+              happened and the sum doesn't exist yet.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+      product       | total_stock
 --------------------+-------------
  Canvas Tote Bag    |          40
  Classic Cotton Tee |          40
-(2 rows)</pre>
-        <p>Graphic Print Tee totals 25, so it's filtered out. Drop the <code>HAVING</code> line to see all three.</p>
-      </div>
-    </article>
-  </section>
+(2 rows)</pre
+            >
+            <p>
+              Graphic Print Tee totals 25, so it's filtered out. Drop the
+              <code>HAVING</code> line to see all three.
+            </p>
+          </div>
+        </article>
+      </section>
 
-  <section id="cte">
-    <div class="sec-head"><span class="sec-num">06</span><h2>Common Table Expressions</h2></div>
-    <p class="lede">A CTE is a named temporary result set defined with <code>WITH</code>, available only to the query
-      that follows it. Two distinct kinds: <b>plain</b> CTEs organise a query, and <b>recursive</b> CTEs walk trees
-      of unknown depth.</p>
-    <div class="notice warn">
-      <p><b>Why these are here, given only 3 categories:</b> a recursive CTE is genuine overkill for a two-level
-        tree — a self-join (exercise 18) handles it. But the plan is to clone Manitou into a candle store and then a
-        <b>grocery store</b>, and grocery catalogues nest deeply: <code>Produce → Vegetables → Root Vegetables</code>.
-        These exercises build the pattern now, on data small enough to verify by eye, so it's familiar when depth
-        arrives.</p>
-    </div>
+      <section id="cte">
+        <div class="sec-head">
+          <span class="sec-num">06</span>
+          <h2>Common Table Expressions</h2>
+        </div>
+        <p class="lede">
+          A CTE is a named temporary result set defined with <code>WITH</code>,
+          available only to the query that follows it. Two distinct kinds:
+          <b>plain</b> CTEs organise a query, and <b>recursive</b> CTEs walk
+          trees of unknown depth.
+        </p>
+        <div class="notice warn">
+          <p>
+            <b>Why these are here, given only 3 categories:</b> a recursive CTE
+            is genuine overkill for a two-level tree — a self-join (exercise 18)
+            handles it. But the plan is to clone Manitou into a candle store and
+            then a <b>grocery store</b>, and grocery catalogues nest deeply:
+            <code>Produce → Vegetables → Root Vegetables</code>. These exercises
+            build the pattern now, on data small enough to verify by eye, so
+            it's familiar when depth arrives.
+          </p>
+        </div>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">23</span><span class="ex-title">A named intermediate step</span><span class="concept">WITH</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">WITH</span> product_stock <span class="kw">AS</span> (
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">23</span
+            ><span class="ex-title">A named intermediate step</span
+            ><span class="concept">WITH</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">WITH</span> product_stock <span class="kw">AS</span> (
     <span class="kw">SELECT</span> p.id, p.name, <span class="kw">SUM</span>(i.quantity_available) <span class="kw">AS</span> total_stock
     <span class="kw">FROM</span> products p
     <span class="kw">JOIN</span> product_variants v <span class="kw">ON</span> v.product_id = p.id
@@ -704,28 +1373,46 @@ footer{margin-top:80px;padding-top:24px;border-top:1px solid var(--line);
 <span class="kw">FROM</span> product_stock
 <span class="kw">WHERE</span> total_stock &gt; <span class="str">30</span>
 <span class="kw">ORDER BY</span> total_stock <span class="kw">DESC</span>, name;</pre>
-        <div class="syntax"><dl>
-          <dt>WITH x AS (…)</dt><dd>defines a temporary named result, usable below like a table</dd>
-        </dl></div>
-        <p>Compare this to <b>exercise 22</b> — identical result, different structure. There it needed
-          <code>HAVING SUM(...) &gt; 30</code>, because the filter ran on an aggregate mid-query. Here the aggregate
-          is already computed and named, so the outer query uses a plain <code>WHERE</code>.</p>
-        <span class="label">Expected</span>
-        <pre class="out">        name        | total_stock
+            <div class="syntax">
+              <dl>
+                <dt>WITH x AS (…)</dt>
+                <dd>
+                  defines a temporary named result, usable below like a table
+                </dd>
+              </dl>
+            </div>
+            <p>
+              Compare this to <b>exercise 22</b> — identical result, different
+              structure. There it needed <code>HAVING SUM(...) &gt; 30</code>,
+              because the filter ran on an aggregate mid-query. Here the
+              aggregate is already computed and named, so the outer query uses a
+              plain <code>WHERE</code>.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+        name        | total_stock
 --------------------+-------------
  Canvas Tote Bag    |          40
  Classic Cotton Tee |          40
-(2 rows)</pre>
-        <p><b>That's the everyday value of a plain CTE:</b> it splits "compute the totals" from "filter the totals"
-          into two readable steps instead of one dense query. No new capability — just clarity, which matters once
-          a query grows past a few lines.</p>
-      </div>
-    </article>
+(2 rows)</pre
+            >
+            <p>
+              <b>That's the everyday value of a plain CTE:</b> it splits
+              "compute the totals" from "filter the totals" into two readable
+              steps instead of one dense query. No new capability — just
+              clarity, which matters once a query grows past a few lines.
+            </p>
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">24</span><span class="ex-title">Two CTEs in one query</span><span class="concept">Chained WITH</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">WITH</span> stock <span class="kw">AS</span> (
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">24</span
+            ><span class="ex-title">Two CTEs in one query</span
+            ><span class="concept">Chained WITH</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">WITH</span> stock <span class="kw">AS</span> (
     <span class="kw">SELECT</span> v.product_id, <span class="kw">SUM</span>(i.quantity_available) <span class="kw">AS</span> units
     <span class="kw">FROM</span> product_variants v
     <span class="kw">JOIN</span> inventory i <span class="kw">ON</span> i.variant_id = v.id
@@ -744,24 +1431,37 @@ counts <span class="kw">AS</span> (
 <span class="kw">JOIN</span> stock s <span class="kw">ON</span> s.product_id = p.id
 <span class="kw">JOIN</span> counts c <span class="kw">ON</span> c.product_id = p.id
 <span class="kw">ORDER BY</span> avg_per_variant <span class="kw">DESC</span>;</pre>
-        <p>Separate CTEs are comma-separated, and each can reference the ones before it. Computing two independent
-          aggregates and combining them is awkward in a single query — this is where CTEs stop being cosmetic.</p>
-        <p><code>::numeric</code> is a <b>cast</b>. Without it, <code>units / variant_count</code> is integer
-          division and 25 ÷ 2 gives 12, not 12.5.</p>
-        <span class="label">Expected</span>
-        <pre class="out">        name        | variant_count | units | avg_per_variant
+            <p>
+              Separate CTEs are comma-separated, and each can reference the ones
+              before it. Computing two independent aggregates and combining them
+              is awkward in a single query — this is where CTEs stop being
+              cosmetic.
+            </p>
+            <p>
+              <code>::numeric</code> is a <b>cast</b>. Without it,
+              <code>units / variant_count</code> is integer division and 25 ÷ 2
+              gives 12, not 12.5.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+        name        | variant_count | units | avg_per_variant
 --------------------+---------------+-------+-----------------
  Canvas Tote Bag    |             1 |    40 |           40.00
  Graphic Print Tee  |             2 |    25 |           12.50
  Classic Cotton Tee |             4 |    40 |           10.00
-(3 rows)</pre>
-      </div>
-    </article>
+(3 rows)</pre
+            >
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">25</span><span class="ex-title">Walking down a tree</span><span class="concept">WITH RECURSIVE</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">WITH RECURSIVE</span> category_tree <span class="kw">AS</span> (
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">25</span
+            ><span class="ex-title">Walking down a tree</span
+            ><span class="concept">WITH RECURSIVE</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">WITH RECURSIVE</span> category_tree <span class="kw">AS</span> (
     <span class="cmt">-- anchor: where the walk starts</span>
     <span class="kw">SELECT</span> id, name, parent_id, <span class="str">0</span> <span class="kw">AS</span> depth
     <span class="kw">FROM</span> categories
@@ -775,32 +1475,53 @@ counts <span class="kw">AS</span> (
     <span class="kw">JOIN</span> category_tree ct <span class="kw">ON</span> c.parent_id = ct.id
 )
 <span class="kw">SELECT</span> depth, name <span class="kw">FROM</span> category_tree <span class="kw">ORDER BY</span> depth, name;</pre>
-        <div class="syntax"><dl>
-          <dt>Anchor</dt><dd>runs once — the starting row(s)</dd>
-          <dt>UNION ALL</dt><dd>joins the anchor to each recursive pass</dd>
-          <dt>Recursive term</dt><dd>references the CTE <b>by its own name</b>, re-running until it returns no rows</dd>
-        </dl></div>
-        <p>Read it as a loop: start at Apparel; find its children; find <em>their</em> children; stop when a pass
-          finds nothing. The <code>depth</code> column is incremented each pass, so it records how far down each row
-          was found.</p>
-        <span class="label">Expected</span>
-        <pre class="out"> depth |    name
+            <div class="syntax">
+              <dl>
+                <dt>Anchor</dt>
+                <dd>runs once — the starting row(s)</dd>
+                <dt>UNION ALL</dt>
+                <dd>joins the anchor to each recursive pass</dd>
+                <dt>Recursive term</dt>
+                <dd>
+                  references the CTE <b>by its own name</b>, re-running until it
+                  returns no rows
+                </dd>
+              </dl>
+            </div>
+            <p>
+              Read it as a loop: start at Apparel; find its children; find
+              <em>their</em> children; stop when a pass finds nothing. The
+              <code>depth</code> column is incremented each pass, so it records
+              how far down each row was found.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+ depth |    name
 -------+-------------
      0 | Apparel
      1 | Accessories
      1 | T-Shirts
-(3 rows)</pre>
-        <p><b>Why a self-join can't do this:</b> each <code>JOIN</code> reaches exactly one level. Two levels needs
-          two joins, five needs five — so you'd have to know the depth when writing the query. Recursion doesn't:
-          it keeps going until nothing new turns up. That's the entire reason it exists, and why a grocery catalogue
-          needs it while your T-shirt store doesn't.</p>
-      </div>
-    </article>
+(3 rows)</pre
+            >
+            <p>
+              <b>Why a self-join can't do this:</b> each
+              <code>JOIN</code> reaches exactly one level. Two levels needs two
+              joins, five needs five — so you'd have to know the depth when
+              writing the query. Recursion doesn't: it keeps going until nothing
+              new turns up. That's the entire reason it exists, and why a
+              grocery catalogue needs it while your T-shirt store doesn't.
+            </p>
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">26</span><span class="ex-title">Walking up a tree</span><span class="concept">Breadcrumbs</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">WITH RECURSIVE</span> breadcrumb <span class="kw">AS</span> (
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">26</span
+            ><span class="ex-title">Walking up a tree</span
+            ><span class="concept">Breadcrumbs</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">WITH RECURSIVE</span> breadcrumb <span class="kw">AS</span> (
     <span class="kw">SELECT</span> id, name, parent_id, <span class="str">0</span> <span class="kw">AS</span> depth
     <span class="kw">FROM</span> categories
     <span class="kw">WHERE</span> slug = <span class="str">'t-shirts'</span>
@@ -812,26 +1533,42 @@ counts <span class="kw">AS</span> (
     <span class="kw">JOIN</span> breadcrumb b <span class="kw">ON</span> c.id = b.parent_id
 )
 <span class="kw">SELECT</span> name <span class="kw">FROM</span> breadcrumb <span class="kw">ORDER BY</span> depth <span class="kw">DESC</span>;</pre>
-        <p>The same structure with the join reversed. Exercise 25 matched <code>c.parent_id = ct.id</code> (find my
-          children); this matches <code>c.id = b.parent_id</code> (find my parent). One direction descends, the
-          other climbs.</p>
-        <p><code>ORDER BY depth DESC</code> puts the root first, which is the order a breadcrumb trail reads.</p>
-        <span class="label">Expected</span>
-        <pre class="out">   name
+            <p>
+              The same structure with the join reversed. Exercise 25 matched
+              <code>c.parent_id = ct.id</code> (find my children); this matches
+              <code>c.id = b.parent_id</code> (find my parent). One direction
+              descends, the other climbs.
+            </p>
+            <p>
+              <code>ORDER BY depth DESC</code> puts the root first, which is the
+              order a breadcrumb trail reads.
+            </p>
+            <span class="label">Expected</span>
+            <pre class="out">
+   name
 ----------
  Apparel
  T-Shirts
-(2 rows)</pre>
-        <p>This is the <b>Home / Apparel / T-Shirts</b> trail at the top of a category page — real Phase 3 UI, not a
-          theoretical exercise. At two levels it looks trivial; in a grocery store it's the only practical way to
-          render the trail for an arbitrarily nested product.</p>
-      </div>
-    </article>
+(2 rows)</pre
+            >
+            <p>
+              This is the <b>Home / Apparel / T-Shirts</b> trail at the top of a
+              category page — real Phase 3 UI, not a theoretical exercise. At
+              two levels it looks trivial; in a grocery store it's the only
+              practical way to render the trail for an arbitrarily nested
+              product.
+            </p>
+          </div>
+        </article>
 
-    <article class="ex">
-      <div class="ex-head"><span class="ex-n">27</span><span class="ex-title">Products in a whole subtree</span><span class="concept">Recursive + JOIN</span></div>
-      <div class="ex-body">
-        <pre><span class="kw">WITH RECURSIVE</span> subtree <span class="kw">AS</span> (
+        <article class="ex">
+          <div class="ex-head">
+            <span class="ex-n">27</span
+            ><span class="ex-title">Products in a whole subtree</span
+            ><span class="concept">Recursive + JOIN</span>
+          </div>
+          <div class="ex-body">
+            <pre><span class="kw">WITH RECURSIVE</span> subtree <span class="kw">AS</span> (
     <span class="kw">SELECT</span> id <span class="kw">FROM</span> categories <span class="kw">WHERE</span> slug = <span class="str">'apparel'</span>
     <span class="kw">UNION ALL</span>
     <span class="kw">SELECT</span> c.id <span class="kw">FROM</span> categories c
@@ -841,130 +1578,203 @@ counts <span class="kw">AS</span> (
 <span class="kw">FROM</span> products p
 <span class="kw">JOIN</span> subtree s <span class="kw">ON</span> p.category_id = s.id
 <span class="kw">ORDER BY</span> p.name;</pre>
-        <p>The payoff query, and the one worth studying closest.</p>
-        <span class="label">Expected</span>
-        <pre class="out">        name        | base_price
+            <p>The payoff query, and the one worth studying closest.</p>
+            <span class="label">Expected</span>
+            <pre class="out">
+        name        | base_price
 --------------------+------------
  Canvas Tote Bag    |      18.00
  Classic Cotton Tee |      24.00
  Graphic Print Tee  |      29.00
-(3 rows)</pre>
-        <div class="notice" style="border-left-color:var(--pg);margin-top:18px">
-          <p><b>Look carefully at what just happened.</b> Not one of those products has
-            <code>category_id</code> pointing at Apparel — check exercise 01, every product sits in T-Shirts or
-            Accessories. Yet asking for "everything under Apparel" returned all three.</p>
-          <p>That's the behaviour every real storefront needs: clicking a top-level category shows products filed
-            three levels beneath it. Without recursion you'd get an <b>empty page</b> for Apparel, because nothing
-            is filed there directly.</p>
+(3 rows)</pre
+            >
+            <div
+              class="notice"
+              style="border-left-color: var(--pg); margin-top: 18px"
+            >
+              <p>
+                <b>Look carefully at what just happened.</b> Not one of those
+                products has <code>category_id</code> pointing at Apparel —
+                check exercise 01, every product sits in T-Shirts or
+                Accessories. Yet asking for "everything under Apparel" returned
+                all three.
+              </p>
+              <p>
+                That's the behaviour every real storefront needs: clicking a
+                top-level category shows products filed three levels beneath it.
+                Without recursion you'd get an <b>empty page</b> for Apparel,
+                because nothing is filed there directly.
+              </p>
+            </div>
+            <p>
+              In a grocery store this is the difference between clicking
+              <b>Produce</b> and seeing carrots filed under
+              <code>Produce → Vegetables → Root Vegetables</code>, versus seeing
+              nothing at all.
+            </p>
+          </div>
+        </article>
+
+        <div class="notice" style="margin-top: 32px">
+          <p>
+            <b>Two safety notes before you use recursion on real data.</b> A
+            cycle in the parent links — a category that is somehow its own
+            ancestor — makes a recursive CTE loop forever. Your foreign keys
+            don't prevent that, so a Phase 4 category editor must reject moves
+            that would create one.
+          </p>
+          <p>
+            Second, <code>UNION</code> instead of
+            <code>UNION ALL</code> deduplicates each pass, which is slower and
+            rarely what you want here. Use <code>UNION ALL</code> unless you
+            have a specific reason not to.
+          </p>
         </div>
-        <p>In a grocery store this is the difference between clicking <b>Produce</b> and seeing carrots filed under
-          <code>Produce → Vegetables → Root Vegetables</code>, versus seeing nothing at all.</p>
-      </div>
-    </article>
+      </section>
 
-    <div class="notice" style="margin-top:32px">
-      <p><b>Two safety notes before you use recursion on real data.</b> A cycle in the parent links — a category
-        that is somehow its own ancestor — makes a recursive CTE loop forever. Your foreign keys don't prevent
-        that, so a Phase 4 category editor must reject moves that would create one.</p>
-      <p>Second, <code>UNION</code> instead of <code>UNION ALL</code> deduplicates each pass, which is slower and
-        rarely what you want here. Use <code>UNION ALL</code> unless you have a specific reason not to.</p>
-    </div>
-  </section>
+      <section id="challenges">
+        <div class="sec-head">
+          <span class="sec-num">07</span>
+          <h2>Challenges</h2>
+        </div>
+        <p class="lede">
+          Write these yourself before revealing the answer. Getting them wrong
+          first is the point — a query that errors teaches more than one you
+          read.
+        </p>
 
-  <section id="challenges">
-    <div class="sec-head"><span class="sec-num">07</span><h2>Challenges</h2></div>
-    <p class="lede">Write these yourself before revealing the answer. Getting them wrong first is the point — a
-      query that errors teaches more than one you read.</p>
-
-    <article class="ex challenge">
-      <div class="ex-head"><span class="ex-n">C1</span><span class="ex-title">Low stock report</span><span class="concept">JOIN + WHERE</span></div>
-      <div class="ex-body">
-        <p>Show every variant with <b>fewer than 10 units in stock</b>, including its product name and SKU, lowest
-          first. Think about which table the quantity condition belongs to.</p>
-        <button class="reveal" data-target="a1">Reveal answer</button>
-        <div class="answer" id="a1" hidden>
-          <pre><span class="kw">SELECT</span> p.name <span class="kw">AS</span> product, v.sku, i.quantity_available
+        <article class="ex challenge">
+          <div class="ex-head">
+            <span class="ex-n">C1</span
+            ><span class="ex-title">Low stock report</span
+            ><span class="concept">JOIN + WHERE</span>
+          </div>
+          <div class="ex-body">
+            <p>
+              Show every variant with <b>fewer than 10 units in stock</b>,
+              including its product name and SKU, lowest first. Think about
+              which table the quantity condition belongs to.
+            </p>
+            <button class="reveal" data-target="a1">Reveal answer</button>
+            <div class="answer" id="a1" hidden>
+              <pre><span class="kw">SELECT</span> p.name <span class="kw">AS</span> product, v.sku, i.quantity_available
 <span class="kw">FROM</span> products p
 <span class="kw">JOIN</span> product_variants v <span class="kw">ON</span> v.product_id = p.id
 <span class="kw">JOIN</span> inventory i <span class="kw">ON</span> i.variant_id = v.id
 <span class="kw">WHERE</span> i.quantity_available &lt; <span class="str">10</span>
 <span class="kw">ORDER BY</span> i.quantity_available;</pre>
-          <pre class="out">      product       |      sku      | quantity_available
+              <pre class="out">
+      product       |      sku      | quantity_available
 --------------------+---------------+--------------------
  Classic Cotton Tee | TEE-CLS-M-WHT |                  0
  Classic Cotton Tee | TEE-CLS-M-BLK |                  3
  Graphic Print Tee  | TEE-GRA-L-NVY |                  7
-(3 rows)</pre>
-          <p>The condition lives on <code>inventory</code>, but you still need both joins to display the product
-            name alongside it.</p>
-        </div>
-      </div>
-    </article>
+(3 rows)</pre
+              >
+              <p>
+                The condition lives on <code>inventory</code>, but you still
+                need both joins to display the product name alongside it.
+              </p>
+            </div>
+          </div>
+        </article>
 
-    <article class="ex challenge">
-      <div class="ex-head"><span class="ex-n">C2</span><span class="ex-title">Below reorder level</span><span class="concept">Column comparison</span></div>
-      <div class="ex-body">
-        <p>Find variants where <code>quantity_available</code> has dropped <b>at or below</b> that variant's own
-          <code>reorder_level</code>. Hint: you can compare two columns to each other, not just a column to a
-          literal.</p>
-        <button class="reveal" data-target="a2">Reveal answer</button>
-        <div class="answer" id="a2" hidden>
-          <pre><span class="kw">SELECT</span> v.sku, i.quantity_available, i.reorder_level
+        <article class="ex challenge">
+          <div class="ex-head">
+            <span class="ex-n">C2</span
+            ><span class="ex-title">Below reorder level</span
+            ><span class="concept">Column comparison</span>
+          </div>
+          <div class="ex-body">
+            <p>
+              Find variants where <code>quantity_available</code> has dropped
+              <b>at or below</b> that variant's own <code>reorder_level</code>.
+              Hint: you can compare two columns to each other, not just a column
+              to a literal.
+            </p>
+            <button class="reveal" data-target="a2">Reveal answer</button>
+            <div class="answer" id="a2" hidden>
+              <pre><span class="kw">SELECT</span> v.sku, i.quantity_available, i.reorder_level
 <span class="kw">FROM</span> inventory i
 <span class="kw">JOIN</span> product_variants v <span class="kw">ON</span> v.id = i.variant_id
 <span class="kw">WHERE</span> i.quantity_available &lt;= i.reorder_level
 <span class="kw">ORDER BY</span> i.quantity_available;</pre>
-          <pre class="out">      sku      | quantity_available | reorder_level
+              <pre class="out">
+      sku      | quantity_available | reorder_level
 ---------------+--------------------+---------------
  TEE-CLS-M-WHT |                  0 |             5
  TEE-CLS-M-BLK |                  3 |             5
-(2 rows)</pre>
-          <p>This is the actual query behind the Phase 4 reorder alerts — the threshold is per-variant data, not a
-            hardcoded number. Note TEE-GRA-L-NVY (7 units) appears in C1 but <em>not</em> here: it's low, but still
-            above its own reorder point.</p>
-        </div>
-      </div>
-    </article>
+(2 rows)</pre
+              >
+              <p>
+                This is the actual query behind the Phase 4 reorder alerts — the
+                threshold is per-variant data, not a hardcoded number. Note
+                TEE-GRA-L-NVY (7 units) appears in C1 but <em>not</em> here:
+                it's low, but still above its own reorder point.
+              </p>
+            </div>
+          </div>
+        </article>
 
-    <article class="ex challenge">
-      <div class="ex-head"><span class="ex-n">C3</span><span class="ex-title">Inventory value</span><span class="concept">Arithmetic + COALESCE</span></div>
-      <div class="ex-body">
-        <p>Calculate the <b>total retail value</b> of all stock: price × quantity, summed across every variant.
-          Remember <code>price_override</code> may be NULL, in which case the product's <code>base_price</code>
-          applies.</p>
-        <button class="reveal" data-target="a3">Reveal answer</button>
-        <div class="answer" id="a3" hidden>
-          <pre><span class="kw">SELECT SUM</span>(<span class="kw">COALESCE</span>(v.price_override, p.base_price) * i.quantity_available)
+        <article class="ex challenge">
+          <div class="ex-head">
+            <span class="ex-n">C3</span
+            ><span class="ex-title">Inventory value</span
+            ><span class="concept">Arithmetic + COALESCE</span>
+          </div>
+          <div class="ex-body">
+            <p>
+              Calculate the <b>total retail value</b> of all stock: price ×
+              quantity, summed across every variant. Remember
+              <code>price_override</code> may be NULL, in which case the
+              product's <code>base_price</code> applies.
+            </p>
+            <button class="reveal" data-target="a3">Reveal answer</button>
+            <div class="answer" id="a3" hidden>
+              <pre><span class="kw">SELECT SUM</span>(<span class="kw">COALESCE</span>(v.price_override, p.base_price) * i.quantity_available)
   <span class="kw">AS</span> total_retail_value
 <span class="kw">FROM</span> inventory i
 <span class="kw">JOIN</span> product_variants v <span class="kw">ON</span> v.id = i.variant_id
 <span class="kw">JOIN</span> products p <span class="kw">ON</span> p.id = v.product_id;</pre>
-          <pre class="out"> total_retail_value
+              <pre class="out">
+ total_retail_value
 --------------------
             2426.00
-(1 row)</pre>
-          <p><code>COALESCE(a, b)</code> returns the first non-null argument — the standard way to express a
-            fallback, and exactly the price-resolution rule from Section 6.3 written in SQL. The Large / Navy tee
-            contributes 7 × <b>32.00</b> (its override), not 7 × 29.00.</p>
-        </div>
-      </div>
-    </article>
+(1 row)</pre
+              >
+              <p>
+                <code>COALESCE(a, b)</code> returns the first non-null argument
+                — the standard way to express a fallback, and exactly the
+                price-resolution rule from Section 6.3 written in SQL. The Large
+                / Navy tee contributes 7 × <b>32.00</b> (its override), not 7 ×
+                29.00.
+              </p>
+            </div>
+          </div>
+        </article>
 
-    <article class="ex challenge">
-      <div class="ex-head"><span class="ex-n">C4</span><span class="ex-title">Effective price per variant</span><span class="concept">COALESCE + alias</span></div>
-      <div class="ex-body">
-        <p>List every SKU with the price a customer would actually pay, cheapest first. One row per variant, no
-          aggregation.</p>
-        <button class="reveal" data-target="a4">Reveal answer</button>
-        <div class="answer" id="a4" hidden>
-          <pre><span class="kw">SELECT</span> v.sku,
+        <article class="ex challenge">
+          <div class="ex-head">
+            <span class="ex-n">C4</span
+            ><span class="ex-title">Effective price per variant</span
+            ><span class="concept">COALESCE + alias</span>
+          </div>
+          <div class="ex-body">
+            <p>
+              List every SKU with the price a customer would actually pay,
+              cheapest first. One row per variant, no aggregation.
+            </p>
+            <button class="reveal" data-target="a4">Reveal answer</button>
+            <div class="answer" id="a4" hidden>
+              <pre><span class="kw">SELECT</span> v.sku,
        p.base_price,
        v.price_override,
        <span class="kw">COALESCE</span>(v.price_override, p.base_price) <span class="kw">AS</span> effective_price
 <span class="kw">FROM</span> product_variants v
 <span class="kw">JOIN</span> products p <span class="kw">ON</span> p.id = v.product_id
 <span class="kw">ORDER BY</span> effective_price, v.sku;</pre>
-          <pre class="out">      sku      | base_price | price_override | effective_price
+              <pre class="out">
+      sku      | base_price | price_override | effective_price
 ---------------+------------+----------------+-----------------
  BAG-TOTE-STD  |      18.00 |                |           18.00
  TEE-CLS-M-BLK |      24.00 |                |           24.00
@@ -973,45 +1783,74 @@ counts <span class="kw">AS</span> (
  TEE-CLS-S-WHT |      24.00 |                |           24.00
  TEE-GRA-M-NVY |      29.00 |                |           29.00
  TEE-GRA-L-NVY |      29.00 |          32.00 |           32.00
-(7 rows)</pre>
-          <p>Showing all three columns side by side makes the fallback visible. Note you can <code>ORDER BY</code> an
-            alias defined in the SELECT — a convenience Postgres allows that some other databases don't.</p>
-        </div>
-      </div>
-    </article>
+(7 rows)</pre
+              >
+              <p>
+                Showing all three columns side by side makes the fallback
+                visible. Note you can <code>ORDER BY</code> an alias defined in
+                the SELECT — a convenience Postgres allows that some other
+                databases don't.
+              </p>
+            </div>
+          </div>
+        </article>
 
-    <article class="ex challenge">
-      <div class="ex-head"><span class="ex-n">C5</span><span class="ex-title">Verify the admin user</span><span class="concept">WHERE + LIKE</span></div>
-      <div class="ex-body">
-        <p>Confirm your seed created exactly one admin, and check whether <code>password_hash</code> holds a real
-          bcrypt hash. Real bcrypt hashes begin with <code>$2b$</code>.</p>
-        <button class="reveal" data-target="a5">Reveal answer</button>
-        <div class="answer" id="a5" hidden>
-          <pre><span class="kw">SELECT</span> email, role, <span class="kw">LEFT</span>(password_hash, <span class="str">7</span>) <span class="kw">AS</span> hash_prefix,
+        <article class="ex challenge">
+          <div class="ex-head">
+            <span class="ex-n">C5</span
+            ><span class="ex-title">Verify the admin user</span
+            ><span class="concept">WHERE + LIKE</span>
+          </div>
+          <div class="ex-body">
+            <p>
+              Confirm your seed created exactly one admin, and check whether
+              <code>password_hash</code> holds a real bcrypt hash. Real bcrypt
+              hashes begin with <code>$2b$</code>.
+            </p>
+            <button class="reveal" data-target="a5">Reveal answer</button>
+            <div class="answer" id="a5" hidden>
+              <pre><span class="kw">SELECT</span> email, role, <span class="kw">LEFT</span>(password_hash, <span class="str">7</span>) <span class="kw">AS</span> hash_prefix,
        <span class="kw">LENGTH</span>(password_hash) <span class="kw">AS</span> hash_len
 <span class="kw">FROM</span> users
 <span class="kw">WHERE</span> role = <span class="str">'admin'</span>;</pre>
-          <pre class="out">        email        | role  | hash_prefix | hash_len
+              <pre class="out">
+        email        | role  | hash_prefix | hash_len
 ---------------------+-------+-------------+----------
  admin@manitou.local | admin | $2b$12$     |       60
-(1 row)</pre>
-          <p><code>LEFT()</code> truncates so you don't paste a full credential into your terminal history — a good
-            habit even for a local dev password. A bcrypt hash is always exactly 60 characters. The
-            <code>$2b$12$</code> prefix encodes the algorithm variant and the cost factor (12).</p>
-        </div>
-      </div>
-    </article>
+(1 row)</pre
+              >
+              <p>
+                <code>LEFT()</code> truncates so you don't paste a full
+                credential into your terminal history — a good habit even for a
+                local dev password. A bcrypt hash is always exactly 60
+                characters. The <code>$2b$12$</code> prefix encodes the
+                algorithm variant and the cost factor (12).
+              </p>
+            </div>
+          </div>
+        </article>
 
-    <article class="ex challenge">
-      <div class="ex-head"><span class="ex-n">C6</span><span class="ex-title">Category tree with counts</span><span class="concept">Recursive + LEFT JOIN</span></div>
-      <div class="ex-body">
-        <p>Build the query a vendor portal's category sidebar needs: every category under Apparel, its depth, and
-          how many products sit <b>directly</b> in it. Categories with none must still appear.</p>
-        <p>Two things to get right — which join type keeps the empty categories (remember exercise 16), and whether
-          <code>COUNT(*)</code> or <code>COUNT(column)</code> gives the correct zero.</p>
-        <button class="reveal" data-target="a6">Reveal answer</button>
-        <div class="answer" id="a6" hidden>
-          <pre><span class="kw">WITH RECURSIVE</span> tree <span class="kw">AS</span> (
+        <article class="ex challenge">
+          <div class="ex-head">
+            <span class="ex-n">C6</span
+            ><span class="ex-title">Category tree with counts</span
+            ><span class="concept">Recursive + LEFT JOIN</span>
+          </div>
+          <div class="ex-body">
+            <p>
+              Build the query a vendor portal's category sidebar needs: every
+              category under Apparel, its depth, and how many products sit
+              <b>directly</b> in it. Categories with none must still appear.
+            </p>
+            <p>
+              Two things to get right — which join type keeps the empty
+              categories (remember exercise 16), and whether
+              <code>COUNT(*)</code> or <code>COUNT(column)</code> gives the
+              correct zero.
+            </p>
+            <button class="reveal" data-target="a6">Reveal answer</button>
+            <div class="answer" id="a6" hidden>
+              <pre><span class="kw">WITH RECURSIVE</span> tree <span class="kw">AS</span> (
     <span class="kw">SELECT</span> id, name, parent_id, <span class="str">0</span> <span class="kw">AS</span> depth
     <span class="kw">FROM</span> categories <span class="kw">WHERE</span> slug = <span class="str">'apparel'</span>
     <span class="kw">UNION ALL</span>
@@ -1023,85 +1862,180 @@ counts <span class="kw">AS</span> (
 <span class="kw">LEFT JOIN</span> products p <span class="kw">ON</span> p.category_id = t.id
 <span class="kw">GROUP BY</span> t.id, t.depth, t.name
 <span class="kw">ORDER BY</span> t.depth, t.name;</pre>
-          <pre class="out"> depth |    name     | product_count
+              <pre class="out">
+ depth |    name     | product_count
 -------+-------------+---------------
      0 | Apparel     |             0
      1 | Accessories |             1
      1 | T-Shirts    |             2
-(3 rows)</pre>
-          <p>Both traps matter here. A plain <code>JOIN</code> would drop Apparel entirely, since nothing is filed
-            directly in it — and <code>COUNT(*)</code> would count the LEFT JOIN's NULL row and report Apparel as
-            having 1 product instead of 0. <code>COUNT(p.id)</code> counts only real matches.</p>
-          <p>Note this counts <b>direct</b> children only, which is what a sidebar usually shows. Counting the whole
-            subtree — so Apparel reads 3 — means joining products against the recursive set as in exercise 27,
-            rather than against each row individually. Worth trying as a follow-up.</p>
+(3 rows)</pre
+              >
+              <p>
+                Both traps matter here. A plain <code>JOIN</code> would drop
+                Apparel entirely, since nothing is filed directly in it — and
+                <code>COUNT(*)</code> would count the LEFT JOIN's NULL row and
+                report Apparel as having 1 product instead of 0.
+                <code>COUNT(p.id)</code> counts only real matches.
+              </p>
+              <p>
+                Note this counts <b>direct</b> children only, which is what a
+                sidebar usually shows. Counting the whole subtree — so Apparel
+                reads 3 — means joining products against the recursive set as in
+                exercise 27, rather than against each row individually. Worth
+                trying as a follow-up.
+              </p>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section id="meta">
+        <div class="sec-head">
+          <span class="sec-num">08</span>
+          <h2>psql commands</h2>
         </div>
-      </div>
-    </article>
-  </section>
+        <p class="lede">
+          Backslash commands are psql features, not SQL — they won't work from
+          SQLAlchemy or any other client.
+        </p>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Command</th>
+              <th>What it does</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="m">\dt</td>
+              <td>List all tables</td>
+            </tr>
+            <tr>
+              <td class="m">\d table_name</td>
+              <td>
+                Full structure of one table: columns, types, indexes,
+                constraints
+              </td>
+            </tr>
+            <tr>
+              <td class="m">\di</td>
+              <td>
+                List all indexes — confirms the Phase 1 step 5 migration worked
+              </td>
+            </tr>
+            <tr>
+              <td class="m">\x</td>
+              <td>
+                Toggle expanded display — invaluable when a row is too wide to
+                read across
+              </td>
+            </tr>
+            <tr>
+              <td class="m">\timing</td>
+              <td>Toggle query timing</td>
+            </tr>
+            <tr>
+              <td class="m">\pset null '(null)'</td>
+              <td>Display NULLs visibly instead of as blank space</td>
+            </tr>
+            <tr>
+              <td class="m">\e</td>
+              <td>
+                Open the last query in your editor — good for long multi-line
+                joins
+              </td>
+            </tr>
+            <tr>
+              <td class="m">\?</td>
+              <td>Help for backslash commands</td>
+            </tr>
+            <tr>
+              <td class="m">\h SELECT</td>
+              <td>SQL syntax help for a specific statement</td>
+            </tr>
+            <tr>
+              <td class="m">\q</td>
+              <td>Quit</td>
+            </tr>
+          </tbody>
+        </table>
 
-  <section id="meta">
-    <div class="sec-head"><span class="sec-num">08</span><h2>psql commands</h2></div>
-    <p class="lede">Backslash commands are psql features, not SQL — they won't work from SQLAlchemy or any other
-      client.</p>
-    <table class="tbl">
-      <thead><tr><th>Command</th><th>What it does</th></tr></thead>
-      <tbody>
-        <tr><td class="m">\dt</td><td>List all tables</td></tr>
-        <tr><td class="m">\d table_name</td><td>Full structure of one table: columns, types, indexes, constraints</td></tr>
-        <tr><td class="m">\di</td><td>List all indexes — confirms the Phase 1 step 5 migration worked</td></tr>
-        <tr><td class="m">\x</td><td>Toggle expanded display — invaluable when a row is too wide to read across</td></tr>
-        <tr><td class="m">\timing</td><td>Toggle query timing</td></tr>
-        <tr><td class="m">\pset null '(null)'</td><td>Display NULLs visibly instead of as blank space</td></tr>
-        <tr><td class="m">\e</td><td>Open the last query in your editor — good for long multi-line joins</td></tr>
-        <tr><td class="m">\?</td><td>Help for backslash commands</td></tr>
-        <tr><td class="m">\h SELECT</td><td>SQL syntax help for a specific statement</td></tr>
-        <tr><td class="m">\q</td><td>Quit</td></tr>
-      </tbody>
-    </table>
+        <div
+          class="notice"
+          style="border-left-color: var(--docker); margin-top: 32px"
+        >
+          <p>
+            <b>Worth trying now:</b> run <code>EXPLAIN ANALYZE</code> before any
+            query from section 04. It shows PostgreSQL's actual execution plan,
+            including whether it used an index or scanned the whole table. At 7
+            rows Postgres will sequential-scan everything regardless — indexes
+            only pay off at scale — but it's the tool you'll use in Phase 8 to
+            find out <em>why</em> a query is slow rather than guessing.
+          </p>
+          <p>
+            <b>Re-running the seed:</b> <code>seed.py</code> wipes every row
+            before inserting, so you can re-run it any time you mangle the data
+            experimenting. It refuses to run against a non-local
+            <code>DATABASE_URL</code>.
+          </p>
+        </div>
+      </section>
 
-    <div class="notice" style="border-left-color:var(--docker);margin-top:32px">
-      <p><b>Worth trying now:</b> run <code>EXPLAIN ANALYZE</code> before any query from section 04. It shows
-        PostgreSQL's actual execution plan, including whether it used an index or scanned the whole table. At 7 rows
-        Postgres will sequential-scan everything regardless — indexes only pay off at scale — but it's the tool
-        you'll use in Phase 8 to find out <em>why</em> a query is slow rather than guessing.</p>
-      <p><b>Re-running the seed:</b> <code>seed.py</code> wipes every row before inserting, so you can re-run it any
-        time you mangle the data experimenting. It refuses to run against a non-local <code>DATABASE_URL</code>.</p>
+      <footer>
+        <span>Manitou — SQL exercises, Phase 1 step 7</span>
+        <span>Outputs computed from seed.py</span>
+      </footer>
     </div>
-  </section>
 
-  <footer>
-    <span>Manitou — SQL exercises, Phase 1 step 7</span>
-    <span>Outputs computed from seed.py</span>
-  </footer>
-
-</div>
-
-<script>
-(function(){
-  document.querySelectorAll('.reveal').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      var panel = document.getElementById(btn.getAttribute('data-target'));
-      if (!panel) return;
-      if (panel.hasAttribute('hidden')) { panel.removeAttribute('hidden'); btn.textContent = 'Hide answer'; }
-      else { panel.setAttribute('hidden',''); btn.textContent = 'Reveal answer'; }
-    });
-  });
-  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
-  var sections = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
-  function sync(){
-    var pos = window.scrollY + 120, idx = 0;
-    for (var i = 0; i < sections.length; i++){
-      if (sections[i] && sections[i].offsetTop <= pos) idx = i;
-    }
-    links.forEach(function(a,i){ a.classList.toggle('on', i === idx); });
-  }
-  var ticking = false;
-  window.addEventListener('scroll', function(){
-    if (!ticking){ window.requestAnimationFrame(function(){ sync(); ticking = false; }); ticking = true; }
-  }, { passive:true });
-  sync();
-})();
-</script>
-</body>
+    <script>
+      (function () {
+        document.querySelectorAll(".reveal").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var panel = document.getElementById(
+              btn.getAttribute("data-target"),
+            );
+            if (!panel) return;
+            if (panel.hasAttribute("hidden")) {
+              panel.removeAttribute("hidden");
+              btn.textContent = "Hide answer";
+            } else {
+              panel.setAttribute("hidden", "");
+              btn.textContent = "Reveal answer";
+            }
+          });
+        });
+        var links = Array.prototype.slice.call(
+          document.querySelectorAll(".toc a"),
+        );
+        var sections = links.map(function (a) {
+          return document.querySelector(a.getAttribute("href"));
+        });
+        function sync() {
+          var pos = window.scrollY + 120,
+            idx = 0;
+          for (var i = 0; i < sections.length; i++) {
+            if (sections[i] && sections[i].offsetTop <= pos) idx = i;
+          }
+          links.forEach(function (a, i) {
+            a.classList.toggle("on", i === idx);
+          });
+        }
+        var ticking = false;
+        window.addEventListener(
+          "scroll",
+          function () {
+            if (!ticking) {
+              window.requestAnimationFrame(function () {
+                sync();
+                ticking = false;
+              });
+              ticking = true;
+            }
+          },
+          { passive: true },
+        );
+        sync();
+      })();
+    </script>
+  </body>
 </html>
