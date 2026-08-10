@@ -45,6 +45,14 @@ from app.security import hash_password
 ADMIN_EMAIL = "admin@manitou.example"
 ADMIN_PASSWORD = "admin"  # local development only
 
+# A customer with saved addresses, so checkout can be walked end to end straight
+# after seeding. Not a test fixture -- task 8's tests build their own data so they
+# don't depend on seed state. This exists because orders.shipping_address_id and
+# billing_address_id are NOT NULL, so without an address there is no way to
+# exercise checkout by hand at all.
+CUSTOMER_EMAIL = "customer@manitou.example"
+CUSTOMER_PASSWORD = "customer"  # local development only
+
 # Children before parents, so no delete leaves a dangling reference.
 DELETE_ORDER = (
     Payment,
@@ -122,6 +130,38 @@ def main() -> None:
                 full_name="Store Owner",
                 role="admin",
             )
+        )
+
+        customer = User(
+            email=CUSTOMER_EMAIL,
+            password_hash=hash_password(CUSTOMER_PASSWORD),
+            full_name="Casey Customer",
+            role="customer",
+        )
+        session.add(customer)
+        session.add_all(
+            [
+                Address(
+                    user=customer,
+                    line1="14 Bramble Lane",
+                    city="Portland",
+                    state="OR",
+                    postal_code="97201",
+                    country="US",
+                    type="shipping",
+                    is_default=True,
+                ),
+                Address(
+                    user=customer,
+                    line1="500 Ledger Street",
+                    line2="Suite 200",
+                    city="Portland",
+                    state="OR",
+                    postal_code="97205",
+                    country="US",
+                    type="billing",
+                ),
+            ]
         )
 
         # Product 1 -- multiple variants across two dimensions.
@@ -220,7 +260,8 @@ def main() -> None:
         for model in reversed(DELETE_ORDER):
             count = session.scalar(select(func.count()).select_from(model))
             print(f"  {model.__tablename__:<18} {count}")
-        print(f"\nAdmin login: {ADMIN_EMAIL} / {ADMIN_PASSWORD}")
+        print(f"\nAdmin login:    {ADMIN_EMAIL} / {ADMIN_PASSWORD}")
+        print(f"Customer login: {CUSTOMER_EMAIL} / {CUSTOMER_PASSWORD}")
 
 
 if __name__ == "__main__":

@@ -892,6 +892,12 @@ Seed the **T-shirt store** (the default build): a couple of categories, products
 Include at least one product with no variants, so the "single item store" path is exercised from
 day one rather than discovered later.
 
+Seed **one customer with a shipping and a billing address** alongside the admin. This is not a test
+fixture — task 8's tests build their own data so they never depend on seed state. It is here because
+`orders.shipping_address_id` and `billing_address_id` are `NOT NULL`: without a saved address there
+is no way to walk checkout by hand at all, which is precisely what this section says the seed is
+for. The rule of thumb: seed whatever a developer needs to exercise the app manually, and no more.
+
 **Seed data must satisfy the same validation the API enforces.** The seed writes through the ORM
 and so bypasses the Pydantic schemas — which makes it easy to create a row the API itself would
 reject, leaving two disagreeing definitions of what is valid. This happened: the admin was seeded
