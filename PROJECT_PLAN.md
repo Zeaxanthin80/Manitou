@@ -180,8 +180,10 @@ Manitou/
 │   │   ├── services/      # business logic (checkout, inventory, payments)
 │   │   └── db.py          # engine, session, connection pool
 │   ├── alembic/           # migrations
-│   ├── tests/
-│   └── requirements.txt
+│   ├── tests/             # pytest suite + conftest.py fixtures
+│   ├── pytest.ini         # testpaths, and pythonpath so `app` imports resolve
+│   ├── requirements.txt   # runtime only — this is what the Docker image installs
+│   └── requirements-dev.txt  # -r requirements.txt, plus pytest and the test client
 ├── web/                   # Next.js storefront + vendor portal
 │   ├── app/               # customer pages
 │   ├── app/admin/         # vendor portal (role-gated)
@@ -222,8 +224,24 @@ or SQLAlchemy and you lose autocomplete and type checking.
   running any `pip`, `python`, `alembic`, `uvicorn`, or `pytest` command.
 - Never `pip install` without the venv active. If you're unsure whether it's active, check that
   your shell prompt shows the environment name.
-- Every new package gets recorded in `requirements.txt` and committed. The venv folder itself is
+- Every new package gets recorded and committed, in **one of two files**. The venv folder itself is
   **never** committed.
+
+| File | Holds | Installed by |
+|---|---|---|
+| `requirements.txt` | Everything the app needs to **run** | The Docker image (Phase 6), and developers indirectly |
+| `requirements-dev.txt` | Test tooling only — `pytest`, the test client. Begins with `-r requirements.txt` | Developers: `pip install -r requirements-dev.txt` |
+
+The split exists so the production container never ships test code. It also means `pip freeze >
+requirements.txt` is **no longer safe** — it would sweep the dev packages into the runtime file.
+Add new entries deliberately, and check for drift afterwards:
+
+```bash
+comm -23 <(pip freeze | cut -d= -f1 | sort) <(cat requirements*.txt | cut -d= -f1 | sort)
+```
+
+Anything it prints is installed but undeclared — which is how `PyJWT` and `email-validator` went
+missing from `requirements.txt` for four tasks, leaving a fresh clone unable to start the app.
 - The Node/Next.js side needs no equivalent step — `node_modules/` is already per-project isolation.
   Just keep it out of Git.
 
@@ -996,6 +1014,19 @@ same service, training wheels off. Do not add that complexity earlier.
 
 - Backend: unit tests for services (checkout, inventory) and integration tests for endpoints.
 - Prioritize the money-and-stock paths — that's where bugs hurt most.
+- **Tests run against a separate `manitou_test` database, never the development one.** `pytest`
+  drops and recreates it, builds the schema by running Alembic against it — which re-proves the
+  migrations work from scratch on every session — and truncates every table between tests.
+  Truncation rather than transaction rollback, because `create_order_from_cart` calls `commit()`
+  and hiding a real commit inside a rolled-back outer transaction needs nested savepoints whose
+  failures look like application bugs.
+- **Tests build their own data.** Nothing may depend on `seed.py` having run; a test that only
+  passes because the store happened to be seeded is not testing anything. `seed.py` exists so a
+  developer can use the app by hand, not to supply fixtures.
+- **A guard you have never watched fail is not a guard.** The concurrency test must be verified by
+  temporarily removing `SELECT ... FOR UPDATE` and confirming it fails — a threaded test can
+  otherwise pass simply because the threads happened to serialise. Same principle applies to
+  constraint tests: make the constraint reject something before trusting it.
 - Load test against the **launch-tier concurrency target from Section 10.1**, not a flat assumed
   number, and tune RDS size and pool settings to that result.
 

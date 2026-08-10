@@ -15,7 +15,13 @@ config = context.config
 
 # The URL is not stored in alembic.ini (it is committed to Git and holds a
 # password).  It comes from .env via app.config.settings instead.
-config.set_main_option("sqlalchemy.url", settings.database_url)
+#
+# Only set it if a caller has not already supplied one. The test suite builds its
+# schema by handing Alembic a Config pointing at manitou_test; overwriting that
+# unconditionally would silently run the migration against the development
+# database instead.
+if not config.get_main_option("sqlalchemy.url", None):
+    config.set_main_option("sqlalchemy.url", settings.database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

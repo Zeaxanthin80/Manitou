@@ -1,0 +1,17 @@
+# Development and test dependencies.
+#
+# Phase 6's Docker image installs requirements.txt only, so the production
+# container never ships pytest or its dependencies.
+#
+#   local:  pip install -r requirements-dev.txt
+#   docker: pip install -r requirements.txt
+-r requirements.txt
+
+httpcore2==2.10.0
+httpx2==2.10.0
+iniconfig==2.3.0
+packaging==26.3
+pluggy==1.6.0
+Pygments==2.20.0
+pytest==9.1.1
+truststore==0.10.4

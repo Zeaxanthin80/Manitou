@@ -59,9 +59,18 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
 - **Python work always runs inside the project venv at `backend/.venv`.** Before suggesting any
   `pip`, `python`, `alembic`, `uvicorn`, or `pytest` command, assume the venv must be active and
   remind the owner if it may not be. Never suggest a global `pip install`.
-- Every new dependency is added to `requirements.txt` and committed. `.venv/` is never committed.
+- Every new dependency is committed, in **one of two files**: `requirements.txt` for anything the
+  app needs at runtime, `requirements-dev.txt` for tooling only used while developing (pytest and
+  the test client). Phase 6's image installs `requirements.txt` alone, so the production container
+  never ships test code. Install locally with `pip install -r requirements-dev.txt`, which pulls in
+  the runtime set via `-r requirements.txt`. `.venv/` is never committed.
+- After installing anything, check for drift — it is easy to install a package and forget the file:
+  `comm -23 <(pip freeze | cut -d= -f1 | sort) <(cat requirements*.txt | cut -d= -f1 | sort)`
 - Local dev split: PostgreSQL runs in Docker; the API runs on the host in the venv. Phase 6
   containerizes the API for AWS. Both install from the same `requirements.txt`.
+- Tests run against a **separate `manitou_test` database**, never the development one. `pytest`
+  creates it, builds the schema with Alembic, and truncates between tests. Tests build their own
+  data and must never depend on `seed.py` having run.
 - Config comes from `.env` (git-ignored). Any new variable must also be added to `.env.example`
   with a placeholder.
 - **Never hardcode a color, font size, or spacing value in any component on any platform.** All of
