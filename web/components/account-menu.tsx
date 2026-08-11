@@ -64,6 +64,20 @@ export function AccountMenu({ user }: { user: User }) {
             </p>
           </div>
 
+          {/* Admins only. Without this the portal has no entrance at all -- you
+              had to know the URL and type it. Hiding it from customers is
+              cosmetic, not a control: the layout gates the route and the API
+              gates the data, both independently of this menu. */}
+          {user.role === "admin" && (
+            <Link
+              href="/admin"
+              role="menuitem"
+              className={`${item} border-b border-border text-accent`}
+            >
+              Vendor portal
+            </Link>
+          )}
+
           <Link href="/account" role="menuitem" className={item}>
             Your account
           </Link>

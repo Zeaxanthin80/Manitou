@@ -6,6 +6,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Numeric,
     Text,
     func,
@@ -68,9 +69,26 @@ class ProductVariant(Base):
 
 class ProductImage(Base):
     __tablename__ = "product_images"
+    __table_args__ = (
+        # At most one primary image per product. The storefront already assumes
+        # this -- images.find(i => i.is_primary) takes the first and ignores any
+        # others -- so without the index a second primary is silently ignored
+        # rather than rejected, and which one wins depends on row order.
+        #
+        # Partial (WHERE is_primary) so the many non-primary rows are exempt; a
+        # plain unique on product_id would allow only one image per product.
+        Index(
+            "uq_product_images_one_primary",
+            "product_id",
+            unique=True,
+            postgresql_where=text("is_primary"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+    # product_variants.product_id already has this; here it was simply missed.
+    # Postgres does not index a foreign key column automatically (Section 6.6).
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
     url: Mapped[str] = mapped_column(Text)
     alt_text: Mapped[str] = mapped_column(Text)
     is_primary: Mapped[bool] = mapped_column(server_default=text("false"))

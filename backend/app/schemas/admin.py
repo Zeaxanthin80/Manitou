@@ -81,6 +81,49 @@ class AdminVariantRead(BaseModel):
     needs_reorder: bool
 
 
+class AdminImageRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    url: str
+    alt_text: str
+    is_primary: bool
+
+
+class AdminImageCreate(BaseModel):
+    """A product image, referenced by URL.
+
+    No file upload here by design: Phase 6 moves storage to S3 + CloudFront, and
+    a container filesystem is ephemeral, so anything written to local disk now
+    would be thrown away. Phase 6 changes where the URL comes from, not this
+    shape.
+    """
+
+    url: str = Field(min_length=1)
+    alt_text: str = Field(min_length=1)
+    is_primary: bool = False
+
+
+class AdminImageUpdate(BaseModel):
+    alt_text: str | None = Field(default=None, min_length=1)
+    is_primary: bool | None = None
+
+
+class AdminVariantUpdate(BaseModel):
+    """Edit an existing variant.
+
+    There is no delete: order_items holds a FK to product_variants with NO
+    ACTION, so a variant that has ever sold cannot be removed without destroying
+    order history. Retiring one means setting its stock to 0, which the
+    storefront already renders as "Sold out".
+    """
+
+    sku: str | None = Field(default=None, min_length=1)
+    variant_name: str | None = Field(default=None, min_length=1)
+    attributes: dict | None = None
+    price_override: Decimal | None = None
+
+
 class AdminProductRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -94,6 +137,7 @@ class AdminProductRead(BaseModel):
     is_active: bool
     created_at: datetime
     variants: list[AdminVariantRead]
+    images: list[AdminImageRead]
 
 
 class AdminProductPage(BaseModel):

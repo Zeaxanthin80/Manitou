@@ -162,6 +162,42 @@ export type OrderDetail = OrderSummary & {
 
 /* ------------------------------------------------------------------ admin -- */
 
+export type AdminVariant = {
+  id: number;
+  sku: string;
+  variant_name: string;
+  attributes: Record<string, string>;
+  price_override: string | null;
+  quantity_available: number;
+  reorder_level: number;
+  /** Computed by the API from quantity_available <= reorder_level. Not derived
+   *  here -- the threshold rule belongs in one place. */
+  needs_reorder: boolean;
+};
+
+export type AdminImage = {
+  id: number;
+  url: string;
+  alt_text: string;
+  is_primary: boolean;
+};
+
+export type AdminProduct = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  category_id: number;
+  base_price: string;
+  unit_of_measure: string;
+  is_active: boolean;
+  created_at: string;
+  variants: AdminVariant[];
+  /** Primary first, then oldest first -- ordered by the API so the gallery does
+   *  not reshuffle between requests. */
+  images: AdminImage[];
+};
+
 export type AdminOrderSummary = OrderSummary & {
   user_id: number;
   user_email: string;
@@ -346,3 +382,37 @@ export const updateOrderStatus = (token: string, id: number, status: string) =>
     method: "PATCH",
     body: { status },
   });
+
+/* ------------------------------------------------------- admin: catalog -- */
+
+export const listAdminProducts = (token: string, limit = 50, offset = 0) =>
+  request<Page<AdminProduct>>(`/admin/products?limit=${limit}&offset=${offset}`, {
+    token,
+  });
+
+export const createProduct = (token: string, body: unknown) =>
+  request<AdminProduct>("/admin/products", { token, body });
+
+export const updateProduct = (token: string, id: number, body: unknown) =>
+  request<AdminProduct>(`/admin/products/${id}`, { token, method: "PATCH", body });
+
+/** Soft delete -- sets is_active = false. Named for what it does, not for the
+ *  HTTP verb: a product that has ever sold can never really be removed, because
+ *  order_items still points at its variants. */
+export const deactivateProduct = (token: string, id: number) =>
+  request<void>(`/admin/products/${id}`, { token, method: "DELETE" });
+
+export const addProductImage = (token: string, productId: number, body: unknown) =>
+  request<AdminProduct>(`/admin/products/${productId}/images`, { token, body });
+
+export const updateProductImage = (token: string, imageId: number, body: unknown) =>
+  request<AdminProduct>(`/admin/images/${imageId}`, { token, method: "PATCH", body });
+
+export const deleteProductImage = (token: string, imageId: number) =>
+  request<AdminProduct>(`/admin/images/${imageId}`, { token, method: "DELETE" });
+
+export const addVariant = (token: string, productId: number, body: unknown) =>
+  request<AdminProduct>(`/admin/products/${productId}/variants`, { token, body });
+
+export const updateVariant = (token: string, variantId: number, body: unknown) =>
+  request<AdminProduct>(`/admin/variants/${variantId}`, { token, method: "PATCH", body });

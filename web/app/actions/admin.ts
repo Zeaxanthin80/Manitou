@@ -1,8 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
-import { ApiError, updateOrderStatus } from "@/lib/api";
+import {
+  ApiError,
+  addProductImage,
+  addVariant,
+  createProduct,
+  deactivateProduct,
+  deleteProductImage,
+  updateOrderStatus,
+  updateProduct,
+  updateProductImage,
+  updateVariant,
+} from "@/lib/api";
 import { currentUser } from "@/app/actions/auth";
 import { getSession } from "@/lib/session";
 
@@ -58,4 +70,194 @@ export async function updateOrderStatusAction(
   revalidatePath(`/admin/orders/${id}`);
   revalidatePath("/admin/orders");
   return { ok: `Order #${id} is now ${status}.` };
+}
+
+/* ------------------------------------------------------------- catalog -- */
+
+const text = (fd: FormData, key: string) => String(fd.get(key) ?? "").trim();
+
+/** Everything the vendor edits is visible to shoppers, so a catalog write
+ *  invalidates the storefront too -- not just the admin screen that made it. */
+function revalidateCatalog(productId?: number, slug?: string) {
+  revalidatePath("/admin/products");
+  if (productId) revalidatePath(`/admin/products/${productId}`);
+  revalidatePath("/", "layout");
+  if (slug) revalidatePath(`/products/${slug}`);
+}
+
+/** Money arrives from a form as a string and must stay one. Number() then
+ *  toString() would turn "24.10" into 24.1 and re-introduce float rounding on a
+ *  numeric(10,2) column. */
+function money(fd: FormData, key: string): string | null {
+  const raw = text(fd, key);
+  return raw === "" ? null : raw;
+}
+
+export async function createProductAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+
+  let created;
+  try {
+    created = await createProduct(token, {
+      name: text(formData, "name"),
+      slug: text(formData, "slug"),
+      description: text(formData, "description") || null,
+      category_id: Number(formData.get("category_id")),
+      base_price: money(formData, "base_price"),
+      // The API requires at least one variant (Field(min_length=1)), so the
+      // opening variant is part of creation rather than a follow-up step.
+      variants: [
+        {
+          sku: text(formData, "sku"),
+          variant_name: text(formData, "variant_name"),
+          price_override: money(formData, "price_override"),
+          quantity_available: Number(formData.get("quantity_available") ?? 0),
+          reorder_level: Number(formData.get("reorder_level") ?? 0),
+        },
+      ],
+    });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+
+  revalidateCatalog(created.id, created.slug);
+  redirect(`/admin/products/${created.id}`);
+}
+
+export async function updateProductAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+  const id = Number(formData.get("product_id"));
+
+  try {
+    const updated = await updateProduct(token, id, {
+      name: text(formData, "name"),
+      slug: text(formData, "slug"),
+      description: text(formData, "description") || null,
+      category_id: Number(formData.get("category_id")),
+      base_price: money(formData, "base_price"),
+    });
+    revalidateCatalog(id, updated.slug);
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+  return { ok: "Product saved." };
+}
+
+export async function setProductActiveAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+  const id = Number(formData.get("product_id"));
+  // Deactivating is DELETE (the soft kind); reactivating is a PATCH, because
+  // there is no "undelete" verb.
+  const activate = formData.get("activate") === "true";
+
+  try {
+    if (activate) await updateProduct(token, id, { is_active: true });
+    else await deactivateProduct(token, id);
+    revalidateCatalog(id, text(formData, "slug"));
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+  return { ok: activate ? "Product is visible again." : "Product hidden from the store." };
+}
+
+export async function addVariantAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+  const id = Number(formData.get("product_id"));
+
+  try {
+    await addVariant(token, id, {
+      sku: text(formData, "sku"),
+      variant_name: text(formData, "variant_name"),
+      price_override: money(formData, "price_override"),
+      quantity_available: Number(formData.get("quantity_available") ?? 0),
+      reorder_level: Number(formData.get("reorder_level") ?? 0),
+    });
+    revalidateCatalog(id, text(formData, "slug"));
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+  return { ok: "Variant added." };
+}
+
+export async function updateVariantAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+
+  try {
+    await updateVariant(token, Number(formData.get("variant_id")), {
+      sku: text(formData, "sku"),
+      variant_name: text(formData, "variant_name"),
+      price_override: money(formData, "price_override"),
+    });
+    revalidateCatalog(Number(formData.get("product_id")), text(formData, "slug"));
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+  return { ok: "Variant saved." };
+}
+
+export async function addImageAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+  const id = Number(formData.get("product_id"));
+
+  try {
+    await addProductImage(token, id, {
+      url: text(formData, "url"),
+      alt_text: text(formData, "alt_text"),
+      is_primary: formData.get("is_primary") === "on",
+    });
+    revalidateCatalog(id, text(formData, "slug"));
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+  return { ok: "Image added." };
+}
+
+export async function imageAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+  const imageId = Number(formData.get("image_id"));
+  const remove = formData.get("intent") === "delete";
+
+  try {
+    if (remove) await deleteProductImage(token, imageId);
+    else await updateProductImage(token, imageId, { is_primary: true });
+    revalidateCatalog(Number(formData.get("product_id")), text(formData, "slug"));
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+  return { ok: remove ? "Image removed." : "Primary image updated." };
 }

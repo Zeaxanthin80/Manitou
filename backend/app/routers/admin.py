@@ -7,14 +7,25 @@ returned instead of a boolean, and GET /admin/orders reads across every customer
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
 from app.dependencies import require_admin
-from app.models import Category, Inventory, Order, Product, ProductVariant, User
+from app.models import (
+    Category,
+    Inventory,
+    Order,
+    Product,
+    ProductImage,
+    ProductVariant,
+    User,
+)
 from app.schemas.admin import (
+    AdminImageCreate,
+    AdminImageRead,
+    AdminImageUpdate,
     AdminInventoryUpdate,
     AdminOrderDetail,
     AdminOrderPage,
@@ -24,7 +35,9 @@ from app.schemas.admin import (
     AdminProductPage,
     AdminProductRead,
     AdminProductUpdate,
+    AdminVariantCreate,
     AdminVariantRead,
+    AdminVariantUpdate,
 )
 from app.schemas.catalog import MAX_PAGE_SIZE
 
@@ -84,6 +97,13 @@ def _to_product(product: Product) -> AdminProductRead:
             )
             for v in product.variants
         ],
+        # Primary first, then oldest first. Without an explicit order the list
+        # arrives in whatever order Postgres returns rows, which can change
+        # between queries and makes the admin gallery reshuffle for no reason.
+        images=[
+            AdminImageRead.model_validate(i)
+            for i in sorted(product.images, key=lambda i: (not i.is_primary, i.id))
+        ],
     )
 
 
@@ -91,7 +111,10 @@ def _get_product(db: Session, product_id: int) -> Product:
     product = db.scalar(
         select(Product)
         .where(Product.id == product_id)
-        .options(selectinload(Product.variants).selectinload(ProductVariant.inventory))
+        .options(
+            selectinload(Product.variants).selectinload(ProductVariant.inventory),
+            selectinload(Product.images),
+        )
     )
     if product is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
@@ -113,7 +136,10 @@ def list_all_products(
     total = db.scalar(select(func.count()).select_from(Product))
     products = db.scalars(
         select(Product)
-        .options(selectinload(Product.variants).selectinload(ProductVariant.inventory))
+        .options(
+            selectinload(Product.variants).selectinload(ProductVariant.inventory),
+            selectinload(Product.images),
+        )
         .order_by(Product.name)
         .limit(limit)
         .offset(offset)
@@ -206,6 +232,179 @@ def delete_product(product_id: int, db: Session = Depends(get_db)) -> None:
     product = _get_product(db, product_id)
     product.is_active = False
     db.commit()
+
+
+def _get_variant(db: Session, variant_id: int) -> ProductVariant:
+    variant = db.scalar(
+        select(ProductVariant).where(ProductVariant.id == variant_id)
+    )
+    if variant is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Variant not found")
+    return variant
+
+
+def _clear_primary(db: Session, product_id: int, keep_id: int | None = None) -> None:
+    """Demote whichever image is currently primary for this product.
+
+    Then flush. uq_product_images_one_primary is a partial UNIQUE index, so two
+    primary rows are rejected even momentarily inside the transaction -- setting
+    the new one before this lands would fail on a product that already has a
+    primary image.
+    """
+    stmt = (
+        update(ProductImage)
+        .where(ProductImage.product_id == product_id, ProductImage.is_primary.is_(True))
+        .values(is_primary=False)
+    )
+    if keep_id is not None:
+        stmt = stmt.where(ProductImage.id != keep_id)
+    db.execute(stmt)
+    db.flush()
+
+
+@router.post(
+    "/products/{product_id}/images",
+    response_model=AdminProductRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_product_image(
+    product_id: int,
+    payload: AdminImageCreate,
+    db: Session = Depends(get_db),
+) -> AdminProductRead:
+    product = _get_product(db, product_id)
+
+    # The first image is always primary. A product with images but no primary
+    # renders "No image" on the storefront, which looks like data loss rather
+    # than a choice.
+    make_primary = payload.is_primary or not product.images
+    if make_primary:
+        _clear_primary(db, product_id)
+
+    db.add(
+        ProductImage(
+            product_id=product_id,
+            url=payload.url,
+            alt_text=payload.alt_text,
+            is_primary=make_primary,
+        )
+    )
+    db.commit()
+    return _to_product(_get_product(db, product_id))
+
+
+@router.patch("/images/{image_id}", response_model=AdminProductRead)
+def update_product_image(
+    image_id: int,
+    payload: AdminImageUpdate,
+    db: Session = Depends(get_db),
+) -> AdminProductRead:
+    image = db.get(ProductImage, image_id)
+    if image is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
+
+    changes = payload.model_dump(exclude_unset=True)
+    if changes.get("is_primary") is True:
+        _clear_primary(db, image.product_id, keep_id=image.id)
+    if changes.get("is_primary") is False and image.is_primary:
+        # Refuse to leave a product with images but none of them primary.
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Set another image as primary instead of unsetting this one.",
+        )
+
+    for field, value in changes.items():
+        setattr(image, field, value)
+    db.commit()
+    return _to_product(_get_product(db, image.product_id))
+
+
+@router.delete("/images/{image_id}", response_model=AdminProductRead)
+def delete_product_image(image_id: int, db: Session = Depends(get_db)) -> AdminProductRead:
+    """Hard delete -- nothing references product_images, unlike products.
+
+    If the primary is removed, the oldest survivor is promoted. Otherwise the
+    product keeps images but shows none on the storefront.
+    """
+    image = db.get(ProductImage, image_id)
+    if image is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
+
+    product_id, was_primary = image.product_id, image.is_primary
+    db.delete(image)
+    db.flush()
+
+    if was_primary:
+        successor = db.scalar(
+            select(ProductImage)
+            .where(ProductImage.product_id == product_id)
+            .order_by(ProductImage.id)
+            .limit(1)
+        )
+        if successor is not None:
+            successor.is_primary = True
+
+    db.commit()
+    return _to_product(_get_product(db, product_id))
+
+
+@router.post(
+    "/products/{product_id}/variants",
+    response_model=AdminProductRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_variant(
+    product_id: int,
+    payload: AdminVariantCreate,
+    db: Session = Depends(get_db),
+) -> AdminProductRead:
+    """Add a variant to an existing product -- a size added after launch.
+
+    create_product could only ever set the opening variants, so before this a
+    t-shirt was stuck with the sizes it was born with.
+    """
+    _get_product(db, product_id)
+
+    variant = ProductVariant(
+        product_id=product_id,
+        sku=payload.sku,
+        variant_name=payload.variant_name,
+        attributes=payload.attributes,
+        price_override=payload.price_override,
+    )
+    # Same invariant create_product upholds: never a variant without inventory.
+    variant.inventory = Inventory(
+        quantity_available=payload.quantity_available,
+        reorder_level=payload.reorder_level,
+    )
+    db.add(variant)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Duplicate variant SKU")
+
+    return _to_product(_get_product(db, product_id))
+
+
+@router.patch("/variants/{variant_id}", response_model=AdminProductRead)
+def update_variant(
+    variant_id: int,
+    payload: AdminVariantUpdate,
+    db: Session = Depends(get_db),
+) -> AdminProductRead:
+    variant = _get_variant(db, variant_id)
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(variant, field, value)
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Duplicate variant SKU")
+
+    return _to_product(_get_product(db, variant.product_id))
 
 
 @router.patch("/variants/{variant_id}/inventory", response_model=AdminVariantRead)
