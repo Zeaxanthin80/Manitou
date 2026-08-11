@@ -5,6 +5,18 @@
    one of them comes from here. See PROJECT_PLAN.md Section 4.3. */
 @import "./tokens.css";
 
+/* A layout breakpoint, not a brand token -- which is why it lives here and not
+   in design-tokens.json (that file is colour, type and spacing; a cloned store
+   restyles, it does not re-decide where the nav collapses).
+
+   769px rather than Tailwind's built-in `md`: `md` is min-width 768px, so
+   `md:hidden` would hide the hamburger AT 768px. The nav must collapse at 768
+   and below -- iPad portrait is exactly 768 -- so the desktop nav starts one
+   pixel later. Use `wide:` for "769px and up". */
+@theme {
+  --breakpoint-wide: 769px;
+}
+
 body {
   background: var(--color-background);
   color: var(--color-text);

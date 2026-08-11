@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 
-import { addAddressAction } from "@/app/actions/checkout";
+import { addAddressAction } from "@/app/actions/address";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";

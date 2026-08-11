@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { currentCart } from "@/app/actions/cart";
-import { currentAddresses } from "@/app/actions/checkout";
+import { currentAddresses } from "@/app/actions/address";
 import { AddressForm } from "@/components/address-form";
 import { CheckoutForm } from "@/components/checkout-form";
 import { OrderTotals } from "@/components/order-totals";

@@ -6,12 +6,12 @@ here as it does in cart.py.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.dependencies import get_current_user
-from app.models import Address, User
+from app.models import Address, Order, User
 from app.schemas import AddressCreate, AddressRead
 
 router = APIRouter(prefix="/addresses", tags=["addresses"])
@@ -63,5 +63,26 @@ def delete_address(
     user: User = Depends(get_current_user),
 ) -> None:
     address = owned_address(db, address_id, user.id)
+
+    # orders.shipping_address_id and billing_address_id are NOT NULL with no ON
+    # DELETE rule, so removing an address a past order points at violates the
+    # foreign key. Left uncaught that surfaces as a 500 -- but running out of
+    # deletable rows is a perfectly foreseeable state, and 500 means "we broke",
+    # not "you can't do that". 409 says which it is, and says it in a sentence
+    # the account page can show verbatim.
+    used_by_order = db.scalar(
+        select(func.count())
+        .select_from(Order)
+        .where(
+            (Order.shipping_address_id == address_id)
+            | (Order.billing_address_id == address_id)
+        )
+    )
+    if used_by_order:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This address is used by a past order and cannot be removed.",
+        )
+
     db.delete(address)
     db.commit()

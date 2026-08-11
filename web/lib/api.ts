@@ -296,8 +296,14 @@ export const placeOrder = (
     },
   });
 
-export const listOrders = (token: string) =>
-  request<Page<OrderSummary>>("/orders", { token });
+export const deleteAddress = (token: string, id: number) =>
+  request<void>(`/addresses/${id}`, { token, method: "DELETE" });
+
+export const listOrders = (token: string, limit = 20, offset = 0) =>
+  request<Page<OrderSummary>>(
+    `/orders?limit=${limit}&offset=${offset}`,
+    { token },
+  );
 
 export const getOrder = (token: string, id: number) =>
   request<OrderDetail>(`/orders/${id}`, { token });

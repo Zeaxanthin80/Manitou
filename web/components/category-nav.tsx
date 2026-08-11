@@ -19,16 +19,19 @@ export function CategoryNav({ categories }: { categories: Category[] }) {
   const pathname = usePathname();
 
   return (
-    <ul className="flex flex-wrap items-center gap-6">
+    // flex-nowrap, not flex-wrap: the header gives this a scrollable row, and a
+    // list that wraps inside a scroll container makes the container taller
+    // instead of scrolling. One line that scrolls beats three lines that don't.
+    <ul className="flex flex-nowrap items-center gap-6">
       {categories.map((c) => {
         const active = pathname === `/categories/${c.slug}`;
         return (
-          <li key={c.id}>
+          <li key={c.id} className="shrink-0">
             <Link
               href={`/categories/${c.slug}`}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "font-body text-sm transition-colors motion-reduce:transition-none",
+                "block whitespace-nowrap font-body text-sm transition-colors motion-reduce:transition-none",
                 active
                   ? "text-accent underline decoration-2 underline-offset-8"
                   : "text-muted hover:text-text",
