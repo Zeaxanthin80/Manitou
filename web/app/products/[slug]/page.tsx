@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AddToCart } from "@/components/add-to-cart";
 import { ApiError, getProduct } from "@/lib/api";
 import { formatMoney, formatUnit } from "@/lib/format";
 import { storeConfig } from "@/lib/store-config";
@@ -13,8 +14,10 @@ import { storeConfig } from "@/lib/store-config";
  * which is exactly what "one sharp accent used sparingly" is for. It appears
  * nowhere else on this page.
  *
- * The variant picker is deliberately not interactive yet -- choosing a variant
- * writes to the cart, and the cart is behind auth. It arrives after task 7.
+ * The variant picker and Add to cart live in <AddToCart>, a Client Component --
+ * choosing a variant is browser state. The page around it stays a Server
+ * Component, so the client boundary is drawn as tightly as the interaction
+ * requires and no tighter.
  */
 export default async function ProductPage({
   params,
@@ -36,10 +39,6 @@ export default async function ProductPage({
   const primary =
     product.images.find((i) => i.is_primary) ?? product.images[0] ?? null;
   const anyInStock = product.variants.some((v) => v.in_stock);
-  // A product whose only variant carries no attributes is the "single item"
-  // shape -- nothing to choose, so no picker should be implied.
-  const hasChoices =
-    storeConfig.features.variants_enabled && product.variants.length > 1;
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-12">
@@ -96,36 +95,8 @@ export default async function ProductPage({
             </p>
           )}
 
-          {hasChoices && (
-            <section className="mt-8">
-              <h2 className="font-body text-xs uppercase tracking-tight text-muted">
-                Options
-              </h2>
-              <ul className="mt-3 flex flex-col">
-                {product.variants.map((v) => (
-                  <li
-                    key={v.id}
-                    className="flex items-baseline justify-between border-b border-border py-3 font-body text-sm last:border-0"
-                  >
-                    <span className={v.in_stock ? "text-text" : "text-muted line-through"}>
-                      {v.variant_name}
-                    </span>
-                    <span className="flex items-baseline gap-4">
-                      <span className="text-text">{formatMoney(v.price)}</span>
-                      <span
-                        className={
-                          v.in_stock
-                            ? "text-xs uppercase tracking-tight text-muted"
-                            : "text-xs uppercase tracking-tight text-accent"
-                        }
-                      >
-                        {v.in_stock ? "Available" : "Sold out"}
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
+          {storeConfig.features.variants_enabled && (
+            <AddToCart variants={product.variants} />
           )}
         </div>
       </div>

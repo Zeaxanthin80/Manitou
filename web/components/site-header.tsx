@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { currentUser, logoutAction } from "@/app/actions/auth";
+import { currentCart } from "@/app/actions/cart";
 import { CategoryNav } from "@/components/category-nav";
 import { listCategories } from "@/lib/api";
 import { storeConfig } from "@/lib/store-config";
@@ -13,7 +14,11 @@ export async function SiteHeader() {
   // a single item and no way to reach the categories a shopper actually browses.
   // A deeper tree would want dropdowns or a sub-nav on the category page; at two
   // levels, flat is the honest answer.
-  const [categories, user] = await Promise.all([listCategories(), currentUser()]);
+  const [categories, user, cart] = await Promise.all([
+    listCategories(),
+    currentUser(),
+    currentCart(),
+  ]);
 
   return (
     <header className="border-b border-border bg-surface">
@@ -29,6 +34,9 @@ export async function SiteHeader() {
         <div className="ml-auto flex items-center gap-4 font-body text-sm">
           {user ? (
             <>
+              <Link href="/cart" className="text-muted hover:text-text">
+                Cart{cart && cart.item_count > 0 ? ` (${cart.item_count})` : ""}
+              </Link>
               <span className="text-muted">{user.email}</span>
               {/* A form, not a link: signing out changes state, and a GET that
                   mutates can be triggered by a prefetch or a crawler. */}

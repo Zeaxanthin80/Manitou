@@ -89,6 +89,32 @@ export type Token = {
   token_type: string;
 };
 
+export type CartLineVariant = {
+  id: number;
+  sku: string;
+  variant_name: string;
+  attributes: Record<string, string>;
+  product_name: string;
+  product_slug: string;
+  /** Live price, not a snapshot -- a cart shows today's price. Only order_items
+   *  freeze it (see PROJECT_PLAN Section 6.4). */
+  price: string;
+  in_stock: boolean;
+};
+
+export type CartItem = {
+  id: number;
+  quantity: number;
+  variant: CartLineVariant;
+  line_total: string;
+};
+
+export type Cart = {
+  items: CartItem[];
+  item_count: number;
+  subtotal: string;
+};
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -181,3 +207,23 @@ export function register(input: {
 export function getCurrentUser(token: string): Promise<User> {
   return request<User>("/auth/me", { token });
 }
+
+/* ----------------------------------------------------------------- cart -- */
+
+export const getCart = (token: string) => request<Cart>("/cart", { token });
+
+export const addCartItem = (token: string, variantId: number, quantity: number) =>
+  request<Cart>("/cart/items", {
+    token,
+    body: { variant_id: variantId, quantity },
+  });
+
+export const updateCartItem = (token: string, itemId: number, quantity: number) =>
+  request<Cart>(`/cart/items/${itemId}`, {
+    token,
+    method: "PATCH",
+    body: { quantity },
+  });
+
+export const removeCartItem = (token: string, itemId: number) =>
+  request<void>(`/cart/items/${itemId}`, { token, method: "DELETE" });
