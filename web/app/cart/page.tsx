@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { currentUser } from "@/app/actions/auth";
 import { currentCart, removeFromCartAction, updateQuantityAction } from "@/app/actions/cart";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { formatMoney } from "@/lib/format";
 
 /**
@@ -126,9 +126,12 @@ export default async function CartPage() {
             Tax and shipping calculated at checkout.
           </p>
 
-          <Button size="lg" className="mt-6 w-full" disabled>
-            Checkout (next task)
-          </Button>
+          <Link
+            href="/checkout"
+            className={buttonClasses({ size: "lg", className: "mt-6 w-full" })}
+          >
+            Checkout
+          </Link>
         </>
       )}
     </main>

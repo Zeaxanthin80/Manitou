@@ -113,6 +113,51 @@ export type Cart = {
   items: CartItem[];
   item_count: number;
   subtotal: string;
+  /** Quoted by the API, never computed here. Doing `subtotal * rate` in
+   *  JavaScript disagrees with the server's Decimal math on roughly 1 in 800
+   *  subtotals at an 8.25% rate -- a page that quotes a cent less than the card
+   *  is charged. Money arithmetic happens in exactly one place. */
+  tax: string;
+  shipping_cost: string;
+  total: string;
+};
+
+export type Address = {
+  id: number;
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string | null;
+  postal_code: string;
+  country: string;
+  type: "shipping" | "billing";
+  is_default: boolean;
+};
+
+export type OrderItem = {
+  id: number;
+  variant_id: number;
+  /** Frozen at purchase time. Never re-derived from the live product -- that is
+   *  the whole point of the snapshot (PROJECT_PLAN Section 6.4). */
+  product_name_snapshot: string;
+  unit_price_snapshot: string;
+  quantity: number;
+};
+
+export type OrderSummary = {
+  id: number;
+  status: string;
+  subtotal: string;
+  tax: string;
+  shipping_cost: string;
+  total: string;
+  created_at: string;
+};
+
+export type OrderDetail = OrderSummary & {
+  items: OrderItem[];
+  shipping_address: Address;
+  billing_address: Address;
 };
 
 export class ApiError extends Error {
@@ -227,3 +272,32 @@ export const updateCartItem = (token: string, itemId: number, quantity: number) 
 
 export const removeCartItem = (token: string, itemId: number) =>
   request<void>(`/cart/items/${itemId}`, { token, method: "DELETE" });
+
+/* ------------------------------------------------------ addresses, orders -- */
+
+export const listAddresses = (token: string) =>
+  request<Address[]>("/addresses", { token });
+
+export const createAddress = (
+  token: string,
+  body: Omit<Address, "id">,
+) => request<Address>("/addresses", { token, body });
+
+export const placeOrder = (
+  token: string,
+  shippingAddressId: number,
+  billingAddressId: number,
+) =>
+  request<OrderDetail>("/orders", {
+    token,
+    body: {
+      shipping_address_id: shippingAddressId,
+      billing_address_id: billingAddressId,
+    },
+  });
+
+export const listOrders = (token: string) =>
+  request<Page<OrderSummary>>("/orders", { token });
+
+export const getOrder = (token: string, id: number) =>
+  request<OrderDetail>(`/orders/${id}`, { token });

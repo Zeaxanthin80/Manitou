@@ -48,6 +48,16 @@ class CartItemRead(BaseModel):
 
 
 class CartRead(BaseModel):
+    """The cart plus what it would cost to buy right now.
+
+    tax/shipping_cost/total are a QUOTE, not a promise: they are recomputed from
+    live prices on every read, and checkout recomputes them again inside the
+    transaction. A client must never add these up itself -- see _to_cart.
+    """
+
     items: list[CartItemRead]
     item_count: int
     subtotal: Decimal
+    tax: Decimal
+    shipping_cost: Decimal
+    total: Decimal

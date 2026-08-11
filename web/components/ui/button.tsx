@@ -32,6 +32,34 @@ export type ButtonProps = React.ComponentProps<"button"> & {
   size?: Size;
 };
 
+/**
+ * The button's visual recipe, on its own.
+ *
+ * For the case where the thing looks like a button but must NOT be one: a
+ * control that navigates is a link, and a link has to be an <a> so it can be
+ * opened in a new tab, copied, and announced as a link rather than a button.
+ * Wrapping a <Link> in a <button> would produce invalid nested-interactive
+ * markup; this gives the <Link> the styling instead.
+ */
+export function buttonClasses({
+  variant = "primary",
+  size = "md",
+  className,
+}: {
+  variant?: Variant;
+  size?: Size;
+  className?: string;
+} = {}) {
+  return cn(
+    "inline-flex items-center justify-center rounded-md font-body",
+    "transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+    "motion-reduce:transition-none",
+    VARIANTS[variant],
+    SIZES[size],
+    className,
+  );
+}
+
 export function Button({
   variant = "primary",
   size = "md",
@@ -44,14 +72,7 @@ export function Button({
       // Defaulting to "button" matters: an unspecified type inside a <form> is
       // "submit", so a stray button silently submits the form.
       type={type}
-      className={cn(
-        "inline-flex items-center justify-center rounded-md font-body",
-        "transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-        "motion-reduce:transition-none",
-        VARIANTS[variant],
-        SIZES[size],
-        className,
-      )}
+      className={buttonClasses({ variant, size, className })}
       {...props}
     />
   );

@@ -22,6 +22,7 @@ from app.schemas import (
     CartLineVariant,
     CartRead,
 )
+from app.store import store_config
 
 router = APIRouter(prefix="/cart", tags=["cart"])
 
@@ -99,10 +100,31 @@ def _to_line(item: CartItem) -> CartItemRead:
 
 def _to_cart(cart: Cart | None) -> CartRead:
     lines = [_to_line(i) for i in cart.items] if cart else []
+    subtotal = sum((line.line_total for line in lines), Decimal("0.00"))
+
+    # Tax and shipping come from the SAME functions checkout uses to build the
+    # real order (services/checkout.py). The alternative -- letting each client
+    # multiply the rate itself -- would put the money formula in Python, then
+    # TypeScript, then Kotlin, then Swift, and the first rounding difference
+    # becomes a customer charged a cent more than the page quoted. One
+    # implementation, four consumers.
+    # An empty cart costs nothing -- including shipping. shipping_for() returns
+    # the flat rate unconditionally, which is right for a real order (checkout
+    # raises CartEmpty before it ever gets there) but would quote a delivery fee
+    # on a cart with nothing in it.
+    if lines:
+        tax = store_config.tax_for(subtotal)
+        shipping_cost = store_config.shipping_for(subtotal)
+    else:
+        tax = shipping_cost = Decimal("0.00")
+
     return CartRead(
         items=lines,
         item_count=sum(line.quantity for line in lines),
-        subtotal=sum((line.line_total for line in lines), Decimal("0.00")),
+        subtotal=subtotal,
+        tax=tax,
+        shipping_cost=shipping_cost,
+        total=subtotal + tax + shipping_cost,
     )
 
 
