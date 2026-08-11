@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo_Black, Inter } from "next/font/google";
 
-import { SiteHeader } from "@/components/site-header";
 import { storeConfig } from "@/lib/store-config";
 import "./globals.css";
 
@@ -31,15 +30,23 @@ export const metadata: Metadata = {
   description: `${storeConfig.store.name} online store`,
 };
 
+/**
+ * The document shell, and nothing else.
+ *
+ * SiteHeader used to live here, which would have given /admin the storefront
+ * nav -- a nested layout can only ADD to its parent, never remove. So the
+ * storefront chrome moved down into app/(store)/layout.tsx and the portal gets
+ * its own in app/admin/layout.tsx.
+ *
+ * `(store)` is a route group: the parentheses keep it out of the URL, so every
+ * existing path still resolves exactly as before.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang={storeConfig.locale}>
-      <body className={`${display.variable} ${body.variable}`}>
-        <SiteHeader />
-        {children}
-      </body>
+      <body className={`${display.variable} ${body.variable}`}>{children}</body>
     </html>
   );
 }

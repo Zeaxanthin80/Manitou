@@ -110,4 +110,4 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
 
 <!-- Update this line as you progress, e.g. "Phase 1 — Database" -->
 
-Phase 2 — Backend API
+Phase 3 — Web Storefront
