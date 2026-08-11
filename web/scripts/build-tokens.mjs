@@ -65,15 +65,23 @@ for (const [name, { size, lineHeight }] of Object.entries(
 }
 
 lines.push("");
-// Tailwind v4 ships a DYNAMIC spacing scale: one --spacing base, multiplied on
-// demand, so p-5 and p-7 exist whether or not the design system wants them.
-// Section 4.3 says every margin comes from the scale and "never an arbitrary
-// number", so the base is disabled and only the eight defined steps exist.
-// Consequence: p-5 is a build error rather than a silent 20px.
-lines.push("  --spacing: initial;");
-for (const [step, value] of Object.entries(tokens.spacing)) {
-  lines.push(`  --spacing-${step}: ${value};`);
-}
+// Tailwind v4 derives EVERY spacing utility -- p-*, m-*, gap-*, inset-*, and the
+// positioning offsets -- from this one base, multiplied on demand. p-4 is
+// calc(var(--spacing) * 4).
+//
+// Do not set this to `initial` to try to restrict the scale to the eight steps
+// in design-tokens.json. That does not narrow the scale, it removes it: every
+// spacing and offset utility stops being generated, including bottom-0 and
+// z-index-adjacent layout, and the failure is silent -- the build succeeds and
+// elements simply lose their positioning.
+//
+// The base is 4px, so the design-tokens scale (4, 8, 12, 16, 24, 32, 48, 64)
+// is exactly p-1, p-2, p-3, p-4, p-6, p-8, p-12, p-16. Off-scale values such as
+// p-5 remain reachable; Section 4.3's "never an arbitrary number" is a review
+// convention here, not a build-enforced one.
+const spacingSteps = Object.values(tokens.spacing).map((v) => parseInt(v, 10));
+const base = Math.min(...spacingSteps);
+lines.push(`  --spacing: ${base}px;`);
 
 lines.push("");
 for (const [name, value] of Object.entries(tokens.radius)) {
