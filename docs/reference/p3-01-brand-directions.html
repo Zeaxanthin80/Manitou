@@ -1,0 +1,2422 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Brand Directions — Manitou Reference</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Archivo+Black&family=Inter:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Source+Sans+3:wght@400;600&family=Anton&family=Playfair+Display:wght@500;700&family=Manrope:wght@400;500;700&family=Alfa+Slab+One&family=Karla:wght@400;600;700&family=Rubik:wght@400;600;800&family=Nunito+Sans:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ground: #0e141b;
+        --surface: #161f29;
+        --surface-2: #1d2833;
+        --line: #2a3947;
+        --ink: #e6edf4;
+        --muted: #8496a6;
+        --client: #4db6e2;
+        --server: #d4a32c;
+        --safe: #8fa98b;
+        --risk: #d9775b;
+        --display: "Barlow Condensed", system-ui, sans-serif;
+        --body: "IBM Plex Sans", system-ui, sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+        font-family: var(--body);
+        font-size: 16px;
+        line-height: 1.65;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 24px 96px;
+      }
+
+      .masthead {
+        padding: 72px 0 40px;
+        border-bottom: 1px solid var(--line);
+      }
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 18px;
+      }
+      h1 {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: clamp(44px, 8vw, 86px);
+        line-height: 0.92;
+        letter-spacing: -0.01em;
+        margin: 0 0 20px;
+        text-transform: uppercase;
+      }
+      .standfirst {
+        max-width: 64ch;
+        color: var(--muted);
+        font-size: 17px;
+        margin: 0;
+      }
+      .standfirst strong {
+        color: var(--ink);
+        font-weight: 500;
+      }
+
+      .toc {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: rgba(14, 20, 27, 0.92);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 2px;
+        overflow-x: auto;
+        padding: 10px 0;
+        margin-bottom: -1px;
+      }
+      .toc a {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-decoration: none;
+        padding: 6px 12px;
+        border-radius: 2px;
+        white-space: nowrap;
+      }
+      .toc a:hover,
+      .toc a:focus-visible {
+        color: var(--ink);
+        background: var(--surface-2);
+      }
+      .toc a.on {
+        color: var(--ink);
+        background: var(--surface-2);
+      }
+
+      section {
+        padding: 64px 0 0;
+        scroll-margin-top: 20px;
+      }
+      .sec-head {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        margin: 0 0 8px;
+      }
+      .sec-num {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        padding: 3px 8px;
+        border-radius: 2px;
+        flex: none;
+      }
+      h2 {
+        font-family: var(--display);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: clamp(26px, 4vw, 38px);
+        line-height: 1.05;
+        margin: 0;
+      }
+      h3 {
+        font-family: var(--display);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 17px;
+        margin: 36px 0 12px;
+      }
+      .lede {
+        max-width: 68ch;
+        color: var(--muted);
+        margin: 14px 0 0;
+      }
+      p {
+        max-width: 70ch;
+      }
+      code {
+        font-family: var(--mono);
+        font-size: 0.88em;
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        padding: 1px 5px;
+        border-radius: 2px;
+        color: var(--ink);
+      }
+      pre {
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.7;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        padding: 16px 18px;
+        margin: 20px 0;
+        overflow-x: auto;
+      }
+      .c-safe {
+        color: var(--safe);
+      }
+      .c-risk {
+        color: var(--risk);
+      }
+      .c-muted {
+        color: var(--muted);
+      }
+
+      .callout {
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--client);
+        background: var(--surface);
+        padding: 18px 22px;
+        margin: 26px 0;
+        border-radius: 2px;
+      }
+      .callout.warn {
+        border-left-color: var(--risk);
+      }
+      .callout.good {
+        border-left-color: var(--safe);
+      }
+      .callout .k {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        display: block;
+        margin-bottom: 8px;
+      }
+      .callout p {
+        margin: 0;
+        max-width: 72ch;
+      }
+      .callout p + p {
+        margin-top: 12px;
+      }
+
+      .tbl {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 24px 0;
+        font-size: 15px;
+      }
+      .tbl th {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-align: left;
+        padding: 0 16px 10px 0;
+        border-bottom: 1px solid var(--line);
+        font-weight: 400;
+      }
+      .tbl td {
+        padding: 13px 16px 13px 0;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      .tbl tr:last-child td {
+        border-bottom: none;
+      }
+      .tbl .m {
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--ink);
+      }
+      .yes {
+        color: var(--safe);
+      }
+      .no {
+        color: var(--risk);
+      }
+      .mid {
+        color: var(--server);
+      }
+
+      /* ---------- brand specimen ---------- */
+      .spec {
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        overflow: hidden;
+        margin: 28px 0 0;
+      }
+      .spec-head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface-2);
+      }
+      .spec-title {
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 20px;
+        text-transform: uppercase;
+      }
+      .verdict {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 4px 8px;
+        border-radius: 2px;
+        margin-left: auto;
+        white-space: nowrap;
+      }
+      .verdict.wide {
+        color: var(--safe);
+        border: 1px solid rgba(143, 169, 139, 0.45);
+      }
+      .verdict.narrow {
+        color: var(--risk);
+        border: 1px solid rgba(217, 119, 91, 0.45);
+      }
+      .verdict.part {
+        color: var(--server);
+        border: 1px solid rgba(212, 163, 44, 0.45);
+      }
+
+      /* the live render — each panel carries its own palette */
+      .render {
+        padding: 32px 28px;
+      }
+      .swatches {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 26px;
+      }
+      .sw {
+        font-family: var(--mono);
+        font-size: 10px;
+        line-height: 1.5;
+        border-radius: 2px;
+        overflow: hidden;
+        width: 118px;
+        border: 1px solid rgba(128, 128, 128, 0.35);
+      }
+      .sw .chip {
+        height: 44px;
+      }
+      .sw .lbl {
+        padding: 6px 8px;
+        background: rgba(128, 128, 128, 0.1);
+      }
+      .sw .lbl b {
+        display: block;
+        font-weight: 500;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .sw .lbl span {
+        opacity: 0.75;
+      }
+
+      .typespec {
+        margin-bottom: 28px;
+        padding-bottom: 24px;
+        border-bottom: 1px dashed rgba(128, 128, 128, 0.3);
+      }
+      .typespec .dsp {
+        font-size: clamp(30px, 5vw, 46px);
+        line-height: 1;
+        margin: 0 0 6px;
+      }
+      .typespec .bdy {
+        font-size: 15px;
+        margin: 0;
+        max-width: 60ch;
+      }
+      .typespec .note {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        opacity: 0.6;
+        margin: 12px 0 0;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+      .card2 {
+        border-radius: var(--r, 4px);
+        overflow: hidden;
+        border: 1px solid rgba(128, 128, 128, 0.25);
+      }
+      .photo {
+        aspect-ratio: 4/3;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--mono);
+        font-size: 9.5px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #8a8a8a;
+        background: #f2f2f0;
+        background-image: linear-gradient(
+          135deg,
+          #ececea 25%,
+          transparent 25%,
+          transparent 50%,
+          #ececea 50%,
+          #ececea 75%,
+          transparent 75%
+        );
+        background-size: 14px 14px;
+      }
+      .card2 .meta {
+        padding: 14px 14px 16px;
+      }
+      .card2 .nm {
+        font-size: 14.5px;
+        line-height: 1.3;
+        margin: 0 0 3px;
+      }
+      .card2 .vr {
+        font-size: 11.5px;
+        opacity: 0.7;
+        margin: 0 0 10px;
+      }
+      .card2 .pr {
+        font-size: 17px;
+        margin: 0 0 12px;
+      }
+      .card2 .unit {
+        font-size: 11px;
+        opacity: 0.7;
+      }
+      .btn {
+        display: block;
+        width: 100%;
+        text-align: center;
+        padding: 9px 12px;
+        border: none;
+        border-radius: var(--r, 4px);
+        font-size: 12.5px;
+        letter-spacing: 0.04em;
+        cursor: default;
+      }
+      .badge2 {
+        display: inline-block;
+        font-size: 9.5px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 3px 7px;
+        border-radius: 2px;
+        margin-bottom: 8px;
+      }
+
+      .transplant {
+        padding: 20px 28px 28px;
+        border-top: 1px solid var(--line);
+        background: var(--surface);
+      }
+      .transplant h4 {
+        font-family: var(--display);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: 14px;
+        margin: 0 0 10px;
+        color: var(--muted);
+      }
+      .tp-row {
+        display: grid;
+        grid-template-columns: 88px 1fr;
+        gap: 14px;
+        padding: 9px 0;
+        border-bottom: 1px solid var(--line);
+        font-size: 14.5px;
+      }
+      .tp-row:last-child {
+        border-bottom: none;
+      }
+      .tp-row .who {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding-top: 3px;
+      }
+      .tp-row p {
+        margin: 0;
+        max-width: 66ch;
+        color: var(--muted);
+      }
+      .tp-row p b {
+        color: var(--ink);
+        font-weight: 500;
+      }
+
+      footer {
+        margin-top: 80px;
+        padding-top: 24px;
+        border-top: 1px solid var(--line);
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--muted);
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      :focus-visible {
+        outline: 2px solid var(--client);
+        outline-offset: 2px;
+      }
+      @media (max-width: 860px) {
+        .cards {
+          grid-template-columns: 1fr;
+        }
+        .masthead {
+          padding: 48px 0 32px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="masthead">
+        <p class="eyebrow">Manitou · Phase 3, task 1 · Decision aid</p>
+        <h1>Brand<br />Directions</h1>
+        <p class="standfirst">
+          Six complete packages —
+          <strong>palette, display face, body face, feel</strong> — rendered
+          rather than described. Each is shown applied to a T-shirt, a candle,
+          and a grocery item, because
+          <strong>how a direction transplants</strong> is a stated project
+          requirement, not a matter of taste.
+        </p>
+      </header>
+
+      <nav class="toc" aria-label="Sections">
+        <a href="#method">How these were built</a>
+        <a href="#a">A · Studio</a>
+        <a href="#b">B · Heritage</a>
+        <a href="#c">C · Street</a>
+        <a href="#d">D · Nordic</a>
+        <a href="#e">E · Havana</a>
+        <a href="#f">F · Carnival</a>
+        <a href="#matrix">Transplant matrix</a>
+        <a href="#choosing">Choosing</a>
+      </nav>
+
+      <section id="method">
+        <div class="sec-head">
+          <span class="sec-num">00</span>
+          <h2>How these were built</h2>
+        </div>
+        <p class="lede">
+          Not four variations on one idea. The set is deliberately spread across
+          a design space so the choice is genuinely open — and every value in it
+          is constrained by something the plan already commits to.
+        </p>
+
+        <h3>Step 1 — the constraints came first</h3>
+        <table class="tbl">
+          <tbody>
+            <tr>
+              <td class="m" style="width: 190px">Section 4.3</td>
+              <td>
+                4–6 colours <b>named by role</b>, never by appearance. A display
+                face and a body face. So each direction is exactly two typefaces
+                and a six-slot palette — not a free-for-all.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Quality floor</td>
+              <td>
+                Body text must hit <b>WCAG AA</b> (4.5:1). Every ratio below is
+                computed against that palette's own background, and anything
+                that fails is labelled decorative-only.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Section 1.1</td>
+              <td>
+                The repo must clone to other store types by changing config and
+                content, <b>not architecture</b>. That makes transplantability a
+                functional requirement, which is why it gets a whole column.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Practicality</td>
+              <td>
+                All seven typefaces are on Google Fonts — free, self-hostable
+                for Phase 6, and available in the weights each direction needs.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Step 2 — spread across three axes</h3>
+        <pre>
+                 WARM ─────────────────────────────── COOL
+                   │                                  │
+    LOUD         <b>F</b> Carnival                     <b>C</b> Street
+                 <b>B</b> Heritage                           │
+                 <b>E</b> Havana                             │
+                   │                                  │
+    QUIET          │              <b>D</b> Nordic       <b>A</b> Studio
+                   │                                  │
+                 LIGHT ─────────────────────── DARK-FIRST (C only)</pre
+        >
+        <p>
+          If they all clustered in one corner you'd be picking a shade, not a
+          direction. B, E and F are the expressive end; A and D the restrained
+          ones. Only C commits to a dark canvas, which turns out to be the
+          single biggest factor in how it transplants.
+        </p>
+        <p>
+          <b>E and F were added later, on request</b>, and slot into the
+          warm/expressive quadrant alongside B. They are not variations of it: B
+          is faded and rustic, E is flat and graphic, F is saturated and
+          celebratory. Where B looks handmade, E looks <em>printed</em> — which
+          turns out to matter for a store that sells printed things.
+        </p>
+
+        <h3>Step 3 — the type pairing rule</h3>
+        <p>
+          Each pairing needs a real <b>contrast of role</b>: the display face
+          carries personality at large sizes, the body face disappears at 15px.
+          Pairing two similar sans faces produces a muddle where neither job is
+          done well. So each direction pairs one characterful face with one
+          neutral workhorse — and in every case the body face is chosen for
+          legibility in a dense product grid, not for looks.
+        </p>
+
+        <div class="callout">
+          <span class="k">Why the photo placeholders are light grey</span>
+          <p>
+            Every card below uses the same neutral placeholder, standing in for
+            a <b>white-background studio product shot</b> — the most common kind
+            of e-commerce photography, and what a small vendor is most likely to
+            have.
+          </p>
+          <p>
+            Watch how it sits on each background. On the light directions it
+            blends in. On the dark one it floats as a bright rectangle. That is
+            not a rendering artefact — it is the actual problem, and it is why
+            photography style constrains palette far more than most people
+            expect.
+          </p>
+        </div>
+      </section>
+
+      <!-- ================= A ================= -->
+      <section id="a">
+        <div class="sec-head">
+          <span class="sec-num">01</span>
+          <h2>A · Studio Monochrome + Signal</h2>
+        </div>
+        <p class="lede">
+          Near-black on warm white, one sharp accent used sparingly. The
+          interface gets out of the way and the product photography carries the
+          personality.
+        </p>
+
+        <div class="spec">
+          <div class="spec-head">
+            <span class="spec-title">Studio</span
+            ><span class="verdict wide">Transplants widely</span>
+          </div>
+          <div
+            class="render"
+            style="
+              --bg: #fafaf9;
+              --sf: #ffffff;
+              --tx: #1c1917;
+              --mu: #57534e;
+              --pr: #1c1917;
+              --ac: #db1b45;
+              --r: 4px;
+              background: var(--bg);
+              color: var(--tx);
+            "
+          >
+            <div class="swatches">
+              <div class="sw">
+                <div class="chip" style="background: #fafaf9"></div>
+                <div class="lbl"><b>background</b><span>#FAFAF9</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #ffffff"></div>
+                <div class="lbl"><b>surface</b><span>#FFFFFF</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #1c1917"></div>
+                <div class="lbl"><b>text</b><span>#1C1917 · 16.74:1</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #57534e"></div>
+                <div class="lbl"><b>muted</b><span>#57534E · 7.30:1</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #1c1917"></div>
+                <div class="lbl"><b>primary</b><span>#1C1917</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #db1b45"></div>
+                <div class="lbl">
+                  <b>accent</b><span>#DB1B45 · 4.73:1</span>
+                </div>
+              </div>
+            </div>
+            <div class="typespec">
+              <p
+                class="dsp"
+                style="
+                  font-family: &quot;Archivo Black&quot;, sans-serif;
+                  text-transform: uppercase;
+                  letter-spacing: -0.01em;
+                "
+              >
+                New Arrivals
+              </p>
+              <p class="bdy" style="font-family: Inter, sans-serif">
+                Midweight combed cotton, cut boxy and pre-shrunk. Printed in
+                small runs and restocked when they sell out.
+              </p>
+              <p class="note">Archivo Black · Inter</p>
+            </div>
+            <div class="cards">
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <p
+                    class="nm"
+                    style="
+                      font-family: &quot;Archivo Black&quot;, sans-serif;
+                      text-transform: uppercase;
+                      font-size: 13px;
+                    "
+                  >
+                    Classic Cotton Tee
+                  </p>
+                  <p
+                    class="vr"
+                    style="font-family: Inter, sans-serif; color: var(--mu)"
+                  >
+                    Small / Black
+                  </p>
+                  <p
+                    class="pr"
+                    style="font-family: &quot;Archivo Black&quot;, sans-serif"
+                  >
+                    $24.00
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #fff;
+                      font-family: Inter, sans-serif;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <span
+                    class="badge2"
+                    style="
+                      background: var(--ac);
+                      color: #fff;
+                      font-family: Inter, sans-serif;
+                    "
+                    >Sale</span
+                  >
+                  <p
+                    class="nm"
+                    style="
+                      font-family: &quot;Archivo Black&quot;, sans-serif;
+                      text-transform: uppercase;
+                      font-size: 13px;
+                    "
+                  >
+                    Cedar &amp; Smoke Candle
+                  </p>
+                  <p
+                    class="vr"
+                    style="font-family: Inter, sans-serif; color: var(--mu)"
+                  >
+                    220 g · soy wax
+                  </p>
+                  <p
+                    class="pr"
+                    style="font-family: &quot;Archivo Black&quot;, sans-serif"
+                  >
+                    $28.00
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #fff;
+                      font-family: Inter, sans-serif;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <p
+                    class="nm"
+                    style="
+                      font-family: &quot;Archivo Black&quot;, sans-serif;
+                      text-transform: uppercase;
+                      font-size: 13px;
+                    "
+                  >
+                    Organic Gala Apples
+                  </p>
+                  <p
+                    class="vr"
+                    style="font-family: Inter, sans-serif; color: var(--mu)"
+                  >
+                    loose · class I
+                  </p>
+                  <p
+                    class="pr"
+                    style="font-family: &quot;Archivo Black&quot;, sans-serif"
+                  >
+                    $3.49
+                    <span
+                      class="unit"
+                      style="font-family: Inter, sans-serif; font-weight: 400"
+                      >/ lb</span
+                    >
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #fff;
+                      font-family: Inter, sans-serif;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="transplant">
+            <h4>How it transplants</h4>
+            <div class="tp-row">
+              <span class="who yes">T-shirt</span>
+              <p>
+                <b>Native.</b> Monochrome chrome plus one signal colour is the
+                default language of apparel retail. The garment supplies all the
+                colour the page needs.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who yes">Candle</span>
+              <p>
+                <b>Works unchanged.</b> Same logic — a neutral frame flatters a
+                warm product shot. Reads premium rather than cosy, which suits a
+                design-led candle brand more than a rustic one.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who yes">Grocery</span>
+              <p>
+                <b>Works, and is the best of the four here.</b> Dense grids need
+                high contrast and clear hierarchy, which this has. Archivo Black
+                handles price stacks and unit pricing legibly at small sizes,
+                and the accent gives you a real "on offer" colour that nothing
+                else is competing for.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who mid">Correction</span>
+              <p>
+                This panel originally listed the accent as
+                <b>#E11D48 at 4.8:1</b>. That ratio was estimated, not computed.
+                Measured, it is <b>4.497:1</b> on the background —
+                <b>failing</b> AA for small text by 0.003, which rounding to
+                4.50 concealed. The accent is now <b>#DB1B45</b> (4.73:1), which
+                clears AA in every usage. The lesson generalises:
+                <b>compute contrast, never estimate it</b>, and be wary of a
+                rounded figure sitting exactly on a threshold.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who mid">Cost</span>
+              <p>
+                Its neutrality is the tradeoff: with weak photography there is
+                nothing holding the page up. This direction
+                <b>depends on decent product shots</b> more than the other
+                three.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= B ================= -->
+      <section id="b">
+        <div class="sec-head">
+          <span class="sec-num">02</span>
+          <h2>B · Heritage Craft</h2>
+        </div>
+        <p class="lede">
+          Warm cream, terracotta and ochre, with a characterful serif carrying
+          the headings. Small-batch and handmade — the most opinionated of the
+          light options.
+        </p>
+
+        <div class="spec">
+          <div class="spec-head">
+            <span class="spec-title">Heritage</span
+            ><span class="verdict part">Warm goods only</span>
+          </div>
+          <div
+            class="render"
+            style="
+              --bg: #fbf7f0;
+              --sf: #ffffff;
+              --tx: #2d2419;
+              --mu: #6b5d4d;
+              --pr: #9a4a2e;
+              --ac: #c08b3e;
+              --r: 3px;
+              background: var(--bg);
+              color: var(--tx);
+            "
+          >
+            <div class="swatches">
+              <div class="sw">
+                <div class="chip" style="background: #fbf7f0"></div>
+                <div class="lbl"><b>background</b><span>#FBF7F0</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #ffffff"></div>
+                <div class="lbl"><b>surface</b><span>#FFFFFF</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #2d2419"></div>
+                <div class="lbl"><b>text</b><span>#2D2419 · 13.9:1</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #6b5d4d"></div>
+                <div class="lbl"><b>muted</b><span>#6B5D4D · 4.9:1</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #9a4a2e"></div>
+                <div class="lbl">
+                  <b>primary</b><span>#9A4A2E · 5.4:1</span>
+                </div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #c08b3e"></div>
+                <div class="lbl">
+                  <b>accent</b><span>#C08B3E · 2.4:1 ⚠</span>
+                </div>
+              </div>
+            </div>
+            <div class="typespec">
+              <p
+                class="dsp"
+                style="font-family: Fraunces, serif; font-weight: 600"
+              >
+                New Arrivals
+              </p>
+              <p
+                class="bdy"
+                style="font-family: &quot;Source Sans 3&quot;, sans-serif"
+              >
+                Midweight combed cotton, cut boxy and pre-shrunk. Printed in
+                small runs and restocked when they sell out.
+              </p>
+              <p class="note">Fraunces · Source Sans 3</p>
+            </div>
+            <div class="cards">
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <p
+                    class="nm"
+                    style="
+                      font-family: Fraunces, serif;
+                      font-weight: 600;
+                      font-size: 15px;
+                    "
+                  >
+                    Classic Cotton Tee
+                  </p>
+                  <p
+                    class="vr"
+                    style="
+                      font-family: &quot;Source Sans 3&quot;, sans-serif;
+                      color: var(--mu);
+                    "
+                  >
+                    Small / Black
+                  </p>
+                  <p
+                    class="pr"
+                    style="font-family: Fraunces, serif; font-weight: 600"
+                  >
+                    $24.00
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #fff;
+                      font-family: &quot;Source Sans 3&quot;, sans-serif;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <span
+                    class="badge2"
+                    style="
+                      background: var(--ac);
+                      color: #2d2419;
+                      font-family: &quot;Source Sans 3&quot;, sans-serif;
+                      font-weight: 600;
+                    "
+                    >Sale</span
+                  >
+                  <p
+                    class="nm"
+                    style="
+                      font-family: Fraunces, serif;
+                      font-weight: 600;
+                      font-size: 15px;
+                    "
+                  >
+                    Cedar &amp; Smoke Candle
+                  </p>
+                  <p
+                    class="vr"
+                    style="
+                      font-family: &quot;Source Sans 3&quot;, sans-serif;
+                      color: var(--mu);
+                    "
+                  >
+                    220 g · soy wax
+                  </p>
+                  <p
+                    class="pr"
+                    style="font-family: Fraunces, serif; font-weight: 600"
+                  >
+                    $28.00
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #fff;
+                      font-family: &quot;Source Sans 3&quot;, sans-serif;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <p
+                    class="nm"
+                    style="
+                      font-family: Fraunces, serif;
+                      font-weight: 600;
+                      font-size: 15px;
+                    "
+                  >
+                    Organic Gala Apples
+                  </p>
+                  <p
+                    class="vr"
+                    style="
+                      font-family: &quot;Source Sans 3&quot;, sans-serif;
+                      color: var(--mu);
+                    "
+                  >
+                    loose · class I
+                  </p>
+                  <p
+                    class="pr"
+                    style="font-family: Fraunces, serif; font-weight: 600"
+                  >
+                    $3.49
+                    <span
+                      class="unit"
+                      style="font-family: &quot;Source Sans 3&quot;, sans-serif"
+                      >/ lb</span
+                    >
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #fff;
+                      font-family: &quot;Source Sans 3&quot;, sans-serif;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="transplant">
+            <h4>How it transplants</h4>
+            <div class="tp-row">
+              <span class="who mid">T-shirt</span>
+              <p>
+                <b>Good, if the tees have a story.</b> Illustrated or
+                screen-printed designs with provenance sit naturally here. Plain
+                blanks or technical apparel would fight it — the frame promises
+                craft the product has to deliver on.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who yes">Candle</span>
+              <p>
+                <b>Native — this is candle-shop language.</b> Warm cream,
+                terracotta and a serif is close to the default vocabulary for
+                home fragrance, ceramics and coffee. Of the four, this is the
+                one you would choose if candles were the real target.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who no">Grocery</span>
+              <p>
+                <b>Works for a farm shop, fails for a weekly shop.</b> Fine for
+                a deli or artisan grocer with 80 products. At the
+                multi-thousand-SKU scale Section 10.1 describes, the cream
+                background and serif read <b>boutique</b>, which fights a fast
+                list-building workflow. Fraunces also muddies at 13px in a dense
+                grid — it is a display face doing display work, and grocery
+                cards are mostly small text.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who no">Watch</span>
+              <p>
+                The ochre accent is <b>2.4:1</b> — decorative only. Safe for
+                borders, badges with dark text, or large headings; never for
+                body copy or small labels. That is a discipline the whole team
+                has to keep, and it is the easiest rule in this document to
+                break by accident.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= C ================= -->
+      <section id="c">
+        <div class="sec-head">
+          <span class="sec-num">03</span>
+          <h2>C · Street Drop</h2>
+        </div>
+        <p class="lede">
+          Near-black canvas, acid accent, heavy condensed caps. The most
+          distinctive of the four and the most committing — and the clearest
+          example of a direction that is <em>apparel-specific</em>.
+        </p>
+
+        <div class="spec">
+          <div class="spec-head">
+            <span class="spec-title">Street</span
+            ><span class="verdict narrow">Apparel-specific</span>
+          </div>
+          <div
+            class="render"
+            style="
+              --bg: #0a0a0a;
+              --sf: #171717;
+              --tx: #fafafa;
+              --mu: #a3a3a3;
+              --pr: #ccff00;
+              --ac: #ff3d00;
+              --r: 0px;
+              background: var(--bg);
+              color: var(--tx);
+            "
+          >
+            <div class="swatches">
+              <div class="sw">
+                <div class="chip" style="background: #0a0a0a"></div>
+                <div class="lbl"><b>background</b><span>#0A0A0A</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #171717"></div>
+                <div class="lbl"><b>surface</b><span>#171717</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #fafafa"></div>
+                <div class="lbl"><b>text</b><span>#FAFAFA · 18.4:1</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #a3a3a3"></div>
+                <div class="lbl"><b>muted</b><span>#A3A3A3 · 7.6:1</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #ccff00"></div>
+                <div class="lbl">
+                  <b>primary</b><span>#CCFF00 · 16.5:1</span>
+                </div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #ff3d00"></div>
+                <div class="lbl"><b>accent</b><span>#FF3D00 · 4.6:1</span></div>
+              </div>
+            </div>
+            <div class="typespec">
+              <p
+                class="dsp"
+                style="
+                  font-family: Anton, sans-serif;
+                  text-transform: uppercase;
+                  letter-spacing: 0.01em;
+                "
+              >
+                New Arrivals
+              </p>
+              <p class="bdy" style="font-family: Inter, sans-serif">
+                Midweight combed cotton, cut boxy and pre-shrunk. Printed in
+                small runs and restocked when they sell out.
+              </p>
+              <p class="note">Anton · Inter</p>
+            </div>
+            <div class="cards">
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <p
+                    class="nm"
+                    style="
+                      font-family: Anton, sans-serif;
+                      text-transform: uppercase;
+                      font-size: 14px;
+                      letter-spacing: 0.02em;
+                    "
+                  >
+                    Classic Cotton Tee
+                  </p>
+                  <p
+                    class="vr"
+                    style="font-family: Inter, sans-serif; color: var(--mu)"
+                  >
+                    Small / Black
+                  </p>
+                  <p class="pr" style="font-family: Anton, sans-serif">
+                    $24.00
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #0a0a0a;
+                      font-family: Inter, sans-serif;
+                      font-weight: 600;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <span
+                    class="badge2"
+                    style="
+                      background: var(--ac);
+                      color: #fff;
+                      font-family: Inter, sans-serif;
+                      font-weight: 600;
+                    "
+                    >Drop</span
+                  >
+                  <p
+                    class="nm"
+                    style="
+                      font-family: Anton, sans-serif;
+                      text-transform: uppercase;
+                      font-size: 14px;
+                      letter-spacing: 0.02em;
+                    "
+                  >
+                    Cedar &amp; Smoke Candle
+                  </p>
+                  <p
+                    class="vr"
+                    style="font-family: Inter, sans-serif; color: var(--mu)"
+                  >
+                    220 g · soy wax
+                  </p>
+                  <p class="pr" style="font-family: Anton, sans-serif">
+                    $28.00
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #0a0a0a;
+                      font-family: Inter, sans-serif;
+                      font-weight: 600;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <p
+                    class="nm"
+                    style="
+                      font-family: Anton, sans-serif;
+                      text-transform: uppercase;
+                      font-size: 14px;
+                      letter-spacing: 0.02em;
+                    "
+                  >
+                    Organic Gala Apples
+                  </p>
+                  <p
+                    class="vr"
+                    style="font-family: Inter, sans-serif; color: var(--mu)"
+                  >
+                    loose · class I
+                  </p>
+                  <p class="pr" style="font-family: Anton, sans-serif">
+                    $3.49
+                    <span class="unit" style="font-family: Inter, sans-serif"
+                      >/ lb</span
+                    >
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #0a0a0a;
+                      font-family: Inter, sans-serif;
+                      font-weight: 600;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="transplant">
+            <h4>How it transplants</h4>
+            <div class="tp-row">
+              <span class="who yes">T-shirt</span>
+              <p>
+                <b>Native, and the strongest of the four for this product.</b>
+                Limited-run tees, drop culture and heavy condensed caps belong
+                together. If the store is genuinely streetwear, nothing else
+                here competes.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who no">Candle</span>
+              <p>
+                <b>Fights the product.</b> Acid green and shouting caps are the
+                opposite of what "cedar, smoke, 40-hour burn" is selling. You
+                would be rebranding, not recolouring.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who no">Grocery</span>
+              <p>
+                <b>Actively bad — look at the third card.</b> Food photography
+                is overwhelmingly bright and white-background, so every product
+                floats as a lit rectangle on black. You would have to re-shoot
+                or cut out the entire catalogue. Then add that grocery UIs are
+                dense, text-heavy and scanned quickly, and long sessions on a
+                near-black data grid are tiring. This is the direction that
+                would force an architecture change to escape.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who no">Cost</span>
+              <p>
+                <b>Hardest to walk back.</b> Dark-first is not a token swap: it
+                changes photography, iconography, illustration and email design.
+                Choose it because the store <em>is</em> this, not because it
+                looks striking on a comparison page.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= D ================= -->
+      <section id="d">
+        <div class="sec-head">
+          <span class="sec-num">04</span>
+          <h2>D · Nordic Calm</h2>
+        </div>
+        <p class="lede">
+          Soft off-white, muted sage and clay, plenty of air. The safest of the
+          four and the least likely to date — also the least memorable.
+        </p>
+
+        <div class="spec">
+          <div class="spec-head">
+            <span class="spec-title">Nordic</span
+            ><span class="verdict part">Home goods leaning</span>
+          </div>
+          <div
+            class="render"
+            style="
+              --bg: #f7f7f5;
+              --sf: #ffffff;
+              --tx: #23282b;
+              --mu: #5f6b70;
+              --pr: #4a6b5d;
+              --ac: #c9754f;
+              --r: 8px;
+              background: var(--bg);
+              color: var(--tx);
+            "
+          >
+            <div class="swatches">
+              <div class="sw">
+                <div class="chip" style="background: #f7f7f5"></div>
+                <div class="lbl"><b>background</b><span>#F7F7F5</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #ffffff"></div>
+                <div class="lbl"><b>surface</b><span>#FFFFFF</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #23282b"></div>
+                <div class="lbl"><b>text</b><span>#23282B · 14.2:1</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #5f6b70"></div>
+                <div class="lbl"><b>muted</b><span>#5F6B70 · 5.3:1</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #4a6b5d"></div>
+                <div class="lbl">
+                  <b>primary</b><span>#4A6B5D · 5.1:1</span>
+                </div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #c9754f"></div>
+                <div class="lbl">
+                  <b>accent</b><span>#C9754F · 3.2:1 ⚠</span>
+                </div>
+              </div>
+            </div>
+            <div class="typespec">
+              <p
+                class="dsp"
+                style="
+                  font-family: &quot;Playfair Display&quot;, serif;
+                  font-weight: 700;
+                "
+              >
+                New Arrivals
+              </p>
+              <p class="bdy" style="font-family: Manrope, sans-serif">
+                Midweight combed cotton, cut boxy and pre-shrunk. Printed in
+                small runs and restocked when they sell out.
+              </p>
+              <p class="note">Playfair Display · Manrope</p>
+            </div>
+            <div class="cards">
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <p
+                    class="nm"
+                    style="
+                      font-family: &quot;Playfair Display&quot;, serif;
+                      font-weight: 700;
+                      font-size: 15px;
+                    "
+                  >
+                    Classic Cotton Tee
+                  </p>
+                  <p
+                    class="vr"
+                    style="font-family: Manrope, sans-serif; color: var(--mu)"
+                  >
+                    Small / Black
+                  </p>
+                  <p
+                    class="pr"
+                    style="
+                      font-family: &quot;Playfair Display&quot;, serif;
+                      font-weight: 700;
+                    "
+                  >
+                    $24.00
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #fff;
+                      font-family: Manrope, sans-serif;
+                      font-weight: 500;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <span
+                    class="badge2"
+                    style="
+                      background: var(--ac);
+                      color: #fff;
+                      font-family: Manrope, sans-serif;
+                      font-weight: 700;
+                    "
+                    >Sale</span
+                  >
+                  <p
+                    class="nm"
+                    style="
+                      font-family: &quot;Playfair Display&quot;, serif;
+                      font-weight: 700;
+                      font-size: 15px;
+                    "
+                  >
+                    Cedar &amp; Smoke Candle
+                  </p>
+                  <p
+                    class="vr"
+                    style="font-family: Manrope, sans-serif; color: var(--mu)"
+                  >
+                    220 g · soy wax
+                  </p>
+                  <p
+                    class="pr"
+                    style="
+                      font-family: &quot;Playfair Display&quot;, serif;
+                      font-weight: 700;
+                    "
+                  >
+                    $28.00
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #fff;
+                      font-family: Manrope, sans-serif;
+                      font-weight: 500;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <p
+                    class="nm"
+                    style="
+                      font-family: &quot;Playfair Display&quot;, serif;
+                      font-weight: 700;
+                      font-size: 15px;
+                    "
+                  >
+                    Organic Gala Apples
+                  </p>
+                  <p
+                    class="vr"
+                    style="font-family: Manrope, sans-serif; color: var(--mu)"
+                  >
+                    loose · class I
+                  </p>
+                  <p
+                    class="pr"
+                    style="
+                      font-family: &quot;Playfair Display&quot;, serif;
+                      font-weight: 700;
+                    "
+                  >
+                    $3.49
+                    <span class="unit" style="font-family: Manrope, sans-serif"
+                      >/ lb</span
+                    >
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #fff;
+                      font-family: Manrope, sans-serif;
+                      font-weight: 500;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="transplant">
+            <h4>How it transplants</h4>
+            <div class="tp-row">
+              <span class="who mid">T-shirt</span>
+              <p>
+                <b>Good for quiet basics</b>, wrong for loud graphics. Premium
+                blanks, muted colourways, minimal branding. A bold printed range
+                would sit awkwardly inside this much restraint.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who yes">Candle</span>
+              <p>
+                <b>Native.</b> Home fragrance, skincare and ceramics are where
+                this language lives. Slightly cooler and more clinical than B —
+                modern apothecary rather than farmhouse.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who mid">Grocery</span>
+              <p>
+                <b>Workable but compromised.</b> The palette is fine; the
+                <em>spacing philosophy</em> is the problem. This direction earns
+                its calm from generous whitespace, and grocery needs density —
+                many items visible at once. Tighten the spacing to fit and you
+                have kept the colours while losing the character. Playfair also
+                has high stroke contrast, so it thins out at small sizes.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who no">Watch</span>
+              <p>
+                Clay at <b>3.2:1</b> is decorative only, and sage at 5.1:1
+                clears AA but not by much. Low-contrast palettes drift below the
+                line easily — one designer lightening a muted tone "just
+                slightly" is all it takes.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= E ================= -->
+      <section id="e">
+        <div class="sec-head">
+          <span class="sec-num">05</span>
+          <h2>E · Havana Silkscreen</h2>
+        </div>
+        <p class="lede">
+          Weathered limewash, sea-turquoise and a silkscreen coral. Drawn from
+          two real Cuban visual traditions — the
+          <strong>patinated pastels of Havana's colonial facades</strong> and
+          the <strong>ICAIC film-poster silkscreens</strong> of the 1960s–80s,
+          which are a genuine chapter of graphic design history rather than
+          tourist iconography.
+        </p>
+
+        <div class="spec">
+          <div class="spec-head">
+            <span class="spec-title">Havana</span
+            ><span class="verdict wide">Transplants widely</span>
+          </div>
+          <div
+            class="render"
+            style="
+              --bg: #f7f2e8;
+              --sf: #ffffff;
+              --tx: #1e2a2e;
+              --mu: #5a6b6f;
+              --pr: #0f6e6b;
+              --ac: #c43a22;
+              --r: 2px;
+              background: var(--bg);
+              color: var(--tx);
+            "
+          >
+            <div class="swatches">
+              <div class="sw">
+                <div class="chip" style="background: #f7f2e8"></div>
+                <div class="lbl">
+                  <b>background</b><span>#F7F2E8 · limewash</span>
+                </div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #ffffff"></div>
+                <div class="lbl"><b>surface</b><span>#FFFFFF</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #1e2a2e"></div>
+                <div class="lbl"><b>text</b><span>#1E2A2E · 12.6:1</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #5a6b6f"></div>
+                <div class="lbl"><b>muted</b><span>#5A6B6F · 4.7:1</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #0f6e6b"></div>
+                <div class="lbl">
+                  <b>primary</b><span>#0F6E6B · 5.3:1</span>
+                </div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #c43a22"></div>
+                <div class="lbl"><b>accent</b><span>#C43A22 · 4.5:1</span></div>
+              </div>
+            </div>
+            <div class="typespec">
+              <p
+                class="dsp"
+                style="
+                  font-family: &quot;Alfa Slab One&quot;, serif;
+                  letter-spacing: -0.005em;
+                "
+              >
+                New Arrivals
+              </p>
+              <p class="bdy" style="font-family: Karla, sans-serif">
+                Midweight combed cotton, cut boxy and pre-shrunk. Printed in
+                small runs and restocked when they sell out.
+              </p>
+              <p class="note">Alfa Slab One · Karla</p>
+            </div>
+            <div class="cards">
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <p
+                    class="nm"
+                    style="
+                      font-family: Karla, sans-serif;
+                      font-weight: 700;
+                      font-size: 14.5px;
+                    "
+                  >
+                    Classic Cotton Tee
+                  </p>
+                  <p
+                    class="vr"
+                    style="font-family: Karla, sans-serif; color: var(--mu)"
+                  >
+                    Small / Black
+                  </p>
+                  <p
+                    class="pr"
+                    style="
+                      font-family: &quot;Alfa Slab One&quot;, serif;
+                      font-size: 18px;
+                    "
+                  >
+                    $24.00
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #fff;
+                      font-family: Karla, sans-serif;
+                      font-weight: 600;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <span
+                    class="badge2"
+                    style="
+                      background: var(--ac);
+                      color: #fff;
+                      font-family: Karla, sans-serif;
+                      font-weight: 700;
+                    "
+                    >Oferta</span
+                  >
+                  <p
+                    class="nm"
+                    style="
+                      font-family: Karla, sans-serif;
+                      font-weight: 700;
+                      font-size: 14.5px;
+                    "
+                  >
+                    Cedar &amp; Smoke Candle
+                  </p>
+                  <p
+                    class="vr"
+                    style="font-family: Karla, sans-serif; color: var(--mu)"
+                  >
+                    220 g · soy wax
+                  </p>
+                  <p
+                    class="pr"
+                    style="
+                      font-family: &quot;Alfa Slab One&quot;, serif;
+                      font-size: 18px;
+                    "
+                  >
+                    $28.00
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #fff;
+                      font-family: Karla, sans-serif;
+                      font-weight: 600;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <p
+                    class="nm"
+                    style="
+                      font-family: Karla, sans-serif;
+                      font-weight: 700;
+                      font-size: 14.5px;
+                    "
+                  >
+                    Organic Gala Apples
+                  </p>
+                  <p
+                    class="vr"
+                    style="font-family: Karla, sans-serif; color: var(--mu)"
+                  >
+                    loose · class I
+                  </p>
+                  <p
+                    class="pr"
+                    style="
+                      font-family: &quot;Alfa Slab One&quot;, serif;
+                      font-size: 18px;
+                    "
+                  >
+                    $3.49
+                    <span class="unit" style="font-family: Karla, sans-serif"
+                      >/ lb</span
+                    >
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #fff;
+                      font-family: Karla, sans-serif;
+                      font-weight: 600;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="transplant">
+            <h4>How it transplants</h4>
+            <div class="tp-row">
+              <span class="who yes">T-shirt</span>
+              <p>
+                <b>The strongest conceptual fit of any direction here.</b>
+                Silkscreen posters and printed tees are
+                <em>the same craft</em> — flat ink, limited colours, bold
+                shapes, small runs. The brand language and the manufacturing
+                process agree with each other, which is rare and worth
+                something.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who yes">Candle</span>
+              <p>
+                <b>Works, leaning market-stall rather than apothecary.</b> The
+                warm limewash flatters amber glass. The slab display reads
+                artisan and a little loud, so it suits a bright, characterful
+                candle line better than a serene luxury one.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who yes">Grocery</span>
+              <p>
+                <b>Genuinely good — second only to Studio.</b> Warm cream
+                handles dense grids without glare, the coral is a natural
+                "oferta" colour with nothing competing for it, and turquoise
+                reads fresh against produce. One adjustment: Alfa Slab One is
+                too dense below ~16px, so product names use
+                <b>Karla bold</b> and the slab is reserved for prices and
+                headings. That split is visible in the cards above.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who mid">Watch</span>
+              <p>
+                <b>Specificity cuts both ways.</b> This borrows from a living
+                culture, and it reads as identity when there is a real
+                connection — the owner, the products, the story — and as costume
+                when there is not. That is a judgement only you can make, and it
+                matters more than any contrast ratio on this page.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= F ================= -->
+      <section id="f">
+        <div class="sec-head">
+          <span class="sec-num">06</span>
+          <h2>F · Carnival</h2>
+        </div>
+        <p class="lede">
+          Sun-white, magenta and gold. Pan-Caribbean rather than one island —
+          the saturated, joyful register of carnival and market day. The
+          highest-energy light direction of the six.
+        </p>
+
+        <div class="spec">
+          <div class="spec-head">
+            <span class="spec-title">Carnival</span
+            ><span class="verdict part">Bright goods leaning</span>
+          </div>
+          <div
+            class="render"
+            style="
+              --bg: #fffbf2;
+              --sf: #ffffff;
+              --tx: #241a14;
+              --mu: #6e5a50;
+              --pr: #c6197d;
+              --ac: #f2a20c;
+              --r: 12px;
+              background: var(--bg);
+              color: var(--tx);
+            "
+          >
+            <div class="swatches">
+              <div class="sw">
+                <div class="chip" style="background: #fffbf2"></div>
+                <div class="lbl"><b>background</b><span>#FFFBF2</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #ffffff"></div>
+                <div class="lbl"><b>surface</b><span>#FFFFFF</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #241a14"></div>
+                <div class="lbl"><b>text</b><span>#241A14 · 15.0:1</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #6e5a50"></div>
+                <div class="lbl"><b>muted</b><span>#6E5A50 · 5.6:1</span></div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #c6197d"></div>
+                <div class="lbl">
+                  <b>primary</b><span>#C6197D · 6.3:1</span>
+                </div>
+              </div>
+              <div class="sw">
+                <div class="chip" style="background: #f2a20c"></div>
+                <div class="lbl">
+                  <b>accent</b><span>#F2A20C · 2.0:1 ⚠</span>
+                </div>
+              </div>
+            </div>
+            <div class="typespec">
+              <p
+                class="dsp"
+                style="
+                  font-family: Rubik, sans-serif;
+                  font-weight: 800;
+                  letter-spacing: -0.02em;
+                "
+              >
+                New Arrivals
+              </p>
+              <p
+                class="bdy"
+                style="font-family: &quot;Nunito Sans&quot;, sans-serif"
+              >
+                Midweight combed cotton, cut boxy and pre-shrunk. Printed in
+                small runs and restocked when they sell out.
+              </p>
+              <p class="note">Rubik 800 · Nunito Sans</p>
+            </div>
+            <div class="cards">
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <p
+                    class="nm"
+                    style="
+                      font-family: Rubik, sans-serif;
+                      font-weight: 800;
+                      font-size: 14px;
+                    "
+                  >
+                    Classic Cotton Tee
+                  </p>
+                  <p
+                    class="vr"
+                    style="
+                      font-family: &quot;Nunito Sans&quot;, sans-serif;
+                      color: var(--mu);
+                    "
+                  >
+                    Small / Black
+                  </p>
+                  <p
+                    class="pr"
+                    style="font-family: Rubik, sans-serif; font-weight: 800"
+                  >
+                    $24.00
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #fff;
+                      font-family: &quot;Nunito Sans&quot;, sans-serif;
+                      font-weight: 700;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <span
+                    class="badge2"
+                    style="
+                      background: var(--ac);
+                      color: #241a14;
+                      font-family: &quot;Nunito Sans&quot;, sans-serif;
+                      font-weight: 700;
+                    "
+                    >Sale</span
+                  >
+                  <p
+                    class="nm"
+                    style="
+                      font-family: Rubik, sans-serif;
+                      font-weight: 800;
+                      font-size: 14px;
+                    "
+                  >
+                    Cedar &amp; Smoke Candle
+                  </p>
+                  <p
+                    class="vr"
+                    style="
+                      font-family: &quot;Nunito Sans&quot;, sans-serif;
+                      color: var(--mu);
+                    "
+                  >
+                    220 g · soy wax
+                  </p>
+                  <p
+                    class="pr"
+                    style="font-family: Rubik, sans-serif; font-weight: 800"
+                  >
+                    $28.00
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #fff;
+                      font-family: &quot;Nunito Sans&quot;, sans-serif;
+                      font-weight: 700;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+              <div class="card2" style="background: var(--sf)">
+                <div class="photo">product photo</div>
+                <div class="meta">
+                  <p
+                    class="nm"
+                    style="
+                      font-family: Rubik, sans-serif;
+                      font-weight: 800;
+                      font-size: 14px;
+                    "
+                  >
+                    Organic Gala Apples
+                  </p>
+                  <p
+                    class="vr"
+                    style="
+                      font-family: &quot;Nunito Sans&quot;, sans-serif;
+                      color: var(--mu);
+                    "
+                  >
+                    loose · class I
+                  </p>
+                  <p
+                    class="pr"
+                    style="font-family: Rubik, sans-serif; font-weight: 800"
+                  >
+                    $3.49
+                    <span
+                      class="unit"
+                      style="
+                        font-family: &quot;Nunito Sans&quot;, sans-serif;
+                        font-weight: 400;
+                      "
+                      >/ lb</span
+                    >
+                  </p>
+                  <button
+                    class="btn"
+                    style="
+                      background: var(--pr);
+                      color: #fff;
+                      font-family: &quot;Nunito Sans&quot;, sans-serif;
+                      font-weight: 700;
+                    "
+                  >
+                    Add to cart
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="transplant">
+            <h4>How it transplants</h4>
+            <div class="tp-row">
+              <span class="who yes">T-shirt</span>
+              <p>
+                <b>Very good for bright graphic tees</b> — festival merch, bold
+                prints, colour-forward ranges. Would fight a muted or monochrome
+                collection, where the interface would be shouting louder than
+                the product.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who no">Candle</span>
+              <p>
+                <b>The weakest fit in this row.</b> Magenta and gold at full
+                saturation pull against everything "slow-burning, scented, calm"
+                is selling. Viable only for a deliberately playful candle brand;
+                wrong for a serene one.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who yes">Grocery</span>
+              <p>
+                <b>Surprisingly strong — arguably its best transplant.</b>
+                Bright saturated palettes are the native language of markets and
+                produce aisles; magenta and gold read fresh and good-value
+                rather than premium. Rounded 12px corners and a friendly body
+                face suit a fast, tap-heavy shopping flow, and warm white
+                handles dense grids fine.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who mid">Watch</span>
+              <p>
+                Two things. Gold is <b>2.0:1</b> — never body text; it works as
+                a badge fill with dark text, as shown. And a saturated palette
+                needs restraint: if every element competes, nothing reads. Pick
+                one loud thing per screen.
+              </p>
+            </div>
+            <div class="tp-row">
+              <span class="who mid">Type honesty</span>
+              <p>
+                Rubik 800 and Nunito Sans are <b>both sans faces</b>, so their
+                contrast comes from weight and width rather than classification
+                — a weaker separation than the serif/sans pairs in B, D and E.
+                It works because the weight gap is large, but it is the least
+                distinct pairing of the six by my own
+                <a href="#method" style="color: var(--client)">step-3 rule</a>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="matrix">
+        <div class="sec-head">
+          <span class="sec-num">07</span>
+          <h2>Transplant matrix</h2>
+        </div>
+        <p class="lede">
+          The same judgements side by side. "Transplants" means: could a cloned
+          store change only <code>design-tokens.json</code>, the store config,
+          and the content — with no architecture or photography overhaul.
+        </p>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width: 22%">Direction</th>
+              <th>T-shirt</th>
+              <th>Candle</th>
+              <th>Grocery</th>
+              <th>Overall</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="m">A · Studio</td>
+              <td class="yes">Native</td>
+              <td class="yes">Works</td>
+              <td class="yes">Works — best of four</td>
+              <td class="yes">Widest reach</td>
+            </tr>
+            <tr>
+              <td class="m">B · Heritage</td>
+              <td class="mid">If story-led</td>
+              <td class="yes">Native</td>
+              <td class="no">Farm shop only</td>
+              <td class="mid">Warm goods</td>
+            </tr>
+            <tr>
+              <td class="m">C · Street</td>
+              <td class="yes">Native — strongest</td>
+              <td class="no">Fights it</td>
+              <td class="no">Needs re-shoot</td>
+              <td class="no">Apparel only</td>
+            </tr>
+            <tr>
+              <td class="m">D · Nordic</td>
+              <td class="mid">Quiet basics</td>
+              <td class="yes">Native</td>
+              <td class="mid">Loses character</td>
+              <td class="mid">Home goods</td>
+            </tr>
+            <tr>
+              <td class="m">E · Havana</td>
+              <td class="yes">Native — best concept fit</td>
+              <td class="yes">Works</td>
+              <td class="yes">Works well</td>
+              <td class="yes">Wide, if authentic</td>
+            </tr>
+            <tr>
+              <td class="m">F · Carnival</td>
+              <td class="yes">Bright ranges</td>
+              <td class="no">Fights it</td>
+              <td class="yes">Works well</td>
+              <td class="mid">Bright goods</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>The two things that actually decide transplantability</h3>
+        <p>
+          Reading across the matrix, the same two factors explain almost every
+          "no":
+        </p>
+        <table class="tbl">
+          <tbody>
+            <tr>
+              <td class="m" style="width: 190px">Photography</td>
+              <td>
+                A palette makes assumptions about the pictures.
+                <b>Dark backgrounds require cut-out or dark-shot photography</b
+                >; white-background studio shots float on them. Since a cloned
+                store inherits the code but brings its own photos, a dark-first
+                direction is the least portable thing you can choose.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Density</td>
+              <td>
+                Apparel shows few items large; grocery shows many items small. A
+                direction whose character comes from
+                <b>generous whitespace</b> (D) or a <b>display serif</b> (B, D)
+                loses that character when compressed. Directions built on
+                contrast and a workhorse body face (A) compress without
+                complaint.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout warn">
+          <span class="k">What "apparel-specific" actually costs</span>
+          <p>
+            Section 1.1 promises a cloned store needs
+            <b>config and content changes, not architecture</b>. Direction C
+            keeps that promise for the code and breaks it for the brand: the
+            tokens swap cleanly, but the new store needs a new photography
+            direction, new iconography and new email templates before it looks
+            intentional.
+          </p>
+          <p>
+            That is not a reason to avoid C — it is a reason to choose it
+            <em>only</em> if this store really is a streetwear store, and to
+            accept that the clone story then applies to the backend rather than
+            the front end.
+          </p>
+        </div>
+      </section>
+
+      <section id="choosing">
+        <div class="sec-head">
+          <span class="sec-num">08</span>
+          <h2>Choosing</h2>
+        </div>
+        <p class="lede">
+          Three questions that settle it faster than staring at swatches.
+        </p>
+        <table class="tbl">
+          <tbody>
+            <tr>
+              <td class="m" style="width: 250px">
+                What photos will you actually have?
+              </td>
+              <td>
+                Phone shots on a white sheet? Choose a light direction — A or D.
+                Styled, moody, cut-out imagery? C becomes viable. This
+                constrains the choice more than taste does.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Is the clone story real?</td>
+              <td>
+                If you genuinely intend to spin this up for a second store type,
+                <b>A</b> costs you the least later. If Manitou is only ever this
+                T-shirt store, that consideration disappears and C is fully on
+                the table.
+              </td>
+            </tr>
+            <tr>
+              <td class="m">Loud or quiet?</td>
+              <td>
+                Should the interface have a personality (B, C) or should the
+                products supply all of it (A, D)? There is no wrong answer, but
+                mixing the two produces the muddle that most small stores end up
+                with.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout good">
+          <span class="k">Nothing here is locked</span>
+          <p>
+            These are packages for coherence, not fixed sets. Once a direction
+            is chosen, any part can be swapped — a different accent, a different
+            display face, lighter or darker neutrals. The point of task 1 is to
+            settle the <b>direction</b>; task 2 turns it into
+            <code>design-tokens.json</code>, and that file is where every later
+            change happens.
+          </p>
+        </div>
+      </section>
+
+      <footer>
+        <span>Manitou — brand directions</span>
+        <span>Phase 3, task 1 · companion to PROJECT_PLAN.md §4.3, §1.1</span>
+      </footer>
+    </div>
+
+    <script>
+      (function () {
+        var links = Array.prototype.slice.call(
+          document.querySelectorAll(".toc a"),
+        );
+        var sections = links.map(function (a) {
+          return document.querySelector(a.getAttribute("href"));
+        });
+        function sync() {
+          var pos = window.scrollY + 130,
+            idx = 0;
+          for (var i = 0; i < sections.length; i++) {
+            if (sections[i] && sections[i].offsetTop <= pos) idx = i;
+          }
+          links.forEach(function (a, i) {
+            a.classList.toggle("on", i === idx);
+          });
+        }
+        var ticking = false;
+        window.addEventListener(
+          "scroll",
+          function () {
+            if (!ticking) {
+              window.requestAnimationFrame(function () {
+                sync();
+                ticking = false;
+              });
+              ticking = true;
+            }
+          },
+          { passive: true },
+        );
+        sync();
+      })();
+    </script>
+  </body>
+</html>
