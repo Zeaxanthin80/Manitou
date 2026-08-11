@@ -164,6 +164,10 @@ Manitou/
 ├── PROJECT_PLAN.md        # this file — the master plan
 ├── README.md              # human-facing setup and run instructions
 ├── design-tokens.json     # single source of truth for color, type, spacing (Section 4.3)
+├── store-config.json      # store identity: name, currency, locale, tax, shipping, feature flags
+│                          #   (Section 1.1). Together with design-tokens.json, the only two files
+│                          #   a cloned store must edit. NOT .env — committed, and identical across
+│                          #   environments. Read by the backend (app/store.py) and the web app.
 ├── .gitignore             # excludes .venv/, __pycache__/, .env, node_modules/
 ├── docker-compose.yml     # local PostgreSQL for development
 ├── docs/                  # project artifacts — ER diagram, per-phase build journals
@@ -178,7 +182,11 @@ Manitou/
 │   │   ├── schemas/       # Pydantic request/response models
 │   │   ├── routers/       # API endpoints (products, orders, auth, ...)
 │   │   ├── services/      # business logic (checkout, inventory, payments)
-│   │   └── db.py          # engine, session, connection pool
+│   │   ├── db.py          # engine, session, connection pool
+│   │   ├── config.py      # settings from .env — secrets, per-environment values
+│   │   ├── store.py       # settings from store-config.json — store identity, per-clone values
+│   │   ├── security.py    # password hashing and JWT encode/decode (no FastAPI imports)
+│   │   └── dependencies.py # FastAPI auth dependencies: get_current_user, require_admin
 │   ├── alembic/           # migrations
 │   ├── tests/             # pytest suite + conftest.py fixtures
 │   ├── pytest.ini         # testpaths, and pythonpath so `app` imports resolve

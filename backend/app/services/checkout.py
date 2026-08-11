@@ -14,6 +14,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.store import store_config
 from app.models import (
     Address,
     Cart,
@@ -139,10 +140,12 @@ def create_order_from_cart(
             )
         )
 
-    # Tax and shipping are 0.00 for now; real rules belong to store
-    # configuration (Section 1.1) and are outside v1 scope.
-    tax = Decimal("0.00")
-    shipping_cost = Decimal("0.00")
+    # Tax and shipping come from store-config.json, not from constants here.
+    # A cloned store changes its rates by editing that file -- the Section 1.1
+    # seam. Both currently resolve to 0.00 for the default build, but the value
+    # is now configuration rather than a literal.
+    tax = store_config.tax_for(subtotal)
+    shipping_cost = store_config.shipping_for(subtotal)
 
     order = Order(
         user_id=user.id,

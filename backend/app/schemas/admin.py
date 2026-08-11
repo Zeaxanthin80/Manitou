@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.store import store_config
+
 
 class AdminVariantCreate(BaseModel):
     """A variant plus its opening stock.
@@ -27,7 +29,8 @@ class AdminProductCreate(BaseModel):
     description: str | None = None
     category_id: int
     base_price: Decimal = Field(gt=0)
-    unit_of_measure: str = "each"
+    # Default comes from store-config.json: a grocery clone defaults to 'lb'
+    unit_of_measure: str = store_config.catalog.default_unit_of_measure
     is_active: bool = True
     variants: list[AdminVariantCreate] = Field(min_length=1)
 
