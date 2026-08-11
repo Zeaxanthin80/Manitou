@@ -18,17 +18,27 @@ export function Pagination({
   limit,
   offset,
   basePath,
+  params,
 }: {
   total: number;
   limit: number;
   offset: number;
   basePath: string;
+  /** Other query params to carry across pages -- a status filter, a search term.
+   *  Without this, paging a filtered list silently drops the filter and page 2
+   *  shows a different set of rows than page 1. */
+  params?: Record<string, string | undefined>;
 }) {
   if (total <= limit) return null;
 
   const page = Math.floor(offset / limit) + 1;
   const pages = Math.ceil(total / limit);
-  const href = (n: number) => `${basePath}?page=${n}`;
+  const href = (n: number) => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(params ?? {})) if (v) q.set(k, v);
+    q.set("page", String(n));
+    return `${basePath}?${q}`;
+  };
 
   const edge = "font-body text-sm uppercase tracking-tight";
 

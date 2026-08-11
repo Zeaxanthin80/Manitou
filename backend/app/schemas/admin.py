@@ -1,8 +1,12 @@
 from datetime import datetime
 from decimal import Decimal
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.address import AddressRead
+from app.schemas.order import OrderItemRead
 from app.store import store_config
 
 
@@ -122,3 +126,36 @@ class AdminOrderPage(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class AdminOrderDetail(AdminOrderSummary):
+    """One order, everything the vendor needs to fulfil it.
+
+    The line items carry the SNAPSHOT name and price, not today's -- the vendor
+    packing this box must see what was actually bought and charged, which is the
+    same reason the customer's receipt uses them (Section 6.4).
+    """
+
+    user_full_name: str
+    items: list[OrderItemRead]
+    shipping_address: AddressRead
+    billing_address: AddressRead
+    #: Which statuses this order may move to right now, straight from
+    #: ALLOWED_TRANSITIONS. Sent rather than reimplemented client-side for the
+    #: same reason the cart quotes its own tax: a second copy of a rule in
+    #: another language is a rule that will eventually disagree with itself.
+    #: The portal renders one button per entry, so the screen cannot offer a move
+    #: the API would reject.
+    allowed_transitions: list[str]
+
+
+class AdminOrderStatusUpdate(BaseModel):
+    """A status change request.
+
+    The Literal rejects a value the database CHECK would also reject, but does it
+    at the boundary with a 422 and a readable message instead of letting an
+    IntegrityError surface as a 500. Whether the move is *allowed from here* is a
+    separate question the router answers -- see ALLOWED_TRANSITIONS.
+    """
+
+    status: Literal["pending", "paid", "shipped", "delivered", "cancelled", "refunded"]

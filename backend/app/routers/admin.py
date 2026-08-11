@@ -16,7 +16,9 @@ from app.dependencies import require_admin
 from app.models import Category, Inventory, Order, Product, ProductVariant, User
 from app.schemas.admin import (
     AdminInventoryUpdate,
+    AdminOrderDetail,
     AdminOrderPage,
+    AdminOrderStatusUpdate,
     AdminOrderSummary,
     AdminProductCreate,
     AdminProductPage,
@@ -31,6 +33,28 @@ router = APIRouter(
     tags=["admin"],
     dependencies=[Depends(require_admin)],
 )
+
+# Which status may follow which. The database CHECK says a status must be one of
+# six values; it cannot say that 'delivered' may not go back to 'pending'. That
+# rule is a workflow, and workflows live in application code.
+#
+# Written as a map rather than a chain of ifs because the vendor UI also needs to
+# READ it -- the order page renders exactly the buttons this allows, so the
+# screen and the guard can never disagree.
+#
+# pending -> paid is manual for now. Phase 5's Stripe webhook takes that hop over;
+# everything after it stays a human decision.
+ALLOWED_TRANSITIONS: dict[str, set[str]] = {
+    "pending": {"paid", "cancelled"},
+    "paid": {"shipped", "cancelled", "refunded"},
+    "shipped": {"delivered", "refunded"},
+    # Terminal. A delivered order that comes back is a refund, not a reversal --
+    # keeping these empty means history is append-only in spirit even though the
+    # column is mutable.
+    "delivered": set(),
+    "cancelled": set(),
+    "refunded": set(),
+}
 
 
 def _to_product(product: Product) -> AdminProductRead:
@@ -274,3 +298,87 @@ def list_all_orders(
         limit=limit,
         offset=offset,
     )
+
+
+def _admin_order(db: Session, order_id: int) -> Order:
+    """One order, with no ownership filter.
+
+    The customer's equivalent in routers/order.py filters on user_id -- that
+    filter IS the authorisation there. Here its absence is the feature, and
+    require_admin on the router is what makes the difference safe.
+    """
+    order = db.scalar(
+        select(Order)
+        .where(Order.id == order_id)
+        .options(
+            selectinload(Order.items),
+            selectinload(Order.user),
+            selectinload(Order.shipping_address),
+            selectinload(Order.billing_address),
+        )
+    )
+    if order is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
+    return order
+
+
+def _to_order_detail(order: Order) -> AdminOrderDetail:
+    return AdminOrderDetail(
+        id=order.id,
+        status=order.status,
+        subtotal=order.subtotal,
+        tax=order.tax,
+        shipping_cost=order.shipping_cost,
+        total=order.total,
+        created_at=order.created_at,
+        user_id=order.user_id,
+        user_email=order.user.email,
+        user_full_name=order.user.full_name,
+        item_count=sum(i.quantity for i in order.items),
+        items=order.items,
+        shipping_address=order.shipping_address,
+        billing_address=order.billing_address,
+        allowed_transitions=sorted(ALLOWED_TRANSITIONS[order.status]),
+    )
+
+
+@router.get("/orders/{order_id}", response_model=AdminOrderDetail)
+def get_any_order(order_id: int, db: Session = Depends(get_db)) -> AdminOrderDetail:
+    return _to_order_detail(_admin_order(db, order_id))
+
+
+@router.patch("/orders/{order_id}", response_model=AdminOrderDetail)
+def update_order_status(
+    order_id: int,
+    payload: AdminOrderStatusUpdate,
+    db: Session = Depends(get_db),
+) -> AdminOrderDetail:
+    """Advance an order through the fulfilment workflow.
+
+    409, not 422, for a move the workflow forbids: the request is perfectly
+    well-formed and the value is a real status -- it is the store's current state
+    that makes it impossible. 422 would say "you sent nonsense", which is untrue
+    and unhelpful when the actual cause is that someone else already shipped it.
+    """
+    order = _admin_order(db, order_id)
+
+    if payload.status == order.status:
+        # Not an error. Two vendors clicking "Ship" on the same order should not
+        # produce a failure for the slower one -- the outcome they wanted holds.
+        return _to_order_detail(order)
+
+    allowed = ALLOWED_TRANSITIONS[order.status]
+    if payload.status not in allowed:
+        detail = (
+            f"Cannot change a {order.status} order to {payload.status}."
+            if not allowed
+            else (
+                f"Cannot change a {order.status} order to {payload.status}. "
+                f"Allowed from here: {', '.join(sorted(allowed))}."
+            )
+        )
+        raise HTTPException(status.HTTP_409_CONFLICT, detail)
+
+    order.status = payload.status
+    db.commit()
+    return _to_order_detail(_admin_order(db, order_id))

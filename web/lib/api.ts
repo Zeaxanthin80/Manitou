@@ -160,6 +160,26 @@ export type OrderDetail = OrderSummary & {
   billing_address: Address;
 };
 
+/* ------------------------------------------------------------------ admin -- */
+
+export type AdminOrderSummary = OrderSummary & {
+  user_id: number;
+  user_email: string;
+  item_count: number;
+};
+
+export type AdminOrderDetail = AdminOrderSummary & {
+  user_full_name: string;
+  items: OrderItem[];
+  shipping_address: Address;
+  billing_address: Address;
+  /** Which statuses this order may move to right now, decided by the API's
+   *  ALLOWED_TRANSITIONS map. Never re-derive this in the browser: a second copy
+   *  of the workflow in another language is one that will drift, and the portal
+   *  would then offer a button the API refuses. */
+  allowed_transitions: string[];
+};
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -307,3 +327,22 @@ export const listOrders = (token: string, limit = 20, offset = 0) =>
 
 export const getOrder = (token: string, id: number) =>
   request<OrderDetail>(`/orders/${id}`, { token });
+
+export const listAdminOrders = (
+  token: string,
+  { limit = 20, offset = 0, status }: { limit?: number; offset?: number; status?: string } = {},
+) => {
+  const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (status) q.set("status", status);
+  return request<Page<AdminOrderSummary>>(`/admin/orders?${q}`, { token });
+};
+
+export const getAdminOrder = (token: string, id: number) =>
+  request<AdminOrderDetail>(`/admin/orders/${id}`, { token });
+
+export const updateOrderStatus = (token: string, id: number, status: string) =>
+  request<AdminOrderDetail>(`/admin/orders/${id}`, {
+    token,
+    method: "PATCH",
+    body: { status },
+  });
