@@ -75,6 +75,20 @@ export type Page<T> = {
   offset: number;
 };
 
+export type User = {
+  id: number;
+  email: string;
+  full_name: string;
+  phone: string | null;
+  role: string;
+  created_at: string;
+};
+
+export type Token = {
+  access_token: string;
+  token_type: string;
+};
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -86,17 +100,43 @@ export class ApiError extends Error {
 
 /* --------------------------------------------------------------- client -- */
 
-async function get<T>(path: string): Promise<T> {
+type Options = { token?: string | null; body?: unknown; method?: string };
+
+async function request<T>(path: string, options: Options = {}): Promise<T> {
+  const { token, body, method = body ? "POST" : "GET" } = options;
+
   // Not cached. Next.js does not cache fetch by default without Cache
   // Components, which is what a store wants: prices and stock must be live.
   // Caching is a Phase 8 decision once load testing shows it is needed.
-  const res = await fetch(`${API_URL}${path}`, { cache: "no-store" });
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      // The token is attached here, server-side. It never reaches the browser.
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
 
   if (!res.ok) {
-    throw new ApiError(res.status, `GET ${path} -> ${res.status}`);
+    // FastAPI puts the reason in `detail`; surface it so a form can show the
+    // API's own message instead of a generic failure.
+    let detail = `${method} ${path} -> ${res.status}`;
+    try {
+      const payload = await res.json();
+      if (typeof payload?.detail === "string") detail = payload.detail;
+    } catch {
+      /* non-JSON error body; keep the generic message */
+    }
+    throw new ApiError(res.status, detail);
   }
+
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
+
+const get = <T>(path: string, token?: string | null) => request<T>(path, { token });
 
 export function listProducts(params: {
   category?: string;
@@ -122,4 +162,22 @@ export function listCategories(): Promise<Category[]> {
 
 export function getCategory(slug: string): Promise<Category> {
   return get<Category>(`/categories/${encodeURIComponent(slug)}`);
+}
+
+/* ----------------------------------------------------------------- auth -- */
+
+export function login(email: string, password: string): Promise<Token> {
+  return request<Token>("/auth/login", { body: { email, password } });
+}
+
+export function register(input: {
+  email: string;
+  password: string;
+  full_name: string;
+}): Promise<User> {
+  return request<User>("/auth/register", { body: input });
+}
+
+export function getCurrentUser(token: string): Promise<User> {
+  return request<User>("/auth/me", { token });
 }

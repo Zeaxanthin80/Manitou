@@ -38,6 +38,13 @@ from app.models import (
 )
 from app.security import hash_password
 
+# Product images point at a file the web app serves from web/public/. A
+# root-relative URL is fine for local development and needs no external host
+# allowlisted in next.config.ts. Phase 6 moves product images to S3 + CloudFront
+# and these become absolute URLs -- which is also what a mobile client in Phase 7
+# would need, since it cannot resolve a path relative to the web app.
+PLACEHOLDER_IMAGE = "/product-placeholder.png"
+
 # .example is reserved by RFC 2606, so this address can never route real mail --
 # unlike a plausible-looking domain someone else might own. Note that .local and
 # .test are rejected outright by the EmailStr validator on registration, so an
@@ -196,7 +203,7 @@ def main() -> None:
         session.add(
             ProductImage(
                 product=classic,
-                url="https://placehold.co/600x600.png?text=Classic+Tee",
+                url=PLACEHOLDER_IMAGE,
                 alt_text="Black crew neck t-shirt laid flat on a pale background",
                 is_primary=True,
             )
@@ -227,7 +234,7 @@ def main() -> None:
         session.add(
             ProductImage(
                 product=graphic,
-                url="https://placehold.co/600x600.png?text=Graphic+Tee",
+                url=PLACEHOLDER_IMAGE,
                 alt_text="Navy t-shirt with a white geometric print across the chest",
                 is_primary=True,
             )
@@ -248,7 +255,7 @@ def main() -> None:
         session.add(
             ProductImage(
                 product=tote,
-                url="https://placehold.co/600x600.png?text=Tote+Bag",
+                url=PLACEHOLDER_IMAGE,
                 alt_text="Natural canvas tote bag standing upright",
                 is_primary=True,
             )

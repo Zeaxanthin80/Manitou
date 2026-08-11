@@ -1,17 +1,16 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  images: {
-    /**
-     * next/image refuses external hosts unless they are listed here. That is a
-     * deliberate safety measure: without it, any URL stored in the database
-     * could make the server fetch and re-serve arbitrary remote content.
-     *
-     * placehold.co is only for the seeded sample images. Phase 6 moves product
-     * images to S3 + CloudFront, and that host replaces this one.
-     */
-    remotePatterns: [{ protocol: "https", hostname: "placehold.co" }],
-  },
+  /**
+   * No `images.remotePatterns` on purpose.
+   *
+   * next/image refuses external hosts unless they are listed, which is a real
+   * safety measure: without it, any URL stored in the database could make the
+   * server fetch and re-serve arbitrary remote content. Product images are now
+   * served from web/public/, so no host needs that trust.
+   *
+   * Phase 6 moves images to S3 + CloudFront and adds that one host here.
+   */
 };
 
 export default nextConfig;
