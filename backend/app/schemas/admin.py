@@ -203,3 +203,53 @@ class AdminOrderStatusUpdate(BaseModel):
     """
 
     status: Literal["pending", "paid", "shipped", "delivered", "cancelled", "refunded"]
+
+
+class AdminStatusCount(BaseModel):
+    status: str
+    count: int
+    value: Decimal
+
+
+class AdminTopProduct(BaseModel):
+    """Grouped on the SNAPSHOT name, not the live product.
+
+    Two consequences worth knowing. A product renamed mid-life shows as two rows
+    -- which is honest: they were sold under different names. And a product that
+    has since been deleted still appears, because the receipt kept its name.
+    """
+
+    product_name: str
+    units: int
+    revenue: Decimal
+
+
+class AdminLowStock(BaseModel):
+    product_id: int
+    product_name: str
+    variant_id: int
+    sku: str
+    variant_name: str
+    quantity_available: int
+    reorder_level: int
+
+
+class AdminSummary(BaseModel):
+    """Sales and stock at a glance.
+
+    "Revenue" deliberately means paid + shipped + delivered -- money actually
+    collected. Summing every order would fold in cancelled ones, which on the
+    current data would overstate takings by more than the real figure. Pending
+    orders are reported separately as awaiting payment rather than counted;
+    until Phase 5 wires Stripe, `paid` is a status a human sets by hand.
+    """
+
+    revenue_all_time: Decimal
+    revenue_last_30_days: Decimal
+    orders_counted: int
+    average_order_value: Decimal
+    pending_count: int
+    pending_value: Decimal
+    by_status: list[AdminStatusCount]
+    top_products: list[AdminTopProduct]
+    low_stock: list[AdminLowStock]

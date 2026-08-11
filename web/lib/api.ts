@@ -198,6 +198,38 @@ export type AdminProduct = {
   images: AdminImage[];
 };
 
+export type AdminStatusCount = { status: string; count: number; value: string };
+export type AdminTopProduct = {
+  /** The snapshot name from order_items, so a renamed product appears under the
+   *  name it actually sold as. */
+  product_name: string;
+  units: number;
+  revenue: string;
+};
+export type AdminLowStock = {
+  product_id: number;
+  product_name: string;
+  variant_id: number;
+  sku: string;
+  variant_name: string;
+  quantity_available: number;
+  reorder_level: number;
+};
+
+export type AdminSummary = {
+  /** paid + shipped + delivered only. Not the sum of every order -- that would
+   *  count cancellations as takings. */
+  revenue_all_time: string;
+  revenue_last_30_days: string;
+  orders_counted: number;
+  average_order_value: string;
+  pending_count: number;
+  pending_value: string;
+  by_status: AdminStatusCount[];
+  top_products: AdminTopProduct[];
+  low_stock: AdminLowStock[];
+};
+
 export type AdminOrderSummary = OrderSummary & {
   user_id: number;
   user_email: string;
@@ -430,3 +462,6 @@ export const updateInventory = (
     method: "PATCH",
     body,
   });
+
+export const getAdminSummary = (token: string) =>
+  request<AdminSummary>("/admin/summary", { token });

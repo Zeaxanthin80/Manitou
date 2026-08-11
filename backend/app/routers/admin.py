@@ -6,6 +6,9 @@ are allowed to reveal: inactive products are visible, real stock counts are
 returned instead of a boolean, and GET /admin/orders reads across every customer.
 """
 
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
@@ -17,6 +20,7 @@ from app.models import (
     Category,
     Inventory,
     Order,
+    OrderItem,
     Product,
     ProductImage,
     ProductVariant,
@@ -27,6 +31,7 @@ from app.schemas.admin import (
     AdminImageRead,
     AdminImageUpdate,
     AdminInventoryUpdate,
+    AdminLowStock,
     AdminOrderDetail,
     AdminOrderPage,
     AdminOrderStatusUpdate,
@@ -35,6 +40,9 @@ from app.schemas.admin import (
     AdminProductPage,
     AdminProductRead,
     AdminProductUpdate,
+    AdminStatusCount,
+    AdminSummary,
+    AdminTopProduct,
     AdminVariantCreate,
     AdminVariantRead,
     AdminVariantUpdate,
@@ -581,3 +589,120 @@ def update_order_status(
     order.status = payload.status
     db.commit()
     return _to_order_detail(_admin_order(db, order_id))
+
+
+# Money actually collected. Deliberately excludes pending (not paid yet),
+# cancelled and refunded. Summing every order would count cancellations as
+# takings.
+EARNING_STATUSES = ("paid", "shipped", "delivered")
+
+
+@router.get("/summary", response_model=AdminSummary)
+def store_summary(db: Session = Depends(get_db)) -> AdminSummary:
+    """Sales and stock at a glance.
+
+    Every figure is aggregated by the DATABASE. Loading orders and summing them
+    in Python would work today with sixteen rows and quietly become the slowest
+    page in the portal at ten thousand -- and it would put money arithmetic back
+    in application code, which the cart already established belongs in one place.
+    """
+    since = datetime.now(timezone.utc) - timedelta(days=30)
+    earning = Order.status.in_(EARNING_STATUSES)
+
+    revenue_all = db.scalar(
+        select(func.coalesce(func.sum(Order.total), 0)).where(earning)
+    )
+    revenue_30 = db.scalar(
+        select(func.coalesce(func.sum(Order.total), 0)).where(
+            earning, Order.created_at >= since
+        )
+    )
+    counted = db.scalar(select(func.count()).select_from(Order).where(earning)) or 0
+
+    pending_count = (
+        db.scalar(
+            select(func.count()).select_from(Order).where(Order.status == "pending")
+        )
+        or 0
+    )
+    pending_value = db.scalar(
+        select(func.coalesce(func.sum(Order.total), 0)).where(Order.status == "pending")
+    )
+
+    by_status = [
+        AdminStatusCount(status=row.status, count=row.n, value=row.value)
+        for row in db.execute(
+            select(
+                Order.status,
+                func.count().label("n"),
+                func.coalesce(func.sum(Order.total), 0).label("value"),
+            )
+            .group_by(Order.status)
+            .order_by(Order.status)
+        )
+    ]
+
+    top_products = [
+        AdminTopProduct(product_name=row.name, units=row.units, revenue=row.revenue)
+        for row in db.execute(
+            select(
+                OrderItem.product_name_snapshot.label("name"),
+                func.sum(OrderItem.quantity).label("units"),
+                func.sum(OrderItem.unit_price_snapshot * OrderItem.quantity).label(
+                    "revenue"
+                ),
+            )
+            .join(Order, Order.id == OrderItem.order_id)
+            # Cancelled and refunded orders did not sell anything, so they must
+            # not inflate a best-seller list. Pending IS counted here: the units
+            # are spoken for even if the money has not landed.
+            .where(Order.status.not_in(("cancelled", "refunded")))
+            .group_by(OrderItem.product_name_snapshot)
+            .order_by(func.sum(OrderItem.quantity).desc())
+            .limit(5)
+        )
+    ]
+
+    low_stock = [
+        AdminLowStock(
+            product_id=row.product_id,
+            product_name=row.product_name,
+            variant_id=row.variant_id,
+            sku=row.sku,
+            variant_name=row.variant_name,
+            quantity_available=row.quantity_available,
+            reorder_level=row.reorder_level,
+        )
+        for row in db.execute(
+            select(
+                Product.id.label("product_id"),
+                Product.name.label("product_name"),
+                ProductVariant.id.label("variant_id"),
+                ProductVariant.sku,
+                ProductVariant.variant_name,
+                Inventory.quantity_available,
+                Inventory.reorder_level,
+            )
+            .join(ProductVariant, ProductVariant.id == Inventory.variant_id)
+            .join(Product, Product.id == ProductVariant.product_id)
+            # The same rule AdminVariantRead.needs_reorder uses, expressed once
+            # more -- in SQL this time, because filtering in Python would mean
+            # fetching every variant in the catalogue to discard most of them.
+            .where(Inventory.quantity_available <= Inventory.reorder_level)
+            .order_by(Inventory.quantity_available, Product.name)
+        )
+    ]
+
+    return AdminSummary(
+        revenue_all_time=revenue_all or 0,
+        revenue_last_30_days=revenue_30 or 0,
+        orders_counted=counted,
+        # Guarded: with no earning orders this would be a division by zero on the
+        # very first day the store is open.
+        average_order_value=(revenue_all / counted) if counted else Decimal("0.00"),
+        pending_count=pending_count,
+        pending_value=pending_value or 0,
+        by_status=by_status,
+        top_products=top_products,
+        low_stock=low_stock,
+    )
