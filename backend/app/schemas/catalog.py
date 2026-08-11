@@ -61,6 +61,12 @@ class ProductListItem(BaseModel):
     unit_of_measure: str
     category_id: int
     primary_image: ImageRead | None
+    # Cheapest and dearest sellable price across this product's variants, after
+    # applying each variant's price_override. base_price alone understates a
+    # product whose Large costs more, so a tile can show "From $24.00" honestly
+    # rather than a figure the shopper will not be charged.
+    min_price: Decimal
+    max_price: Decimal
 
 
 class ProductDetail(BaseModel):

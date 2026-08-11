@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Archivo_Black, Inter } from "next/font/google";
 
+import { SiteHeader } from "@/components/site-header";
 import { storeConfig } from "@/lib/store-config";
 import "./globals.css";
 
@@ -35,7 +36,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang={storeConfig.locale}>
-      <body className={`${display.variable} ${body.variable}`}>{children}</body>
+      <body className={`${display.variable} ${body.variable}`}>
+        <SiteHeader />
+        {children}
+      </body>
     </html>
   );
 }

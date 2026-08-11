@@ -43,18 +43,15 @@ for (const [name, value] of Object.entries(tokens.color)) {
 }
 
 lines.push("");
-// The actual font files are loaded by next/font in app/layout.tsx, which sets
-// --font-display-family / --font-body-family. Referencing them here keeps the
-// token file free of any knowledge of how fonts get loaded.
-lines.push(
-  `  --font-display: var(--font-display-family), ${tokens.typography.fontFamily.display.slice(1).join(", ")};`,
-);
-lines.push(
-  `  --font-body: var(--font-body-family), ${tokens.typography.fontFamily.body.slice(1).join(", ")};`,
-);
 for (const [name, value] of Object.entries(tokens.typography.fontWeight)) {
   lines.push(`  --font-weight-${name}: ${value};`);
 }
+
+// The font families go in a SEPARATE `@theme inline` block -- see below.
+const fontLines = [
+  `  --font-display: var(--font-display-family), ${tokens.typography.fontFamily.display.slice(1).join(", ")};`,
+  `  --font-body: var(--font-body-family), ${tokens.typography.fontFamily.body.slice(1).join(", ")};`,
+];
 
 lines.push("");
 for (const [name, { size, lineHeight }] of Object.entries(
@@ -96,6 +93,20 @@ for (const [name, value] of Object.entries(tokens.shadow)) {
 const css =
   BANNER("design-tokens.json") +
   `@theme {\n${lines.join("\n")}\n}\n\n` +
+  // The font families MUST be `@theme inline`, not plain `@theme`.
+  //
+  // A custom property is substituted where it is DECLARED, not where it is
+  // used. Plain @theme declares --font-display on :root, so the nested
+  // var(--font-display-family) is resolved there -- and next/font sets that
+  // variable on <body>, a descendant, so it is not defined yet. It silently
+  // falls through to system-ui and that resolved value inherits everywhere.
+  // The heading renders in a system font and nothing errors.
+  //
+  // `inline` makes Tailwind write the value straight into the utility rule
+  // instead, so var(--font-display-family) resolves on the element using it,
+  // which does inherit from <body>. This is why create-next-app's own
+  // globals.css uses @theme inline for its font variables.
+  `@theme inline {\n${fontLines.join("\n")}\n}\n\n` +
   `/* Focus ring. Section 4.3's quality floor requires a visible keyboard focus\n` +
   `   state on every interactive element, so it is a system value rather than\n` +
   `   something each component reinvents. */\n` +

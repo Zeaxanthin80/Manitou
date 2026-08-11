@@ -196,7 +196,7 @@ def main() -> None:
         session.add(
             ProductImage(
                 product=classic,
-                url="https://placehold.co/600x600?text=Classic+Tee",
+                url="https://placehold.co/600x600.png?text=Classic+Tee",
                 alt_text="Black crew neck t-shirt laid flat on a pale background",
                 is_primary=True,
             )
@@ -227,7 +227,7 @@ def main() -> None:
         session.add(
             ProductImage(
                 product=graphic,
-                url="https://placehold.co/600x600?text=Graphic+Tee",
+                url="https://placehold.co/600x600.png?text=Graphic+Tee",
                 alt_text="Navy t-shirt with a white geometric print across the chest",
                 is_primary=True,
             )
@@ -248,7 +248,7 @@ def main() -> None:
         session.add(
             ProductImage(
                 product=tote,
-                url="https://placehold.co/600x600?text=Tote+Bag",
+                url="https://placehold.co/600x600.png?text=Tote+Bag",
                 alt_text="Natural canvas tote bag standing upright",
                 is_primary=True,
             )

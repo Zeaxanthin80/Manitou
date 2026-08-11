@@ -5,12 +5,14 @@ anyone. Every query filters is_active, so a deactivated product is invisible
 here even by direct URL. Admin endpoints (task 6) see everything.
 """
 
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
-from app.models import Category, Product
+from app.models import Category, Product, ProductVariant
 from app.schemas import (
     CategoryRead,
     ImageRead,
@@ -45,7 +47,34 @@ def _category_subtree_ids(db: Session, slug: str) -> list[int] | None:
     return ids or None
 
 
-def _to_list_item(product: Product) -> ProductListItem:
+def _variant_price_bounds():
+    """Per-product min/max of the EFFECTIVE variant price.
+
+    Computed as a grouped subquery rather than by loading every variant: the
+    list endpoint needs two numbers, not the whole variant set, and this keeps
+    the query count flat as the page grows.
+
+    COALESCE mirrors the pricing rule used everywhere else -- price_override
+    when set, otherwise the product's base_price.
+    """
+    effective = func.coalesce(ProductVariant.price_override, Product.base_price)
+    return (
+        select(
+            ProductVariant.product_id.label("product_id"),
+            func.min(effective).label("min_price"),
+            func.max(effective).label("max_price"),
+        )
+        .join(Product, Product.id == ProductVariant.product_id)
+        .group_by(ProductVariant.product_id)
+        .subquery()
+    )
+
+
+def _to_list_item(
+    product: Product,
+    min_price: Decimal | None,
+    max_price: Decimal | None,
+) -> ProductListItem:
     primary = next(
         (img for img in product.images if img.is_primary),
         next(iter(product.images), None),
@@ -58,6 +87,10 @@ def _to_list_item(product: Product) -> ProductListItem:
         unit_of_measure=product.unit_of_measure,
         category_id=product.category_id,
         primary_image=ImageRead.model_validate(primary) if primary else None,
+        # A product with no variants has no aggregate row; fall back to the
+        # product's own price rather than emitting null.
+        min_price=min_price if min_price is not None else product.base_price,
+        max_price=max_price if max_price is not None else product.base_price,
     )
 
 
@@ -99,8 +132,11 @@ def list_products(
 
     # selectinload issues one extra query for all images at once. Without it,
     # rendering N products lazily loads each product's images: N+1 queries.
-    products = db.scalars(
-        select(Product)
+    bounds = _variant_price_bounds()
+    rows = db.execute(
+        select(Product, bounds.c.min_price, bounds.c.max_price)
+        # OUTER join: a product with no variants still appears in the listing.
+        .outerjoin(bounds, bounds.c.product_id == Product.id)
         .where(*conditions)
         .options(selectinload(Product.images))
         .order_by(Product.name)
@@ -109,7 +145,7 @@ def list_products(
     ).all()
 
     return ProductPage(
-        items=[_to_list_item(p) for p in products],
+        items=[_to_list_item(p, lo, hi) for p, lo, hi in rows],
         total=total or 0,
         limit=limit,
         offset=offset,

@@ -30,8 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files. .env.example is DELIBERATELY committed -- it is the contract that
+# documents which variables the app needs (PROJECT_PLAN Section 4.2). Real values
+# never are.
 .env*
+!.env.example
 
 # vercel
 .vercel
