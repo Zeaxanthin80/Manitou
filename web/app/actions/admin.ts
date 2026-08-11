@@ -12,6 +12,7 @@ import {
   deleteProductImage,
   updateOrderStatus,
   updateProduct,
+  updateInventory,
   updateProductImage,
   updateVariant,
 } from "@/lib/api";
@@ -260,4 +261,42 @@ export async function imageAction(
     throw err;
   }
   return { ok: remove ? "Image removed." : "Primary image updated." };
+}
+
+export async function updateInventoryAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+
+  const variantId = Number(formData.get("variant_id"));
+  const qty = Number(formData.get("quantity_available"));
+  const reorder = Number(formData.get("reorder_level"));
+
+  // Catch it here rather than shipping a request the API will 422. Both columns
+  // also carry a >= 0 CHECK, so there are three layers and the database has the
+  // last word.
+  if (!Number.isInteger(qty) || qty < 0 || !Number.isInteger(reorder) || reorder < 0) {
+    return { error: "Stock and reorder level must be whole numbers, zero or more." };
+  }
+
+  try {
+    await updateInventory(token, variantId, {
+      quantity_available: qty,
+      reorder_level: reorder,
+    });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+
+  revalidatePath("/admin/inventory");
+  revalidatePath("/admin/products");
+  // Stock decides "Sold out" on the storefront, so the shopper-facing pages are
+  // stale the moment this changes.
+  revalidatePath("/", "layout");
+  const slug = text(formData, "slug");
+  if (slug) revalidatePath(`/products/${slug}`);
+  return { ok: "Saved." };
 }

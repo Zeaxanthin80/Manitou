@@ -416,3 +416,17 @@ export const addVariant = (token: string, productId: number, body: unknown) =>
 
 export const updateVariant = (token: string, variantId: number, body: unknown) =>
   request<AdminProduct>(`/admin/variants/${variantId}`, { token, method: "PATCH", body });
+
+/** Absolute stock levels, not a delta. The vendor is recording a count they
+ *  took, so send what they typed -- a +/- adjustment would race checkout, which
+ *  is the one place that legitimately does read-modify-write under a row lock. */
+export const updateInventory = (
+  token: string,
+  variantId: number,
+  body: { quantity_available?: number; reorder_level?: number },
+) =>
+  request<AdminVariant>(`/admin/variants/${variantId}/inventory`, {
+    token,
+    method: "PATCH",
+    body,
+  });
