@@ -391,7 +391,7 @@ How each platform consumes it:
 
 | Platform         | How tokens are applied                                                                                 |
 | ---------------- | ------------------------------------------------------------------------------------------------------ |
-| Web (Next.js)    | Imported into `tailwind.config.js` so Tailwind's palette, type scale, and spacing come from the tokens |
+| Web (Next.js)    | Generated into a Tailwind `@theme` block by `web/scripts/build-tokens.mjs`, so Tailwind's palette, type scale, and spacing come from the tokens |
 | Android (Kotlin) | Mirrored into a Compose `Theme.kt` — `MaterialTheme` colors, typography, and shapes                    |
 | iOS (Swift)      | Mirrored into a SwiftUI theme file — `Color` and `Font` extensions                                     |
 
@@ -536,8 +536,11 @@ Do the phases in order. Do not start mobile (Phase 7) until the website works en
    `weight_pricing_enabled`. Every store-specific value the UI needs comes from here — never
    hardcoded in a component. This file plus `design-tokens.json` should be the only things a
    cloned store must edit.
-4. **[You + Claude Code]** Create the Next.js project and wire `tailwind.config.js` to read from
-   `design-tokens.json` so nothing is hardcoded.
+4. **[You + Claude Code]** Create the Next.js project and wire Tailwind to read from
+   `design-tokens.json` so nothing is hardcoded. Note that Tailwind v4 has no `tailwind.config.js`
+   — configuration is a `@theme` block in CSS. `web/scripts/build-tokens.mjs` generates that block
+   (and a typed `store-config.ts`) from the two repo-root JSON files, running automatically before
+   `dev` and `build`. Both generated files are git-ignored: edit the JSON, never the output.
 5. **[You + Claude Code]** Build the shared UI primitives Phase 4 will reuse: button, input, form
    field, card, table, modal, and toast.
 6. **[You + Claude Code]** Build the pages: catalog/home, category, product detail, cart,

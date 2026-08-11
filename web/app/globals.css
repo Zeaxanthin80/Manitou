@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+/* Generated from ../design-tokens.json by scripts/build-tokens.mjs.
+   Never hardcode a colour, font size, or spacing value in a component -- every
+   one of them comes from here. See PROJECT_PLAN.md Section 4.3. */
+@import "./tokens.css";
+
+body {
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
