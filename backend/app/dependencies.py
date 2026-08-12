@@ -4,15 +4,19 @@ Kept separate from app/security.py so the crypto layer stays free of framework
 imports. This module is the HTTP-facing half: read the header, return 401 or 403.
 """
 
+from functools import lru_cache
+
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db import get_db
 from app.models import User
 from app.security import decode_access_token
+from app.services.email import EmailSender, build_sender
 
 # auto_error=False because the default returns 403 when the Authorization header
 # is missing. A missing credential is 401 -- 403 means "authenticated, but not
@@ -71,3 +75,15 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
             detail="Admin privileges required",
         )
     return user
+
+
+@lru_cache(maxsize=1)
+def get_email_sender() -> EmailSender:
+    """The configured email sender, built once.
+
+    Lives here rather than in services/email.py so that module stays free of any
+    FastAPI import, matching security.py and checkout.py. Being a dependency is
+    what lets a test swap in MemoryEmailSender with app.dependency_overrides
+    instead of monkeypatching a module global.
+    """
+    return build_sender(settings.email_sender)
