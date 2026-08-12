@@ -116,6 +116,23 @@ def client(session_factory):
     app.dependency_overrides.clear()
 
 
+@pytest.fixture
+def outbox(client):
+    """Captures email instead of sending it, so a test can read what was sent.
+
+    Depends on `client` so the override is installed on the same app instance and
+    torn down by the same cleanup. Scraping the console sender's stdout would be
+    the alternative, and it would be miserable.
+    """
+    from app.dependencies import get_email_sender
+    from app.main import app
+    from app.services.email import MemoryEmailSender
+
+    sender = MemoryEmailSender()
+    app.dependency_overrides[get_email_sender] = lambda: sender
+    return sender
+
+
 # --------------------------------------------------------------------------
 # Data factories. Tests build exactly what they need -- no seed dependency.
 # --------------------------------------------------------------------------

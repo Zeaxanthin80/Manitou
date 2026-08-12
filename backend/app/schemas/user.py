@@ -24,12 +24,7 @@ class UserCreate(BaseModel):
     @field_validator("password")
     @classmethod
     def password_fits_bcrypt(cls, value: str) -> str:
-        if len(value.encode()) > BCRYPT_MAX_BYTES:
-            raise ValueError(
-                f"password must be at most {BCRYPT_MAX_BYTES} bytes "
-                "(non-ASCII characters use more than one byte each)"
-            )
-        return value
+        return _fits_bcrypt(value)
 
 
 class UserRead(BaseModel):
@@ -66,3 +61,58 @@ class LoginRequest(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+def _fits_bcrypt(value: str) -> str:
+    """Shared by every schema that accepts a new password.
+
+    Extracted rather than repeated: registration already proved that a
+    character-based cap lets 72 accented characters (144 bytes) through and turns
+    into a 500 at hashing time. Every future password field must inherit that
+    lesson, not re-learn it.
+    """
+    if len(value.encode()) > BCRYPT_MAX_BYTES:
+        raise ValueError(
+            f"password must be at most {BCRYPT_MAX_BYTES} bytes "
+            "(non-ASCII characters use more than one byte each)"
+        )
+    return value
+
+
+class ProfileUpdate(BaseModel):
+    """Name and phone. Deliberately no email and no password.
+
+    Both of those are consequential enough to need the current password, so they
+    get their own endpoints. Bundling them here would mean either demanding a
+    password to edit a phone number -- which teaches people to type their password
+    into any form that asks -- or letting an email change through without one.
+    """
+
+    full_name: str | None = Field(default=None, min_length=1)
+    phone: str | None = None
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_fits_bcrypt(cls, value: str) -> str:
+        return _fits_bcrypt(value)
+
+
+class EmailChange(BaseModel):
+    current_password: str
+    new_email: EmailStr
+
+
+class AccountDelete(BaseModel):
+    """Deleting an account is irreversible, so it asks for the password.
+
+    Not a confirmation checkbox: a stolen session should not be able to erase
+    someone's account, and the password is the only thing the session itself does
+    not already carry.
+    """
+
+    current_password: str

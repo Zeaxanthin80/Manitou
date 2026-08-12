@@ -23,7 +23,16 @@ from app.schemas.order import (
     OrderPage,
     OrderSummary,
 )
-from app.schemas.user import LoginRequest, Token, UserCreate, UserRead
+from app.schemas.user import (
+    AccountDelete,
+    EmailChange,
+    LoginRequest,
+    PasswordChange,
+    ProfileUpdate,
+    Token,
+    UserCreate,
+    UserRead,
+)
 
 __all__ = [
     "AddressCreate",
@@ -35,6 +44,8 @@ __all__ = [
     "CartRead",
     "CategoryRead",
     "ImageRead",
+    "AccountDelete",
+    "EmailChange",
     "LoginRequest",
     "OrderCreate",
     "OrderDetail",
@@ -44,6 +55,8 @@ __all__ = [
     "ProductDetail",
     "ProductListItem",
     "ProductPage",
+    "PasswordChange",
+    "ProfileUpdate",
     "Token",
     "UserCreate",
     "UserRead",
