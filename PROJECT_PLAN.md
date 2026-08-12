@@ -806,7 +806,7 @@ reference to another table's PK).
 | action | text | Dotted verb, e.g. `customer.suspended`, `customer.role_changed`, `customer.anonymised`, `auth.password_changed`, `auth.2fa_enabled`, `order.status_changed` |
 | target_type | text | `user`, `order`, `product`, … |
 | target_id | bigint | nullable |
-| metadata | jsonb | Before/after values and any reason given. Never credentials — no tokens, hashes, or secrets, even scrubbed |
+| details | jsonb | Before/after values and any reason given. Never credentials — no tokens, hashes, or secrets, even scrubbed. Named `details`, not `metadata`: the latter is reserved by SQLAlchemy's Declarative API and raises `InvalidRequestError` on class definition |
 | ip_address | text | nullable |
 | created_at | timestamptz | default now() |
 
