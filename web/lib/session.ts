@@ -47,3 +47,39 @@ export async function clearSession() {
   const store = await cookies();
   store.delete(COOKIE);
 }
+
+/* --------------------------------------------------------- 2FA challenge -- */
+
+const CHALLENGE_COOKIE = "manitou_mfa";
+
+/**
+ * Holds the half-finished sign-in between the password step and the code step.
+ *
+ * A cookie rather than a hidden form field: the challenge stays out of the page
+ * source, out of anything that logs or caches HTML, and out of the browser
+ * history. Same flags as the session cookie for the same reasons -- httpOnly so
+ * script cannot read it, lax so an inbound link does not carry it cross-site.
+ *
+ * Short expiry to match the token's own five minutes. A stale one is harmless
+ * anyway: the API refuses an expired challenge, and holding one grants nothing.
+ */
+export async function setChallenge(challenge: string) {
+  const store = await cookies();
+  store.set(CHALLENGE_COOKIE, challenge, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 5 * 60,
+    path: "/",
+  });
+}
+
+export async function getChallenge(): Promise<string | null> {
+  const store = await cookies();
+  return store.get(CHALLENGE_COOKIE)?.value ?? null;
+}
+
+export async function clearChallenge() {
+  const store = await cookies();
+  store.delete(CHALLENGE_COOKIE);
+}

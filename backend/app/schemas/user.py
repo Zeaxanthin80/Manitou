@@ -41,6 +41,10 @@ class UserRead(BaseModel):
     full_name: str
     phone: str | None
     role: str
+    #: Whether two-factor is on. A customer's own security state is their data,
+    #: and the settings page has no other way to know which controls to render.
+    #: The secret itself is never exposed -- only the fact that one exists.
+    totp_enabled: bool
     created_at: datetime
 
 

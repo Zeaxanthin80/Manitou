@@ -21,12 +21,17 @@ export function AuthForm({
   submitLabel,
   includeName = false,
   footer,
+  secondaryLink,
 }: {
   action: (prev: FormState, data: FormData) => Promise<FormState>;
   title: string;
   submitLabel: string;
   includeName?: boolean;
   footer: { text: string; href: string; label: string };
+  /** Optional extra link under the button -- "Forgot your password?" on sign in.
+   *  Optional so the register page, which has no such flow, omits it entirely
+   *  rather than passing something empty. */
+  secondaryLink?: { href: string; label: string };
 }) {
   const [state, formAction, pending] = useActionState(action, {});
 
@@ -80,6 +85,17 @@ export function AuthForm({
       </form>
 
       <p className="mt-6 font-body text-sm text-muted">
+        {secondaryLink && (
+          <>
+            <Link
+              href={secondaryLink.href}
+              className="text-accent underline underline-offset-4"
+            >
+              {secondaryLink.label}
+            </Link>
+            <br />
+          </>
+        )}
         {footer.text}{" "}
         <Link href={footer.href} className="text-accent underline underline-offset-4">
           {footer.label}

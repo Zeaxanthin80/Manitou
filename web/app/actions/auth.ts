@@ -2,8 +2,22 @@
 
 import { redirect } from "next/navigation";
 
-import { ApiError, getCurrentUser, login, register } from "@/lib/api";
-import { clearSession, getSession, setSession } from "@/lib/session";
+import {
+  ApiError,
+  getCurrentUser,
+  isMfaChallenge,
+  login,
+  register,
+  twoFactorVerify,
+} from "@/lib/api";
+import {
+  clearChallenge,
+  clearSession,
+  getChallenge,
+  getSession,
+  setChallenge,
+  setSession,
+} from "@/lib/session";
 import type { User } from "@/lib/api";
 
 /**
@@ -19,7 +33,7 @@ import type { User } from "@/lib/api";
  * must check the session itself rather than assuming the UI gated it.
  */
 
-export type FormState = { error?: string };
+export type FormState = { error?: string; mfaRequired?: boolean };
 
 /** Read the JWT's own `exp` claim so the cookie dies exactly when the token
  *  does. Hardcoding a duration here would let the two drift apart, leaving a
@@ -47,8 +61,17 @@ export async function loginAction(
   const password = String(formData.get("password") ?? "");
 
   try {
-    const token = await login(email, password);
-    await setSession(token.access_token, tokenExpiry(token.access_token));
+    const result = await login(email, password);
+
+    // Two shapes come back from one call. An account with two-factor gets a
+    // challenge, which is NOT a session -- it grants access to nothing until it
+    // is exchanged for a real token at the code step.
+    if (isMfaChallenge(result)) {
+      await setChallenge(result.challenge);
+      return { mfaRequired: true };
+    }
+
+    await setSession(result.access_token, tokenExpiry(result.access_token));
   } catch (error) {
     if (error instanceof ApiError) {
       // The API returns one identical 401 for an unknown email and a wrong
@@ -75,9 +98,15 @@ export async function registerAction(
   try {
     await register({ email, password, full_name: fullName });
     // Registration does not return a token, so log in straight away rather
-    // than making a new customer fill in the same details twice.
-    const token = await login(email, password);
-    await setSession(token.access_token, tokenExpiry(token.access_token));
+    // than making a new customer fill in the same details twice. A brand-new
+    // account cannot have 2FA on, but narrow anyway rather than assert -- the
+    // union exists precisely so nobody has to remember that.
+    const result = await login(email, password);
+    if (isMfaChallenge(result)) {
+      await setChallenge(result.challenge);
+      return { mfaRequired: true };
+    }
+    await setSession(result.access_token, tokenExpiry(result.access_token));
   } catch (error) {
     if (error instanceof ApiError) return { error: error.message };
     throw error;
@@ -88,7 +117,47 @@ export async function registerAction(
 
 export async function logoutAction() {
   await clearSession();
+  await clearChallenge();
   redirect("/");
+}
+
+
+/**
+ * The second step: exchange the pending challenge plus a code for a session.
+ *
+ * Accepts either a six-digit authenticator code or a recovery code -- the API
+ * tries both and answers with one 401 either way, so this does not need to know
+ * which the customer typed.
+ */
+export async function verifyMfaAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const challenge = await getChallenge();
+  if (!challenge) {
+    // The five-minute window lapsed, or they arrived here directly.
+    return { error: "That sign-in attempt expired. Please sign in again." };
+  }
+
+  const code = String(formData.get("code") ?? "").trim();
+
+  try {
+    const token = await twoFactorVerify(challenge, code);
+    await setSession(token.access_token, tokenExpiry(token.access_token));
+    await clearChallenge();
+  } catch (error) {
+    if (error instanceof ApiError) return { error: error.message };
+    throw error;
+  }
+
+  redirect("/");
+}
+
+
+/** Whether a half-finished sign-in is waiting for a code. Read by the login page
+ *  to decide which of the two steps to render. */
+export async function mfaPending(): Promise<boolean> {
+  return (await getChallenge()) !== null;
 }
 
 /** The current user, or null. Used by Server Components to render signed-in

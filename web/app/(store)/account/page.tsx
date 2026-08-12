@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { currentAddresses } from "@/app/actions/address";
 import { currentUser, logoutAction } from "@/app/actions/auth";
 import { AddressForm } from "@/components/address-form";
+import { ProfileForm } from "@/components/profile-form";
 import { AddressList } from "@/components/address-list";
 import { OrderStatus } from "@/components/order-status";
 import { Button, buttonClasses } from "@/components/ui/button";
@@ -56,28 +57,27 @@ export default async function AccountPage() {
       </div>
 
       <section className="mt-10">
-        <h2 className="font-body text-sm uppercase tracking-tight text-muted">
-          Details
-        </h2>
-        <dl className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-[8rem_1fr]">
-          <dt className="font-body text-sm text-muted">Name</dt>
-          <dd className="font-body text-sm text-text">{user.full_name}</dd>
-          <dt className="font-body text-sm text-muted">Email</dt>
-          <dd className="font-body text-sm text-text">{user.email}</dd>
-          {user.phone && (
-            <>
-              <dt className="font-body text-sm text-muted">Phone</dt>
-              <dd className="font-body text-sm text-text">{user.phone}</dd>
-            </>
-          )}
-          <dt className="font-body text-sm text-muted">Member since</dt>
-          <dd className="font-body text-sm text-text">
-            {new Date(user.created_at).toLocaleDateString(undefined, {
-              year: "numeric",
-              month: "long",
-            })}
-          </dd>
-        </dl>
+        <div className="flex flex-wrap items-baseline justify-between gap-4">
+          <h2 className="font-body text-sm uppercase tracking-tight text-muted">
+            Details
+          </h2>
+          <Link
+            href="/account/security"
+            className="font-body text-sm text-muted underline hover:text-text"
+          >
+            Password, email &amp; security
+          </Link>
+        </div>
+        <div className="mt-4">
+          <ProfileForm user={user} />
+        </div>
+        <p className="mt-4 font-body text-sm text-muted">
+          {user.email} &middot; member since{" "}
+          {new Date(user.created_at).toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "long",
+          })}
+        </p>
       </section>
 
       <section className="mt-12">

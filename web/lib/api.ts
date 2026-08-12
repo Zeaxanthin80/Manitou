@@ -81,12 +81,34 @@ export type User = {
   full_name: string;
   phone: string | null;
   role: string;
+  /** Whether two-factor is on. Never the secret -- only its existence. */
+  totp_enabled: boolean;
   created_at: string;
 };
 
 export type Token = {
   access_token: string;
   token_type: string;
+};
+
+/** What /auth/login returns when the account has two-factor on: proof the
+ *  password step passed, and nothing more. The challenge carries scope="2fa" and
+ *  is refused by every authenticated endpoint. */
+export type MfaChallenge = {
+  mfa_required: true;
+  challenge: string;
+};
+
+/** Narrowing helper. Both shapes come back from the same call, so every caller
+ *  has to ask which one it got -- the type system makes forgetting impossible. */
+export function isMfaChallenge(r: Token | MfaChallenge): r is MfaChallenge {
+  return "mfa_required" in r;
+}
+
+export type TwoFactorSetup = {
+  secret: string;
+  provisioning_uri: string;
+  qr_data_uri: string;
 };
 
 export type CartLineVariant = {
@@ -325,8 +347,16 @@ export function getCategory(slug: string): Promise<Category> {
 
 /* ----------------------------------------------------------------- auth -- */
 
-export function login(email: string, password: string): Promise<Token> {
-  return request<Token>("/auth/login", { body: { email, password } });
+/** Returns a Token, OR an MfaChallenge when the account has 2FA enabled. Use
+ *  isMfaChallenge() to tell them apart -- the union is deliberate, so that a
+ *  caller cannot silently treat a challenge as a session. */
+export function login(
+  email: string,
+  password: string,
+): Promise<Token | MfaChallenge> {
+  return request<Token | MfaChallenge>("/auth/login", {
+    body: { email, password },
+  });
 }
 
 export function register(input: {
@@ -465,3 +495,67 @@ export const updateInventory = (
 
 export const getAdminSummary = (token: string) =>
   request<AdminSummary>("/admin/summary", { token });
+
+/* ------------------------------------------------- account self-service -- */
+
+export const updateProfile = (
+  token: string,
+  body: { full_name?: string; phone?: string | null },
+) => request<User>("/auth/me", { token, method: "PATCH", body });
+
+/** Returns a FRESH token. The caller must store it: every token issued before
+ *  the change is now rejected, including the one that made the request. */
+export const changePassword = (
+  token: string,
+  current_password: string,
+  new_password: string,
+) =>
+  request<Token>("/auth/change-password", {
+    token,
+    body: { current_password, new_password },
+  });
+
+export const changeEmail = (
+  token: string,
+  current_password: string,
+  new_email: string,
+) =>
+  request<User>("/auth/change-email", {
+    token,
+    body: { current_password, new_email },
+  });
+
+export const deleteAccount = (token: string, current_password: string) =>
+  request<void>("/auth/me", {
+    token,
+    method: "DELETE",
+    body: { current_password },
+  });
+
+/* -------------------------------------------------------- password reset -- */
+
+export const forgotPassword = (email: string) =>
+  request<{ detail: string }>("/auth/forgot-password", { body: { email } });
+
+export const resetPassword = (token: string, new_password: string) =>
+  request<void>("/auth/reset-password", { body: { token, new_password } });
+
+/* ------------------------------------------------------------ two-factor -- */
+
+export const twoFactorSetup = (token: string) =>
+  request<TwoFactorSetup>("/auth/2fa/setup", { token, body: {} });
+
+/** The recovery codes come back exactly once. There is no endpoint to fetch them
+ *  again -- they are bcrypt-hashed on write, so this response is the only place
+ *  the plaintext ever exists. */
+export const twoFactorEnable = (token: string, code: string) =>
+  request<{ recovery_codes: string[] }>("/auth/2fa/enable", {
+    token,
+    body: { code },
+  });
+
+export const twoFactorDisable = (token: string, current_password: string) =>
+  request<void>("/auth/2fa/disable", { token, body: { current_password } });
+
+export const twoFactorVerify = (challenge: string, code: string) =>
+  request<Token>("/auth/2fa/verify", { body: { challenge, code } });
