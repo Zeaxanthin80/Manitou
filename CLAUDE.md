@@ -92,6 +92,8 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
   guard inventory so stock can't go negative under concurrency.
 - **Accounts are anonymised, never deleted.** `orders.user_id` is NOT NULL with NO ACTION, so a
   customer who has ordered cannot be removed. Scrub the personal fields and keep the order rows.
+  Addresses too: delete only those no order references — an order has no address snapshot, so the
+  row it points at *is* the shipping record.
 - Password reset tokens are stored **hashed**, single-use, and short-lived; `forgot-password`
   answers identically for a known and an unknown address, like login does.
 - Suspension (`users.is_active`) is checked in `get_current_user`, not only at login, so an open

@@ -116,3 +116,24 @@ class AccountDelete(BaseModel):
     """
 
     current_password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Plain str, not EmailStr, and that is deliberate.
+
+    EmailStr would 422 on a malformed address -- a different response from the
+    202 a well-formed unknown address gets, which is exactly the distinction this
+    endpoint exists not to make. Anything unparseable simply matches no user.
+    """
+
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_fits_bcrypt(cls, value: str) -> str:
+        return _fits_bcrypt(value)

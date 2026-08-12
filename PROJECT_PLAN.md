@@ -590,6 +590,12 @@ customer who has ever ordered **cannot be deleted**. Erasure is therefore *anony
 personal fields are scrubbed and the order rows keep their foreign key. That is also the normal
 answer to a legal erasure request, since tax rules require retaining invoices.
 
+The same constraint reaches one level further, into addresses. `orders.shipping_address_id` is also
+`NO ACTION`, and an order carries **no address snapshot** — unlike `order_items`, which freeze name
+and price, an order points at the live `addresses` row. So anonymisation **deletes address-book
+entries no order references and leaves the rest intact**: scrubbing an order-linked address would
+erase where a real parcel was actually sent, which is the record an invoice depends on.
+
 **One existing decision makes suspension cheap.** `get_current_user` already re-reads the user row
 on every request (Section 8), so setting `is_active = false` takes effect on that user's very next
 request. No token-revocation machinery is needed.
@@ -1166,7 +1172,9 @@ same service, training wheels off. Do not add that complexity earlier.
 - **Accounts are anonymised, not deleted.** `orders.user_id` is `NOT NULL` with `NO ACTION`, so
   deleting a customer who has ordered is impossible without destroying order history. Scrubbing the
   personal fields in place satisfies an erasure request while keeping the invoices tax rules
-  require.
+  require. Addresses follow the same rule for the same reason: those an order references survive
+  (the order holds no snapshot, so the row *is* the shipping record), and address-book entries no
+  order used are deleted.
 - **Consequential actions are recorded, and the record is append-only** (Phase 4.5). Suspension,
   role changes, anonymisation, admin-triggered resets, and the customer's own credential changes all
   write an `audit_events` row **in the same transaction as the action** — so an action cannot commit

@@ -25,15 +25,24 @@ from app.models import (
 from app.schemas import (
     AccountDelete,
     EmailChange,
+    ForgotPasswordRequest,
     LoginRequest,
     PasswordChange,
     ProfileUpdate,
+    ResetPasswordRequest,
     Token,
     UserCreate,
     UserRead,
 )
 from app.security import create_access_token, hash_password, verify_password
+from app.config import settings
 from app.services import audit
+from app.services.password_reset import (
+    TOKEN_TTL,
+    InvalidResetToken,
+    redeem,
+    request_reset,
+)
 from app.services.email import EmailMessage, EmailSender
 from app.store import store_config
 
@@ -326,5 +335,98 @@ def delete_account(
         target_type="user",
         target_id=user.id,
         initiated_by="self",
+    )
+    db.commit()
+
+
+@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+    sender: EmailSender = Depends(get_email_sender),
+) -> dict:
+    """Send a reset link, and say the same thing no matter what happened.
+
+    202 with one fixed body for every outcome: unknown address, real address,
+    suspended account, or a repeat inside the cooldown. Section 8's rule that
+    authentication failures must be indistinguishable applies here too -- this is
+    the other endpoint that takes an email address, and a different response for
+    an unknown one turns it into an account-enumeration oracle.
+
+    The timing dimension is the mirror image of login's. There, a missing user
+    could return *faster* because it skipped the password hash, so a dummy hash
+    keeps the paths even. Here the expensive step is sending mail, so an unknown
+    address risks being faster -- but generating and SHA-256-hashing a token is
+    microseconds, and the send is the same order of magnitude as everything else
+    the request already does. Measured rather than assumed; see the timing test.
+    """
+    issued = request_reset(db, payload.email)
+
+    if issued is not None:
+        user, raw_token = issued
+        audit.record(
+            db,
+            actor=user,
+            action="auth.password_reset_requested",
+            target_type="user",
+            target_id=user.id,
+            # No token value: the audit denylist refuses any key containing
+            # "token", which is that guard doing its job.
+            delivered_to=user.email,
+        )
+        db.commit()
+
+        link = f"{settings.app_base_url}/reset-password?token={raw_token}"
+        sender.send(
+            EmailMessage(
+                to=user.email,
+                subject=f"Reset your {store_config.store.name} password",
+                body=(
+                    f"Someone asked to reset the password for your "
+                    f"{store_config.store.name} account.\n\n"
+                    f"{link}\n\n"
+                    f"This link works once and expires in "
+                    f"{int(TOKEN_TTL.total_seconds() // 60)} minutes.\n\n"
+                    f"If this wasn't you, ignore this email -- your password has "
+                    f"not changed. Questions: {store_config.store.support_email}"
+                ),
+            )
+        )
+
+    return {"detail": "If that address has an account, a reset link is on its way."}
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+def reset_password(
+    payload: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+) -> None:
+    """Consume the token and set the new password. No session is issued.
+
+    Deliberately returns 204 rather than a token: possession of a link sitting in
+    an inbox must never produce a live session. The customer signs in afterwards,
+    which also proves the new password is what they think it is.
+
+    400 covers unknown, expired and already-used alike -- distinguishing them
+    would tell someone probing tokens whether a given one ever existed.
+    """
+    try:
+        user = redeem(db, payload.token, hash_password(payload.new_password))
+    except InvalidResetToken:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "That reset link is invalid or has expired. Request a new one.",
+        ) from None
+
+    # actor=None on purpose. The whole premise is that this person could not
+    # authenticate, so there is no signed-in actor to attribute it to -- the row
+    # records "system" and names the user as the target instead.
+    audit.record(
+        db,
+        actor=None,
+        action="auth.password_reset_completed",
+        target_type="user",
+        target_id=user.id,
+        other_sessions_ended=True,
     )
     db.commit()

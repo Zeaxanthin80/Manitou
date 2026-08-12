@@ -229,11 +229,22 @@ def test_change_password_keeps_this_session_and_kills_the_others(
     leave that one working -- via the fresh token it returns -- while the other
     stops on its next request.
     """
+    import time
+
     user = make_user(email="two-devices@manitou.example")
     other_device = auth_headers(user)
     this_device = auth_headers(user)
 
     assert client.get("/auth/me", headers=other_device).status_code == 200
+
+    # Deliberate, and not padding. token_predates_password_change compares whole
+    # seconds, so a token minted in the SAME second as the change survives -- the
+    # documented tradeoff that stops a user being signed out of the session they
+    # just created. Without this wait the test is a coin flip on how fast the
+    # suite happens to run: it passed alone and failed once more tests ran before
+    # it. Sleeping past the second boundary tests the property that actually
+    # matters -- sessions from BEFORE the change end.
+    time.sleep(1.1)
 
     r = client.post("/auth/change-password", headers=this_device, json={
         "current_password": user.raw_password, "new_password": "a-brand-new-one"})
@@ -382,3 +393,224 @@ def test_delete_account_requires_the_password(client, db, make_user, auth_header
     assert r.status_code == 401
     db.expire_all()
     assert db.get(User, user_id).email == "not-so-fast@manitou.example"
+
+
+# ---------------------------------------------------------------------------
+# Phase 4.5 task 7 -- password reset.
+# ---------------------------------------------------------------------------
+
+RESET_BODY = {"detail": "If that address has an account, a reset link is on its way."}
+
+
+def _link_token(message) -> str:
+    """Pull the raw token out of a sent email, the way a customer clicks it."""
+    import re
+
+    match = re.search(r"reset-password\?token=(\S+)", message.body)
+    assert match, f"no reset link in the email body:\n{message.body}"
+    return match.group(1)
+
+
+def test_forgot_password_is_identical_for_every_outcome(
+    client, db, make_user, outbox
+):
+    """Unknown, known, suspended and malformed must be indistinguishable.
+
+    Same rule as login (Section 8): this is the other endpoint that takes an
+    email address, and any difference turns it into an enumeration oracle.
+    """
+    make_user(email="real@manitou.example")
+    suspended = make_user(email="frozen@manitou.example")
+    suspended.is_active = False
+    db.commit()
+
+    responses = [
+        client.post("/auth/forgot-password", json={"email": address})
+        for address in (
+            "real@manitou.example",
+            "nobody@manitou.example",
+            "frozen@manitou.example",
+            "not-even-an-email",
+        )
+    ]
+
+    assert {r.status_code for r in responses} == {202}
+    assert {r.text for r in responses} == {responses[0].text}, (
+        "every outcome must return a byte-identical body"
+    )
+    # Only the real, active account is actually sent anything.
+    assert len(outbox.sent) == 1
+    assert outbox.sent[0].to == "real@manitou.example"
+
+
+def test_reset_token_is_never_stored_in_the_clear(client, db, make_user, outbox):
+    """A leaked database backup must not be usable to reset anyone's password."""
+    from app.models import PasswordResetToken
+    from app.services.password_reset import hash_token
+    from sqlalchemy import select
+
+    user = make_user(email="hashme@manitou.example")
+    client.post("/auth/forgot-password", json={"email": user.email})
+
+    raw = _link_token(outbox.last_to(user.email))
+    rows = db.scalars(select(PasswordResetToken)).all()
+
+    assert len(rows) == 1
+    assert rows[0].token_hash != raw, "the raw token must not be the stored value"
+    assert raw not in rows[0].token_hash
+    assert rows[0].token_hash == hash_token(raw), "and its SHA-256 must match"
+
+
+def test_reset_completes_and_ends_every_session(
+    client, db, make_user, auth_headers, outbox
+):
+    import time
+
+    user = make_user(email="forgot@manitou.example")
+    session = auth_headers(user)
+    assert client.get("/auth/me", headers=session).status_code == 200
+
+    # Same second-boundary as the change-password test: password_changed_at is
+    # compared in whole seconds, so a token minted in the same second as the reset
+    # survives by design. Wait past the boundary so this tests what it claims --
+    # that a session opened BEFORE the reset ends.
+    time.sleep(1.1)
+
+    client.post("/auth/forgot-password", json={"email": user.email})
+    raw = _link_token(outbox.last_to(user.email))
+
+    r = client.post("/auth/reset-password", json={
+        "token": raw, "new_password": "a-new-secret-1"})
+    assert r.status_code == 204
+
+    assert client.get("/auth/me", headers=session).status_code == 401, (
+        "a reset must end sessions -- whoever prompted it may hold a live token"
+    )
+    assert client.post("/auth/login", json={
+        "email": user.email, "password": user.raw_password}).status_code == 401
+    assert client.post("/auth/login", json={
+        "email": user.email, "password": "a-new-secret-1"}).status_code == 200
+
+
+def test_a_reset_link_works_exactly_once(client, make_user, outbox):
+    user = make_user(email="replay@manitou.example")
+    client.post("/auth/forgot-password", json={"email": user.email})
+    raw = _link_token(outbox.last_to(user.email))
+
+    assert client.post("/auth/reset-password", json={
+        "token": raw, "new_password": "first-change-1"}).status_code == 204
+    assert client.post("/auth/reset-password", json={
+        "token": raw, "new_password": "second-change"}).status_code == 400
+
+    assert client.post("/auth/login", json={
+        "email": user.email, "password": "first-change-1"}).status_code == 200, (
+        "the replay must not have taken effect"
+    )
+
+
+def test_an_expired_link_is_refused(client, db, make_user, outbox):
+    from datetime import datetime, timedelta, timezone
+    from app.models import PasswordResetToken
+    from sqlalchemy import select
+
+    user = make_user(email="stale@manitou.example")
+    client.post("/auth/forgot-password", json={"email": user.email})
+    raw = _link_token(outbox.last_to(user.email))
+
+    row = db.scalar(select(PasswordResetToken))
+    row.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    db.commit()
+
+    assert client.post("/auth/reset-password", json={
+        "token": raw, "new_password": "too-late-now-1"}).status_code == 400
+
+
+def test_unknown_token_and_used_token_are_indistinguishable(
+    client, make_user, outbox
+):
+    """Different reasons, one message -- otherwise probing reveals which tokens
+    ever existed."""
+    user = make_user(email="opaque@manitou.example")
+    client.post("/auth/forgot-password", json={"email": user.email})
+    raw = _link_token(outbox.last_to(user.email))
+    client.post("/auth/reset-password", json={
+        "token": raw, "new_password": "used-it-up-1"})
+
+    used = client.post("/auth/reset-password", json={
+        "token": raw, "new_password": "another-one-1"})
+    never = client.post("/auth/reset-password", json={
+        "token": "a-token-that-never-existed", "new_password": "another-one-1"})
+
+    assert used.status_code == never.status_code == 400
+    assert used.text == never.text
+
+
+def test_cooldown_suppresses_a_second_email_but_not_the_response(
+    client, make_user, outbox
+):
+    user = make_user(email="impatient@manitou.example")
+
+    first = client.post("/auth/forgot-password", json={"email": user.email})
+    second = client.post("/auth/forgot-password", json={"email": user.email})
+
+    assert first.status_code == second.status_code == 202
+    assert first.text == second.text, "the caller must not be able to tell"
+    assert len(outbox.sent) == 1, "but only one email may actually go out"
+
+
+def test_requesting_again_invalidates_the_earlier_link(client, db, make_user, outbox):
+    """Someone who clicks forgot-password three times must not leave live links."""
+    from datetime import datetime, timedelta, timezone
+    from app.models import PasswordResetToken
+    from sqlalchemy import select
+
+    user = make_user(email="twice@manitou.example")
+    client.post("/auth/forgot-password", json={"email": user.email})
+    first_raw = _link_token(outbox.last_to(user.email))
+
+    # Step past the cooldown rather than sleeping through it.
+    row = db.scalar(select(PasswordResetToken))
+    row.created_at = datetime.now(timezone.utc) - timedelta(minutes=5)
+    db.commit()
+
+    client.post("/auth/forgot-password", json={"email": user.email})
+    second_raw = _link_token(outbox.sent[-1])
+    assert second_raw != first_raw
+
+    assert client.post("/auth/reset-password", json={
+        "token": second_raw, "new_password": "newest-one-11"}).status_code == 204
+    assert client.post("/auth/reset-password", json={
+        "token": first_raw, "new_password": "older-link-11"}).status_code == 400, (
+        "the earlier link must die with the reset"
+    )
+
+
+def test_reset_records_an_audit_event_with_no_actor_and_no_token(
+    client, db, make_user, outbox
+):
+    from app.models import AuditEvent
+    from sqlalchemy import select
+
+    user = make_user(email="audited@manitou.example")
+    client.post("/auth/forgot-password", json={"email": user.email})
+    raw = _link_token(outbox.last_to(user.email))
+    client.post("/auth/reset-password", json={
+        "token": raw, "new_password": "recorded-one-1"})
+
+    event = db.scalar(select(AuditEvent).where(
+        AuditEvent.action == "auth.password_reset_completed"))
+    assert event is not None
+    assert event.actor_user_id is None, (
+        "the premise is that this person could not authenticate"
+    )
+    assert event.actor_email == "system"
+    assert raw not in str(event.details), "no token value may reach the audit trail"
+
+
+def test_new_password_byte_limit_applies_to_reset_too(client, make_user, outbox):
+    user = make_user(email="bytes-reset@manitou.example")
+    client.post("/auth/forgot-password", json={"email": user.email})
+    raw = _link_token(outbox.last_to(user.email))
+
+    assert client.post("/auth/reset-password", json={
+        "token": raw, "new_password": "é" * 72}).status_code == 422
