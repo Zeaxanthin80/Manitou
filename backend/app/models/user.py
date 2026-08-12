@@ -44,6 +44,13 @@ class User(Base):
     # until a first code is verified, so an abandoned setup cannot lock anyone out.
     totp_secret: Mapped[str | None] = mapped_column(Text)
     totp_enabled: Mapped[bool] = mapped_column(server_default=text("false"))
+    # The last TOTP time step accepted for this user. A code is only good for its
+    # own 30-second step, but pyotp has no memory -- measured, it verifies the
+    # same code indefinitely -- so with clock-skew tolerance an observed code
+    # stays usable for ~90 seconds. Recording the step and refusing anything at or
+    # below it closes that window, which is exactly the window a phishing relay
+    # needs.
+    totp_last_used_step: Mapped[int | None] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

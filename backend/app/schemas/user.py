@@ -137,3 +137,54 @@ class ResetPasswordRequest(BaseModel):
     @classmethod
     def new_password_fits_bcrypt(cls, value: str) -> str:
         return _fits_bcrypt(value)
+
+
+class MfaChallenge(BaseModel):
+    """Returned by /auth/login when the account has 2FA on.
+
+    Deliberately not a Token. `challenge` carries scope="2fa" and is refused by
+    get_current_user, so holding one proves the password step passed and grants
+    access to nothing.
+    """
+
+    mfa_required: bool = True
+    challenge: str
+
+
+class TwoFactorSetup(BaseModel):
+    """Everything needed to add the account to an authenticator app.
+
+    `secret` is included alongside the QR because not every app can scan one --
+    manual entry is the fallback, and hiding it would strand anyone on a desktop
+    authenticator.
+    """
+
+    secret: str
+    provisioning_uri: str
+    qr_data_uri: str
+
+
+class TwoFactorEnableRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=6)
+
+
+class TwoFactorEnabled(BaseModel):
+    """Recovery codes, shown exactly once.
+
+    They are bcrypt-hashed on write, so this response is the only time the
+    plaintext exists anywhere. There is no endpoint to retrieve them again --
+    losing them means generating a new set, which invalidates the old.
+    """
+
+    recovery_codes: list[str]
+
+
+class TwoFactorDisableRequest(BaseModel):
+    current_password: str
+
+
+class TwoFactorVerifyRequest(BaseModel):
+    challenge: str
+    # Not length-constrained: this accepts either a 6-digit TOTP code or a
+    # recovery code, which is longer and hyphenated.
+    code: str = Field(min_length=6)

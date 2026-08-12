@@ -639,7 +639,14 @@ is safe only when every action taken inside it is attributable, which is impossi
 9. **[You + Claude Code]** Admin customer API: `GET /admin/customers` (search + pagination),
    `GET /admin/customers/{id}` (orders, addresses, lifetime value),
    `PATCH /admin/customers/{id}` (suspend/reactivate, change role),
-   `POST /admin/customers/{id}/password-reset`, and `POST /admin/customers/{id}/anonymise`.
+   `POST /admin/customers/{id}/password-reset`, `POST /admin/customers/{id}/disable-2fa`, and
+   `POST /admin/customers/{id}/anonymise`.
+
+   The disable-2fa endpoint is the escape hatch for a customer who has lost both their
+   authenticator and their recovery codes — without it that account is unrecoverable, which is a
+   worse lockout than the password one this phase exists to fix. It is also, unavoidably, an admin
+   being able to strip a customer's second factor, which is exactly why it is audited as
+   `customer.2fa_disabled` with the acting admin named.
    Two guards, both enforced server-side: an admin cannot suspend or demote **themselves**, and the
    **last remaining admin** cannot be suspended or demoted. Without them the store can be locked
    out of its own portal with no way back in. Every one of these writes an audit event, as do the

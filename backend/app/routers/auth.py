@@ -3,8 +3,10 @@
 import secrets
 from datetime import datetime, timezone
 
+import jwt
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -28,15 +30,36 @@ from app.schemas import (
     ForgotPasswordRequest,
     LoginRequest,
     PasswordChange,
+    MfaChallenge,
     ProfileUpdate,
     ResetPasswordRequest,
     Token,
+    TwoFactorDisableRequest,
+    TwoFactorEnableRequest,
+    TwoFactorEnabled,
+    TwoFactorSetup,
+    TwoFactorVerifyRequest,
     UserCreate,
     UserRead,
 )
-from app.security import create_access_token, hash_password, verify_password
+from app.security import (
+    create_access_token,
+    create_mfa_challenge_token,
+    decode_access_token,
+    hash_password,
+    verify_password,
+)
 from app.config import settings
 from app.services import audit
+from app.services.two_factor import (
+    consume_recovery_code,
+    disable as disable_two_factor,
+    generate_recovery_codes,
+    new_secret,
+    provisioning_uri,
+    qr_data_uri,
+    verify_code,
+)
 from app.services.password_reset import (
     TOKEN_TTL,
     InvalidResetToken,
@@ -89,8 +112,10 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> User:
     return user
 
 
-@router.post("/login", response_model=Token)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> Token:
+@router.post("/login", response_model=Token | MfaChallenge)
+def login(
+    payload: LoginRequest, db: Session = Depends(get_db)
+) -> Token | MfaChallenge:
     """Exchange email and password for an access token."""
     user = db.scalar(select(User).where(User.email == payload.email))
 
@@ -121,6 +146,11 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> Token:
     # debugging it as a password problem.
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, SUSPENDED_DETAIL)
+
+    if user.totp_enabled:
+        # A challenge, not a token. It carries scope="2fa", which get_current_user
+        # refuses -- so a correct password on its own reaches nothing.
+        return MfaChallenge(challenge=create_mfa_challenge_token(user.id))
 
     return Token(access_token=create_access_token(user.id, user.role))
 
@@ -430,3 +460,186 @@ def reset_password(
         other_sessions_ended=True,
     )
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Two-factor authentication (TOTP)
+# ---------------------------------------------------------------------------
+
+
+def _challenged_user(db: Session, challenge: str) -> User:
+    """Resolve a challenge token to the half-authenticated user behind it.
+
+    Separate from get_current_user on purpose. That function REFUSES scoped
+    tokens; this one requires the scope to be exactly "2fa". The two are mirror
+    images, and keeping them apart is what stops a challenge ever being mistaken
+    for a session.
+    """
+    try:
+        payload = decode_access_token(challenge)
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "That sign-in attempt expired. Start again."
+        ) from exc
+
+    if payload.get("scope") != "2fa":
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "That sign-in attempt expired. Start again."
+        )
+
+    user = db.get(User, int(payload["sub"]))
+    if user is None or not user.is_active or not user.totp_enabled:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "That sign-in attempt expired. Start again."
+        )
+    return user
+
+
+@router.post("/2fa/setup", response_model=TwoFactorSetup)
+def two_factor_setup(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> TwoFactorSetup:
+    """Generate a secret and show it as a QR code.
+
+    Stores the secret but leaves totp_enabled FALSE. That split is what makes an
+    abandoned setup harmless: someone who scans the QR, closes the tab, and never
+    enters a code still signs in with their password alone. Only /2fa/enable,
+    which requires a working code, flips the flag.
+
+    Called again, it issues a NEW secret and discards the old one -- a half-done
+    setup should never leave a stale secret that an old QR screenshot could still
+    satisfy.
+    """
+    if user.totp_enabled:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Two-factor authentication is already on. Turn it off first to set up "
+            "a new device.",
+        )
+
+    secret = new_secret()
+    user.totp_secret = secret
+    user.totp_last_used_step = None
+    db.commit()
+
+    uri = provisioning_uri(user, secret)
+    return TwoFactorSetup(
+        secret=secret, provisioning_uri=uri, qr_data_uri=qr_data_uri(uri)
+    )
+
+
+@router.post("/2fa/enable", response_model=TwoFactorEnabled)
+def two_factor_enable(
+    payload: TwoFactorEnableRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> TwoFactorEnabled:
+    """Confirm the app is working, then turn 2FA on and issue recovery codes.
+
+    Requiring a real code before flipping the flag is the whole reason setup and
+    enable are separate: it proves the authenticator actually holds the secret,
+    rather than taking the customer's word and locking them out.
+    """
+    if user.totp_enabled:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Two-factor authentication is already on."
+        )
+    if not user.totp_secret:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Start setup before enabling two-factor."
+        )
+    if not verify_code(user, payload.code):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "That code is not valid. Check your authenticator app and try the "
+            "current code.",
+        )
+
+    user.totp_enabled = True
+    codes = generate_recovery_codes(db, user)
+
+    # `recovery_count`, not `recovery_codes_issued` -- the audit denylist refuses
+    # any key containing "code", and a key describing codes is close enough to a
+    # key holding one that the guard is right to be blunt.
+    audit.record(
+        db,
+        actor=user,
+        action="auth.2fa_enabled",
+        target_type="user",
+        target_id=user.id,
+        recovery_count=len(codes),
+    )
+    db.commit()
+    return TwoFactorEnabled(recovery_codes=codes)
+
+
+@router.post("/2fa/disable", status_code=status.HTTP_204_NO_CONTENT)
+def two_factor_disable(
+    payload: TwoFactorDisableRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    """Turn 2FA off. Requires the password, not a code.
+
+    A code would be circular: the common reason to turn it off is that the
+    authenticator is gone. The password is the factor still available, and the
+    session already proves the browser is signed in.
+    """
+    _require_current_password(user, payload.current_password)
+
+    if user.totp_enabled or user.totp_secret:
+        disable_two_factor(db, user)
+        audit.record(
+            db,
+            actor=user,
+            action="auth.2fa_disabled",
+            target_type="user",
+            target_id=user.id,
+            initiated_by="self",
+        )
+    db.commit()
+
+
+@router.post("/2fa/verify", response_model=Token)
+def two_factor_verify(
+    payload: TwoFactorVerifyRequest,
+    db: Session = Depends(get_db),
+) -> Token:
+    """Exchange a challenge plus a code for a real access token.
+
+    Accepts either a TOTP code or a recovery code, tried in that order. One 401
+    for both failures: distinguishing them would tell someone probing which kind
+    of value they had wrong.
+    """
+    user = _challenged_user(db, payload.challenge)
+
+    if verify_code(user, payload.code):
+        db.commit()
+        return Token(access_token=create_access_token(user.id, user.role))
+
+    if consume_recovery_code(db, user, payload.code):
+        audit.record(
+            db,
+            actor=user,
+            action="auth.2fa_recovery_code_used",
+            target_type="user",
+            target_id=user.id,
+            remaining=db.scalar(
+                select(func.count())
+                .select_from(RecoveryCode)
+                .where(
+                    RecoveryCode.user_id == user.id,
+                    RecoveryCode.used_at.is_(None),
+                )
+            ),
+        )
+        db.commit()
+        return Token(access_token=create_access_token(user.id, user.role))
+
+    # Commit anyway: verify_code may have consumed a time step before failing on
+    # replay, and that must persist or the replay guard forgets.
+    db.commit()
+    raise HTTPException(
+        status.HTTP_401_UNAUTHORIZED, "That code is not valid or has already been used."
+    )

@@ -614,3 +614,244 @@ def test_new_password_byte_limit_applies_to_reset_too(client, make_user, outbox)
 
     assert client.post("/auth/reset-password", json={
         "token": raw, "new_password": "é" * 72}).status_code == 422
+
+
+def _advance_step(db, user):
+    """Pretend the last-used step is one older, so `totp.now()` is fresh again.
+
+    /2fa/enable consumes the current step -- correctly, since a code used once
+    must not work anywhere else. Tests would otherwise have to sleep through a
+    30-second window to get a usable code.
+    """
+    from app.models import User
+
+    # expire_all first: this session loaded the user before the HTTP calls ran,
+    # so its cached copy still shows totp_last_used_step = None and db.get would
+    # hand back the stale object rather than re-reading. The request handlers use
+    # their own session, so nothing here notices their writes automatically.
+    db.expire_all()
+    row = db.get(User, user.id)
+    if row.totp_last_used_step is not None:
+        row.totp_last_used_step -= 1
+        db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Phase 4.5 task 8 -- two-factor authentication.
+# ---------------------------------------------------------------------------
+
+
+def _enable_2fa(client, user, headers):
+    """Run setup + enable, returning (totp, recovery_codes)."""
+    import pyotp
+
+    setup = client.post("/auth/2fa/setup", headers=headers, json={})
+    assert setup.status_code == 200, setup.text
+    totp = pyotp.TOTP(setup.json()["secret"])
+
+    enabled = client.post("/auth/2fa/enable", headers=headers, json={"code": totp.now()})
+    assert enabled.status_code == 200, enabled.text
+    return totp, enabled.json()["recovery_codes"]
+
+
+def test_a_challenge_token_grants_access_to_nothing(client, make_user, auth_headers):
+    """The single most important property in this feature.
+
+    A challenge proves only that the password step passed. If get_current_user
+    accepted it, a correct password alone would reach every endpoint and the
+    second factor would be decorative -- a complete bypass.
+    """
+    user = make_user(email="bypass@manitou.example")
+    _enable_2fa(client, user, auth_headers(user))
+
+    login = client.post("/auth/login", json={
+        "email": user.email, "password": user.raw_password})
+    assert login.status_code == 200
+    body = login.json()
+    assert body.get("mfa_required") is True
+    assert "access_token" not in body, "login must not hand out a session"
+
+    stolen = {"Authorization": f"Bearer {body['challenge']}"}
+    for path in ("/auth/me", "/orders", "/addresses", "/cart"):
+        assert client.get(path, headers=stolen).status_code == 401, (
+            f"{path} accepted a 2FA challenge as a session token"
+        )
+
+
+def test_challenge_is_not_accepted_for_admin_routes(client, make_user, auth_headers):
+    admin = make_user(email="admin-2fa@manitou.example", role="admin")
+    _enable_2fa(client, admin, auth_headers(admin))
+
+    body = client.post("/auth/login", json={
+        "email": admin.email, "password": admin.raw_password}).json()
+    stolen = {"Authorization": f"Bearer {body['challenge']}"}
+
+    assert client.get("/admin/products", headers=stolen).status_code == 401
+
+
+def test_verify_exchanges_a_code_for_a_real_token(client, db, make_user, auth_headers):
+    user = make_user(email="verify@manitou.example")
+    totp, _ = _enable_2fa(client, user, auth_headers(user))
+
+    # enable() consumed the current step, so ask for the next one rather than
+    # sleeping 30 seconds.
+    _advance_step(db, user)
+
+    challenge = client.post("/auth/login", json={
+        "email": user.email, "password": user.raw_password}).json()["challenge"]
+    r = client.post("/auth/2fa/verify", json={"challenge": challenge, "code": totp.now()})
+
+    assert r.status_code == 200
+    token = r.json()["access_token"]
+    assert client.get("/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code == 200
+
+
+def test_a_code_cannot_be_replayed(client, db, make_user, auth_headers):
+    """pyotp will happily verify the same code all window long -- measured.
+
+    Without totp_last_used_step, a code seen over a shoulder or captured by a
+    phishing page stays usable for up to ~90 seconds.
+    """
+    user = make_user(email="replay-2fa@manitou.example")
+    totp, _ = _enable_2fa(client, user, auth_headers(user))
+    _advance_step(db, user)
+    code = totp.now()
+
+    first = client.post("/auth/login", json={
+        "email": user.email, "password": user.raw_password}).json()["challenge"]
+    assert client.post("/auth/2fa/verify", json={
+        "challenge": first, "code": code}).status_code == 200
+
+    second = client.post("/auth/login", json={
+        "email": user.email, "password": user.raw_password}).json()["challenge"]
+    assert client.post("/auth/2fa/verify", json={
+        "challenge": second, "code": code}).status_code == 401, (
+        "the same code must not work twice"
+    )
+
+
+def test_an_older_step_is_refused_even_inside_the_skew_window(
+    db, make_user
+):
+    """valid_window=1 accepts the neighbouring steps for clock skew. That must
+    not become a way to replay a code from 30 seconds ago."""
+    import time
+    import pyotp
+    from app.services.two_factor import TOTP_STEP_SECONDS, new_secret, verify_code
+
+    user = make_user(email="skew@manitou.example")
+    user.totp_secret = new_secret()
+    totp = pyotp.TOTP(user.totp_secret)
+
+    assert verify_code(user, totp.now()) is True
+    older = totp.at(time.time() - TOTP_STEP_SECONDS)
+    assert verify_code(user, older) is False, "an earlier step must not be accepted"
+
+    newer = totp.at(time.time() + TOTP_STEP_SECONDS)
+    assert verify_code(user, newer) is True, (
+        "but a later step must still work -- the guard must not reject everything"
+    )
+
+
+def test_recovery_code_works_once(client, db, make_user, auth_headers):
+    user = make_user(email="recovery@manitou.example")
+    _, codes = _enable_2fa(client, user, auth_headers(user))
+    assert len(codes) == 10
+
+    def verify(code):
+        challenge = client.post("/auth/login", json={
+            "email": user.email, "password": user.raw_password}).json()["challenge"]
+        return client.post("/auth/2fa/verify", json={
+            "challenge": challenge, "code": code}).status_code
+
+    assert verify(codes[0]) == 200
+    assert verify(codes[0]) == 401, "a recovery code is single use"
+    assert verify(codes[1]) == 200, "the others must still work"
+
+
+def test_recovery_codes_are_hashed_not_stored(client, db, make_user, auth_headers):
+    from sqlalchemy import select
+    from app.models import RecoveryCode
+
+    user = make_user(email="hashed-codes@manitou.example")
+    _, codes = _enable_2fa(client, user, auth_headers(user))
+
+    stored = [r.code_hash for r in db.scalars(
+        select(RecoveryCode).where(RecoveryCode.user_id == user.id))]
+    assert len(stored) == 10
+    for plain in codes:
+        assert plain not in stored, "a recovery code must never be stored in the clear"
+
+
+def test_setup_without_enable_leaves_the_account_alone(client, make_user, auth_headers):
+    """An abandoned setup must not lock anyone out."""
+    user = make_user(email="abandoned@manitou.example")
+    r = client.post("/auth/2fa/setup", headers=auth_headers(user), json={})
+    assert r.status_code == 200
+
+    login = client.post("/auth/login", json={
+        "email": user.email, "password": user.raw_password})
+    assert "access_token" in login.json(), (
+        "storing a secret must not turn 2FA on -- only /2fa/enable does that"
+    )
+
+
+def test_enable_rejects_a_wrong_code(client, make_user, auth_headers):
+    import pyotp
+
+    user = make_user(email="wrong-code@manitou.example")
+    headers = auth_headers(user)
+    client.post("/auth/2fa/setup", headers=headers, json={})
+
+    r = client.post("/auth/2fa/enable", headers=headers, json={"code": "000000"})
+    assert r.status_code == 400
+
+    login = client.post("/auth/login", json={
+        "email": user.email, "password": user.raw_password})
+    assert "access_token" in login.json(), "a failed enable must not turn 2FA on"
+
+
+def test_disable_requires_the_password_and_clears_everything(
+    client, db, make_user, auth_headers
+):
+    from sqlalchemy import select
+    from app.models import RecoveryCode, User
+
+    user = make_user(email="disable-2fa@manitou.example")
+    headers = auth_headers(user)
+    _enable_2fa(client, user, headers)
+
+    assert client.post("/auth/2fa/disable", headers=headers, json={
+        "current_password": "nope"}).status_code == 401
+
+    assert client.post("/auth/2fa/disable", headers=headers, json={
+        "current_password": user.raw_password}).status_code == 204
+
+    db.expire_all()
+    fresh = db.get(User, user.id)
+    assert fresh.totp_enabled is False
+    assert fresh.totp_secret is None
+    assert db.scalars(select(RecoveryCode).where(
+        RecoveryCode.user_id == user.id)).all() == []
+
+    assert "access_token" in client.post("/auth/login", json={
+        "email": user.email, "password": user.raw_password}).json()
+
+
+def test_2fa_audit_events_carry_no_secret_or_code(
+    client, db, make_user, auth_headers
+):
+    from sqlalchemy import select
+    from app.models import AuditEvent
+
+    user = make_user(email="audit-2fa@manitou.example")
+    headers = auth_headers(user)
+    totp, codes = _enable_2fa(client, user, headers)
+
+    event = db.scalar(select(AuditEvent).where(AuditEvent.action == "auth.2fa_enabled"))
+    assert event is not None
+    assert event.details == {"recovery_count": 10}
+    blob = str(event.details)
+    assert user.totp_secret is None or user.totp_secret not in blob
+    for code in codes:
+        assert code not in blob

@@ -32,6 +32,33 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
 
+#: How long a half-finished sign-in stays redeemable. Short: it exists only to
+#: carry someone from the password step to the code step.
+MFA_CHALLENGE_MINUTES = 5
+
+
+def create_mfa_challenge_token(user_id: int) -> str:
+    """A token that proves the password step passed, and nothing else.
+
+    Carries `scope: "2fa"` so it is distinguishable from an access token, and no
+    `role`, so nothing can read authority out of it even by mistake. It is
+    exchanged at /auth/2fa/verify for a real access token.
+
+    get_current_user REFUSES any token carrying a scope. That check is the whole
+    security of the design: a challenge accepted as an access token would mean a
+    password alone reaches every endpoint, which is a complete bypass of the
+    second factor.
+    """
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(user_id),
+        "scope": "2fa",
+        "iat": now,
+        "exp": now + timedelta(minutes=MFA_CHALLENGE_MINUTES),
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
 def create_access_token(user_id: int, role: str) -> str:
     """Issue a signed JWT identifying a user and carrying their role.
 

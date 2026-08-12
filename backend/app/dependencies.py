@@ -91,6 +91,17 @@ def get_current_user(
         # caller's business.
         raise _unauthorized("Invalid or expired token") from exc
 
+    # Reject any token that carries a scope, rather than blocking the one scope
+    # that exists today. An access token has none, so this fails CLOSED: a token
+    # type added later cannot quietly inherit full access by default.
+    #
+    # This is the guard that makes two-factor mean anything. The challenge issued
+    # after the password step carries scope="2fa"; if it were accepted here, a
+    # password alone would reach every endpoint and the second factor would be
+    # decorative.
+    if payload.get("scope") is not None:
+        raise _unauthorized("Invalid or expired token")
+
     user_id = payload.get("sub")
     if user_id is None:
         raise _unauthorized("Invalid or expired token")
