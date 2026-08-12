@@ -1,6 +1,5 @@
 """Authentication and account self-service."""
 
-import secrets
 from datetime import datetime, timezone
 
 import jwt
@@ -16,14 +15,7 @@ from app.dependencies import (
     get_current_user,
     get_email_sender,
 )
-from app.models import (
-    Address,
-    Cart,
-    Order,
-    PasswordResetToken,
-    RecoveryCode,
-    User,
-)
+from app.models import RecoveryCode, User
 from app.schemas import (
     AccountDelete,
     EmailChange,
@@ -51,6 +43,7 @@ from app.security import (
 )
 from app.config import settings
 from app.services import audit
+from app.services.account import anonymise, password_matches
 from app.services.two_factor import (
     consume_recovery_code,
     disable as disable_two_factor,
@@ -162,17 +155,13 @@ def read_current_user(user: User = Depends(get_current_user)) -> User:
 
 
 def _require_current_password(user: User, supplied: str) -> None:
-    """Re-authenticate before a consequential change.
-
-    A valid session proves the request came from a signed-in browser, not that
-    the person at the keyboard is the account owner. For changing an email,
-    rotating a password, or erasing an account, the password is the one factor a
-    stolen session does not already carry.
+    """Raise 401 unless the supplied password is this user's.
 
     401 rather than 403: this is "prove who you are again", not "you are known
-    and not allowed".
+    and not allowed". The comparison itself lives in services/account.py so the
+    admin router can use it too.
     """
-    if not verify_password(supplied, user.password_hash):
+    if not password_matches(user, supplied):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Current password is incorrect",
@@ -319,40 +308,11 @@ def delete_account(
     """
     _require_current_password(user, payload.current_password)
 
-    used_address_ids = set(
-        db.scalars(
-            select(Order.shipping_address_id).where(Order.user_id == user.id)
-        ).all()
-    ) | set(
-        db.scalars(
-            select(Order.billing_address_id).where(Order.user_id == user.id)
-        ).all()
-    )
-    for address in db.scalars(select(Address).where(Address.user_id == user.id)):
-        if address.id not in used_address_ids:
-            db.delete(address)
-
-    for cart in db.scalars(select(Cart).where(Cart.user_id == user.id)):
-        for item in list(cart.items):
-            db.delete(item)
-        db.delete(cart)
-
-    for row in db.scalars(
-        select(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
-    ):
-        db.delete(row)
-    for code in db.scalars(select(RecoveryCode).where(RecoveryCode.user_id == user.id)):
-        db.delete(code)
-
-    user.email = f"deleted-{user.id}@invalid"  # .invalid is RFC 2606 reserved
-    user.full_name = "Deleted account"
-    user.phone = None
-    user.is_active = False
-    # A fresh random secret rather than keeping the old hash: the previous
-    # password must stop working, and nothing here should be reversible.
-    user.password_hash = hash_password(secrets.token_urlsafe(32))
-    user.totp_secret = None
-    user.totp_enabled = False
+    # One implementation, shared with POST /admin/users/{id}/anonymise. A customer
+    # erasing themselves and an admin acting on their behalf must scrub
+    # identically; two copies would drift, and you would find out from a support
+    # ticket saying "you told me this was deleted".
+    anonymise(db, user)
 
     # AFTER the scrub, deliberately. audit.record snapshots actor.email into an
     # append-only table, so recording first would write the real address into the

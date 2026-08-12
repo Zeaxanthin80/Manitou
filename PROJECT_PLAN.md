@@ -636,11 +636,16 @@ is safe only when every action taken inside it is attributable, which is impossi
    `POST /auth/2fa/enable` (verify a code, then issue recovery codes), `POST /auth/2fa/disable`,
    and the login challenge — with 2FA on, `/auth/login` returns a short-lived challenge instead of
    an access token, redeemed by `POST /auth/2fa/verify`.
-9. **[You + Claude Code]** Admin customer API: `GET /admin/customers` (search + pagination),
-   `GET /admin/customers/{id}` (orders, addresses, lifetime value),
-   `PATCH /admin/customers/{id}` (suspend/reactivate, change role),
-   `POST /admin/customers/{id}/password-reset`, `POST /admin/customers/{id}/disable-2fa`, and
-   `POST /admin/customers/{id}/anonymise`.
+9. **[You + Claude Code]** Admin user API: `GET /admin/users` (search + pagination, filter by role
+   and status), `GET /admin/users/{id}` (orders, addresses, lifetime value),
+   `PATCH /admin/users/{id}` (suspend/reactivate, change role),
+   `POST /admin/users/{id}/password-reset`, `POST /admin/users/{id}/disable-2fa`, and
+   `POST /admin/users/{id}/anonymise` — which requires the acting admin's own password, being the
+   one irreversible action of the six.
+
+   **Users, not customers**: the list deliberately includes admins. Filtered to `role = 'customer'`
+   it could never show who has access, never demote anyone, and would make the guards below
+   unreachable except by hand-crafting an API call.
 
    The disable-2fa endpoint is the escape hatch for a customer who has lost both their
    authenticator and their recovery codes — without it that account is unrecoverable, which is a
@@ -661,10 +666,12 @@ is safe only when every action taken inside it is attributable, which is impossi
 10. **[You + Claude Code]** Web — customer: expand `/account` with editable profile, change password,
    two-factor setup and account deletion. Add `/forgot-password` and `/reset-password`, plus the
    second step in the login flow when 2FA is enabled.
-11. **[You + Claude Code]** Web — vendor: `/admin/customers` list and detail with suspend,
-    reactivate, send-reset and anonymise actions, reusing the Phase 3 primitives. The customer
-    detail page shows that customer's audit history, and `/admin/audit` shows the whole log,
-    filterable by action — read-only, with no delete control anywhere in the UI.
+11. **[You + Claude Code]** Web — vendor: `/admin/users` list and detail with suspend, reactivate,
+    send-reset, disable-2FA and anonymise actions, reusing the Phase 3 primitives. The detail page
+    renders only the actions `allowed_actions` reports, so a button can never offer something the
+    API will refuse — the same contract as the order dashboard's `allowed_transitions`. It also
+    shows that user's audit history, and `/admin/audit` shows the whole log, filterable by action —
+    read-only, with no delete control anywhere in the UI.
 12. **[You]** Walk the whole thing end to end: request a reset and complete it using the link
     printed to the console; enable 2FA with a real authenticator app and sign in with a code; spend
     a recovery code; suspend an account and confirm the already-open session dies on its next

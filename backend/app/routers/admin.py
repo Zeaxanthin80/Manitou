@@ -17,6 +17,8 @@ from sqlalchemy.orm import Session, selectinload
 from app.db import get_db
 from app.dependencies import require_admin
 from app.models import (
+    Address,
+    AuditEvent,
     Category,
     Inventory,
     Order,
@@ -39,16 +41,30 @@ from app.schemas.admin import (
     AdminProductCreate,
     AdminProductPage,
     AdminProductRead,
+    AdminAnonymiseRequest,
+    AdminAuditEvent,
+    AdminAuditPage,
     AdminProductUpdate,
     AdminStatusCount,
     AdminSummary,
     AdminTopProduct,
     AdminVariantCreate,
     AdminVariantRead,
+    AdminUserDetail,
+    AdminUserPage,
+    AdminUserSummary,
+    AdminUserUpdate,
     AdminVariantUpdate,
 )
 from app.schemas.catalog import MAX_PAGE_SIZE
+from app.config import settings
+from app.dependencies import get_email_sender
 from app.services import audit
+from app.services.account import anonymise, count_admins, password_matches
+from app.services.email import EmailMessage, EmailSender
+from app.services.password_reset import TOKEN_TTL, request_reset
+from app.services.two_factor import disable as disable_two_factor
+from app.store import store_config
 
 router = APIRouter(
     prefix="/admin",
@@ -778,4 +794,365 @@ def store_summary(db: Session = Depends(get_db)) -> AdminSummary:
         by_status=by_status,
         top_products=top_products,
         low_stock=low_stock,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Users
+#
+# The two guards below exist because the store can lock itself out of its own
+# portal in one click. Admins are created by seed.py; there is no CLI to make
+# another, so a demoted or suspended last admin means editing the database by
+# hand to get back in.
+# ---------------------------------------------------------------------------
+
+
+def _lockout_check(db: Session, actor: User, target: User, *, action: str) -> None:
+    """Refuse anything that would remove the last way into the portal.
+
+    409, not 403: the request is well formed and the caller is permitted in
+    principle -- it is the store's current state that makes it impossible. Same
+    reasoning as the order-status transitions.
+    """
+    if actor.id == target.id:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"You cannot {action} your own account. Ask another admin.",
+        )
+    if target.role == "admin" and target.is_active:
+        if count_admins(db, exclude_user_id=target.id) == 0:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"Cannot {action} the last active admin -- the store would have no "
+                f"way back into the portal. Promote another admin first.",
+            )
+
+
+def _allowed_actions(db: Session, actor: User, target: User) -> list[str]:
+    """Which destructive actions are legal against this user right now.
+
+    Computed from the same conditions the endpoints enforce, and sent to the
+    portal so it renders only buttons that will work -- the same contract as
+    AdminOrderDetail.allowed_transitions.
+    """
+    actions: list[str] = ["password_reset"]
+    if target.totp_enabled:
+        actions.append("disable_2fa")
+
+    locked = actor.id == target.id or (
+        target.role == "admin"
+        and target.is_active
+        and count_admins(db, exclude_user_id=target.id) == 0
+    )
+    if not locked:
+        actions += ["anonymise"]
+        actions.append("reactivate" if not target.is_active else "suspend")
+        actions.append("demote" if target.role == "admin" else "promote")
+    return actions
+
+
+def _user_stats(db: Session, user_ids: list[int]) -> dict[int, tuple[int, Decimal]]:
+    """Order count and lifetime value per user, in one query rather than N.
+
+    Lifetime value uses EARNING_STATUSES -- the same paid/shipped/delivered tuple
+    the summary endpoint uses. Importing it rather than restating the list is what
+    stops this page and the dashboard disagreeing about what a customer is worth.
+    """
+    if not user_ids:
+        return {}
+    rows = db.execute(
+        select(
+            Order.user_id,
+            func.count().label("n"),
+            func.coalesce(func.sum(Order.total), 0).label("value"),
+        )
+        .where(Order.user_id.in_(user_ids), Order.status.in_(EARNING_STATUSES))
+        .group_by(Order.user_id)
+    ).all()
+    return {r.user_id: (r.n, r.value) for r in rows}
+
+
+def _to_user_summary(user: User, stats: tuple[int, Decimal]) -> AdminUserSummary:
+    count, value = stats
+    return AdminUserSummary(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        is_active=user.is_active,
+        totp_enabled=user.totp_enabled,
+        created_at=user.created_at,
+        order_count=count,
+        lifetime_value=value,
+    )
+
+
+def _get_user(db: Session, user_id: int) -> User:
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+    return user
+
+
+@router.get("/users", response_model=AdminUserPage)
+def list_users(
+    db: Session = Depends(get_db),
+    q: str | None = Query(None, description="Search email and name"),
+    role: str | None = Query(None),
+    active: bool | None = Query(None),
+    limit: int = Query(20, ge=1, le=MAX_PAGE_SIZE),
+    offset: int = Query(0, ge=0),
+) -> AdminUserPage:
+    """Every account, admins included.
+
+    Deliberately not filtered to customers: role management is part of this
+    screen, and a list that hides admins cannot show who has access, cannot
+    demote anyone, and makes the last-admin guard unreachable.
+    """
+    conditions = []
+    if q:
+        term = f"%{q}%"
+        conditions.append(User.email.ilike(term) | User.full_name.ilike(term))
+    if role:
+        conditions.append(User.role == role)
+    if active is not None:
+        conditions.append(User.is_active.is_(active))
+
+    total = db.scalar(select(func.count()).select_from(User).where(*conditions))
+    users = db.scalars(
+        select(User)
+        .where(*conditions)
+        .order_by(User.created_at.desc(), User.id.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+
+    stats = _user_stats(db, [u.id for u in users])
+    return AdminUserPage(
+        items=[_to_user_summary(u, stats.get(u.id, (0, Decimal("0.00")))) for u in users],
+        total=total or 0,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/users/{user_id}", response_model=AdminUserDetail)
+def get_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_admin),
+) -> AdminUserDetail:
+    target = _get_user(db, user_id)
+    stats = _user_stats(db, [target.id]).get(target.id, (0, Decimal("0.00")))
+
+    orders = db.scalars(
+        select(Order)
+        .where(Order.user_id == target.id)
+        .options(selectinload(Order.items))
+        .order_by(Order.created_at.desc())
+        .limit(5)
+    ).all()
+    addresses = db.scalars(
+        select(Address).where(Address.user_id == target.id).order_by(Address.id)
+    ).all()
+
+    base = _to_user_summary(target, stats)
+    return AdminUserDetail(
+        **base.model_dump(),
+        phone=target.phone,
+        password_changed_at=target.password_changed_at,
+        addresses=addresses,
+        recent_orders=[
+            AdminOrderSummary(
+                id=o.id, status=o.status, subtotal=o.subtotal, tax=o.tax,
+                shipping_cost=o.shipping_cost, total=o.total,
+                created_at=o.created_at, user_id=o.user_id,
+                user_email=target.email,
+                item_count=sum(i.quantity for i in o.items),
+            )
+            for o in orders
+        ],
+        allowed_actions=_allowed_actions(db, actor, target),
+    )
+
+
+@router.patch("/users/{user_id}", response_model=AdminUserDetail)
+def update_user(
+    user_id: int,
+    payload: AdminUserUpdate,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_admin),
+) -> AdminUserDetail:
+    target = _get_user(db, user_id)
+    changes = payload.model_dump(exclude_unset=True)
+
+    if changes.get("is_active") is False:
+        _lockout_check(db, actor, target, action="suspend")
+    if changes.get("role") == "customer" and target.role == "admin":
+        _lockout_check(db, actor, target, action="demote")
+
+    if "is_active" in changes and changes["is_active"] != target.is_active:
+        target.is_active = changes["is_active"]
+        audit.record(
+            db, actor=actor,
+            action="customer.reactivated" if target.is_active else "customer.suspended",
+            target_type="user", target_id=target.id, subject=target.email,
+        )
+    if "role" in changes and changes["role"] != target.role:
+        previous, target.role = target.role, changes["role"]
+        audit.record(
+            db, actor=actor, action="customer.role_changed",
+            target_type="user", target_id=target.id, subject=target.email,
+            **audit.changes({"role": previous}, {"role": target.role}, "role"),
+        )
+    db.commit()
+    return get_user(user_id, db, actor)
+
+
+@router.post("/users/{user_id}/password-reset", status_code=status.HTTP_202_ACCEPTED)
+def send_password_reset(
+    user_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_admin),
+    sender: EmailSender = Depends(get_email_sender),
+) -> dict:
+    """Send the customer a real reset link.
+
+    The admin never sees or sets a password -- they trigger the same flow the
+    customer would, so the link goes to the customer's inbox and nothing about
+    the credential passes through the portal.
+    """
+    target = _get_user(db, user_id)
+    issued = request_reset(db, target.email)
+    if issued is None:
+        # Suspended, or one was sent in the last minute. Say so plainly: unlike
+        # the public endpoint, there is nothing to hide from an authenticated
+        # admin, and silence here would look like a bug.
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "No link sent -- the account is suspended, or one was sent in the "
+            "last minute.",
+        )
+
+    _, raw_token = issued
+    audit.record(
+        db, actor=actor, action="customer.password_reset_sent",
+        target_type="user", target_id=target.id, subject=target.email,
+    )
+    db.commit()
+
+    link = f"{settings.app_base_url}/reset-password?token={raw_token}"
+    sender.send(EmailMessage(
+        to=target.email,
+        subject=f"Reset your {store_config.store.name} password",
+        body=(
+            f"A password reset was started for your {store_config.store.name} "
+            f"account.\n\n{link}\n\nThis link works once and expires in "
+            f"{int(TOKEN_TTL.total_seconds() // 60)} minutes.\n\n"
+            f"If you did not expect this, contact "
+            f"{store_config.store.support_email}."
+        ),
+    ))
+    return {"detail": f"Reset link sent to {target.email}."}
+
+
+@router.post("/users/{user_id}/disable-2fa", status_code=status.HTTP_204_NO_CONTENT)
+def admin_disable_two_factor(
+    user_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_admin),
+) -> None:
+    """The escape hatch for a customer who lost their phone AND their codes.
+
+    Without it that account is unrecoverable -- a worse lockout than the password
+    one this phase exists to fix. It is also, unavoidably, an admin stripping
+    someone's second factor, which is exactly why it is audited with the acting
+    admin named.
+    """
+    target = _get_user(db, user_id)
+    if not target.totp_enabled and not target.totp_secret:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Two-factor is not set up on that account."
+        )
+
+    disable_two_factor(db, target)
+    audit.record(
+        db, actor=actor, action="customer.2fa_disabled",
+        target_type="user", target_id=target.id, subject=target.email,
+    )
+    db.commit()
+
+
+@router.post("/users/{user_id}/anonymise", status_code=status.HTTP_204_NO_CONTENT)
+def anonymise_user(
+    user_id: int,
+    payload: AdminAnonymiseRequest,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_admin),
+) -> None:
+    """Erase a customer's identity on their behalf. Irreversible.
+
+    Requires the ACTING ADMIN's password, not the target's -- the admin is the
+    one being asked to confirm, and demanding the customer's would be impossible
+    anyway.
+
+    Runs the same lockout checks as suspension, because anonymise sets
+    is_active = False and would otherwise be a way around them.
+    """
+    if not password_matches(actor, payload.current_password):
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "Your password is incorrect."
+        )
+
+    target = _get_user(db, user_id)
+    _lockout_check(db, actor, target, action="anonymise")
+
+    subject = target.email
+    anonymise(db, target)
+    # Recorded as the ADMIN, with their real address -- the mirror of the
+    # self-service case in auth.py, where the event is written after the scrub so
+    # the customer's own address never lands in an append-only table.
+    audit.record(
+        db, actor=actor, action="customer.anonymised",
+        target_type="user", target_id=target.id,
+        subject=subject, initiated_by="admin",
+    )
+    db.commit()
+
+
+@router.get("/audit", response_model=AdminAuditPage)
+def list_audit_events(
+    db: Session = Depends(get_db),
+    action: str | None = Query(None),
+    target_type: str | None = Query(None),
+    target_id: int | None = Query(None),
+    limit: int = Query(50, ge=1, le=MAX_PAGE_SIZE),
+    offset: int = Query(0, ge=0),
+) -> AdminAuditPage:
+    """Read the audit trail. There is no endpoint that writes, edits or deletes it.
+
+    The table is append-only in the database via a trigger; giving the API any
+    way to touch it would make that guarantee decorative.
+
+    The two filters match the two indexes created for them: ix_audit_events_action
+    and ix_audit_events_target.
+    """
+    conditions = []
+    if action:
+        conditions.append(AuditEvent.action == action)
+    if target_type:
+        conditions.append(AuditEvent.target_type == target_type)
+    if target_id is not None:
+        conditions.append(AuditEvent.target_id == target_id)
+
+    total = db.scalar(select(func.count()).select_from(AuditEvent).where(*conditions))
+    events = db.scalars(
+        select(AuditEvent)
+        .where(*conditions)
+        .order_by(AuditEvent.created_at.desc(), AuditEvent.id.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    return AdminAuditPage(
+        items=list(events), total=total or 0, limit=limit, offset=offset
     )

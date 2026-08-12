@@ -253,3 +253,92 @@ class AdminSummary(BaseModel):
     by_status: list[AdminStatusCount]
     top_products: list[AdminTopProduct]
     low_stock: list[AdminLowStock]
+
+
+class AdminUserSummary(BaseModel):
+    """One row of the user list."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: str
+    full_name: str
+    role: str
+    is_active: bool
+    totp_enabled: bool
+    created_at: datetime
+    order_count: int
+    lifetime_value: Decimal
+
+
+class AdminUserPage(BaseModel):
+    items: list[AdminUserSummary]
+    total: int
+    limit: int
+    offset: int
+
+
+class AdminUserAddress(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    line1: str
+    line2: str | None
+    city: str
+    state: str | None
+    postal_code: str
+    country: str
+    type: str
+    is_default: bool
+
+
+class AdminUserDetail(AdminUserSummary):
+    phone: str | None
+    password_changed_at: datetime | None
+    addresses: list[AdminUserAddress]
+    recent_orders: list[AdminOrderSummary]
+    #: Which of the destructive actions are legal against THIS user right now,
+    #: computed server-side from the same guards the endpoints enforce. Sent for
+    #: the same reason AdminOrderDetail sends allowed_transitions: the portal
+    #: renders exactly what the API permits, so a button can never offer
+    #: something that 409s.
+    allowed_actions: list[str]
+
+
+class AdminUserUpdate(BaseModel):
+    """Suspend, reactivate, or change role. Both optional, both consequential."""
+
+    is_active: bool | None = None
+    role: Literal["customer", "admin"] | None = None
+
+
+class AdminAnonymiseRequest(BaseModel):
+    """The one irreversible action here asks for the admin's own password.
+
+    Every other action on this screen can be undone; this one destroys an
+    identity. A stolen admin session should not be enough on its own -- the same
+    reasoning that makes DELETE /auth/me require the customer's password.
+    """
+
+    current_password: str
+
+
+class AdminAuditEvent(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    actor_user_id: int | None
+    actor_email: str
+    action: str
+    target_type: str
+    target_id: int | None
+    details: dict
+    ip_address: str | None
+    created_at: datetime
+
+
+class AdminAuditPage(BaseModel):
+    items: list[AdminAuditEvent]
+    total: int
+    limit: int
+    offset: int
