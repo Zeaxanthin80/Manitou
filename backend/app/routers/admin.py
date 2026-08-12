@@ -48,6 +48,7 @@ from app.schemas.admin import (
     AdminVariantUpdate,
 )
 from app.schemas.catalog import MAX_PAGE_SIZE
+from app.services import audit
 
 router = APIRouter(
     prefix="/admin",
@@ -166,6 +167,10 @@ def list_all_products(
 def create_product(
     payload: AdminProductCreate,
     db: Session = Depends(get_db),
+    # require_admin already gates this router; naming it here too is how the
+    # function gets the actor. FastAPI caches dependencies per request, so the
+    # check does not run twice.
+    user: User = Depends(require_admin),
 ) -> AdminProductRead:
     if db.get(Category, payload.category_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Category not found")
@@ -197,6 +202,18 @@ def create_product(
             status.HTTP_409_CONFLICT, "Duplicate product slug or variant SKU"
         )
 
+    audit.record(
+        db,
+        actor=user,
+        action="product.created",
+        target_type="product",
+        target_id=product.id,
+        name=product.name,
+        slug=product.slug,
+        base_price=str(product.base_price),
+        variants=len(payload.variants),
+    )
+    db.commit()
     return _to_product(_get_product(db, product.id))
 
 
@@ -205,8 +222,12 @@ def update_product(
     product_id: int,
     payload: AdminProductUpdate,
     db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
 ) -> AdminProductRead:
     product = _get_product(db, product_id)
+    AUDITED = ("name", "slug", "category_id", "base_price", "unit_of_measure", "is_active")
+    # Captured before the setattr loop below -- afterwards the old values are gone.
+    before = {f: getattr(product, f) for f in AUDITED}
 
     # exclude_unset is load-bearing: it distinguishes a field that was omitted
     # from one explicitly sent as null. Without it, every unsent field would be
@@ -224,11 +245,31 @@ def update_product(
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "Duplicate product slug")
 
+    after = {f: getattr(product, f) for f in AUDITED}
+    diff = audit.changes(before, after, *AUDITED)
+    if diff:
+        # A visibility flip gets its own verb rather than hiding inside a generic
+        # "updated" -- "when did this stop being visible?" is a question someone
+        # will actually search for.
+        if before["is_active"] != after["is_active"]:
+            action = "product.reactivated" if after["is_active"] else "product.deactivated"
+        else:
+            action = "product.updated"
+        audit.record(
+            db, actor=user, action=action, target_type="product",
+            target_id=product_id, **diff,
+        )
+        db.commit()
+
     return _to_product(_get_product(db, product_id))
 
 
 @router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_product(product_id: int, db: Session = Depends(get_db)) -> None:
+def delete_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+) -> None:
     """Soft delete: hide it, don't remove it.
 
     A real DELETE is impossible once the product has been ordered -- every FK
@@ -238,7 +279,13 @@ def delete_product(product_id: int, db: Session = Depends(get_db)) -> None:
     reversible via PATCH.
     """
     product = _get_product(db, product_id)
-    product.is_active = False
+    if product.is_active:
+        product.is_active = False
+        audit.record(
+            db, actor=user, action="product.deactivated", target_type="product",
+            target_id=product_id, name=product.name,
+            **audit.changes({"is_active": True}, {"is_active": False}, "is_active"),
+        )
     db.commit()
 
 
@@ -420,6 +467,7 @@ def update_inventory(
     variant_id: int,
     payload: AdminInventoryUpdate,
     db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
 ) -> AdminVariantRead:
     """Set absolute stock levels.
 
@@ -442,8 +490,20 @@ def update_inventory(
         inventory = Inventory(variant_id=variant_id)
         db.add(inventory)
 
+    FIELDS = ("quantity_available", "reorder_level")
+    before = {f: getattr(inventory, f, 0) for f in FIELDS}
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(inventory, field, value)
+    after = {f: getattr(inventory, f, 0) for f in FIELDS}
+
+    diff = audit.changes(before, after, *FIELDS)
+    if diff:
+        # Stock is money-adjacent: "who set this to zero, and when?" is a real
+        # question, and nothing else in the system would answer it.
+        audit.record(
+            db, actor=user, action="inventory.adjusted", target_type="variant",
+            target_id=variant_id, sku=variant.sku, **diff,
+        )
     db.commit()
 
     return AdminVariantRead(
@@ -559,6 +619,7 @@ def update_order_status(
     order_id: int,
     payload: AdminOrderStatusUpdate,
     db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
 ) -> AdminOrderDetail:
     """Advance an order through the fulfilment workflow.
 
@@ -586,7 +647,13 @@ def update_order_status(
         )
         raise HTTPException(status.HTTP_409_CONFLICT, detail)
 
+    previous = order.status
     order.status = payload.status
+    audit.record(
+        db, actor=user, action="order.status_changed", target_type="order",
+        target_id=order_id, customer=order.user.email,
+        **audit.changes({"status": previous}, {"status": payload.status}, "status"),
+    )
     db.commit()
     return _to_order_detail(_admin_order(db, order_id))
 
