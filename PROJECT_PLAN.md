@@ -639,6 +639,12 @@ is safe only when every action taken inside it is attributable, which is impossi
    out of its own portal with no way back in. Every one of these writes an audit event, as do the
    credential changes in tasks 6–8 — a customer disputing "someone changed my password" needs that
    record as much as the vendor does.
+
+   Also **reading** the trail: `GET /admin/audit` (paginated, filterable by `action` and by
+   `target_type` + `target_id`, newest first — the two indexes task 1 created exist for exactly
+   these two queries). There is deliberately no write, update or delete endpoint for
+   `audit_events` at any point in this project: the table is append-only in the database, and
+   giving the API a way to touch it would make that guarantee decorative.
 10. **[You + Claude Code]** Web — customer: expand `/account` with editable profile, change password,
    two-factor setup and account deletion. Add `/forgot-password` and `/reset-password`, plus the
    second step in the login flow when 2FA is enabled.
