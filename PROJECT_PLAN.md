@@ -193,8 +193,11 @@ Manitou/
 │   ├── requirements.txt   # runtime only — this is what the Docker image installs
 │   └── requirements-dev.txt  # -r requirements.txt, plus pytest and the test client
 ├── web/                   # Next.js storefront + vendor portal
-│   ├── app/               # customer pages
-│   ├── app/admin/         # vendor portal (role-gated)
+│   ├── app/layout.tsx     # document shell only — html/body/fonts
+│   ├── app/(store)/       # customer pages. Route group: parentheses keep it out of the
+│   │                      #   URL, so /cart is still /cart. Carries SiteHeader + SiteFooter
+│   ├── app/admin/         # vendor portal (role-gated). Its own nav, deliberately no footer
+│   ├── components/        # shared UI — ui/ holds the primitives Phase 4 reuses
 │   └── ...
 ├── mobile-android/        # Kotlin app (Phase 7)
 ├── mobile-ios/            # Swift app (Phase 7)
@@ -293,6 +296,10 @@ the source of the values differs.
 repo — including future-you on a new machine — has no way to know the app needs eight specific
 variables. They'd start the app, get a cryptic connection error, and have to reverse-engineer the
 requirements from the source code.
+
+Phase 4.5 adds two more: `EMAIL_SENDER` (which delivery implementation to use — `console` locally,
+`ses` in Phase 6) and `APP_BASE_URL` (the origin password-reset links point at, which differs
+between a laptop and production and therefore belongs here rather than in `store-config.json`).
 
 `.env.example` solves exactly that. It's the committed, safe-to-read **contract** stating what
 configuration the application requires. It carries the variable _names_ and harmless placeholders,
@@ -419,7 +426,10 @@ conventions, and an app that ignores them feels wrong and dated:
 
 - iOS expects bottom tab bars, swipe-back navigation, and system share sheets.
 - Android expects Material navigation patterns and hardware back-button behavior.
-- The web expects a persistent top nav, hover states, and browser-native controls.
+- The web expects a persistent top nav, a site footer, hover states, and browser-native controls.
+  The footer is where shoppers look for contact details, shipping and returns before they buy;
+  omitting it reads as an unfinished store. Mobile apps get neither — they use native navigation
+  and a Settings screen instead, which is the "identical brand, native feel" rule below.
 
 So the target is: **identical brand, native feel.**
 
@@ -450,6 +460,8 @@ and how to fix it. Empty states invite an action rather than just reporting empt
 - Sufficient color contrast for body text.
 - Reduced-motion preferences respected.
 - Images carry meaningful alt text (`product_images.alt_text` exists in the schema for this reason).
+- Store-specific copy — name, tagline, support address — comes from `store-config.json`, never a
+  literal in a component. The footer is where this rule is easiest to break and hardest to notice.
 
 ### When the design gets defined
 
@@ -565,6 +577,96 @@ primitives and `design-tokens.json`, and calls the same API with the same JWT au
    more table-heavy than the storefront, but must stay visibly the same product — if a new
    component is needed, build it from the tokens and add it to the shared set.
 
+### Phase 4.5 — Account Management
+
+**Why this phase exists, and why it is numbered 4.5.** It was not in the original plan. Building
+Phase 4 made the gap plain: the vendor portal manages products, stock and orders but cannot see a
+single customer, and a customer who forgets their password is locked out permanently — there is no
+recovery path at all. Neither is acceptable before taking real money in Phase 5. It is numbered 4.5
+rather than renumbering so every existing reference to Phases 5–8 stays correct.
+
+**One constraint shapes the whole phase.** `orders.user_id` is `NOT NULL` with `NO ACTION`, so a
+customer who has ever ordered **cannot be deleted**. Erasure is therefore *anonymisation in place*:
+personal fields are scrubbed and the order rows keep their foreign key. That is also the normal
+answer to a legal erasure request, since tax rules require retaining invoices.
+
+**One existing decision makes suspension cheap.** `get_current_user` already re-reads the user row
+on every request (Section 8), so setting `is_active = false` takes effect on that user's very next
+request. No token-revocation machinery is needed.
+
+**And the phase needs an audit trail, because of what it adds.** Nothing in the database currently
+records who did what — thirteen tables, not one of them an event log. That was tolerable while the
+admin could only edit products. This phase adds suspending a person, changing a role, and
+irreversibly scrubbing someone's identity, and "who did this, and when?" is the first question asked
+after any of them goes wrong. The audit trail is therefore built *before* the actions it records,
+not retrofitted afterwards. It is also the precondition for ever adding impersonation: that feature
+is safe only when every action taken inside it is attributable, which is impossible without this.
+
+1. **[You + Claude Code]** Migration: add `users.is_active`, `users.password_changed_at`,
+   `users.totp_secret`, `users.totp_enabled`; create `password_reset_tokens`,
+   `user_recovery_codes` and `audit_events` (Section 6.3). `audit_events` gets a trigger rejecting
+   `UPDATE` and `DELETE`, so append-only is a database guarantee rather than a habit.
+2. **[You]** Install `pyotp` and `qrcode[pil]` into the venv and add both to `requirements.txt`.
+   They are runtime dependencies, not dev tooling.
+3. **[You + Claude Code]** Audit trail service (`app/services/audit.py`) — built third, before any
+   endpoint that needs it, so every task below records as it is written instead of being
+   retrofitted. `record(db, actor, action, target, metadata)` enqueues the row on the **caller's
+   session**, so the event commits in the same transaction as the action it describes: no silent
+   actions, and no records of things that never happened. Then retrofit the Phase 4 writes that
+   already exist — order status changes, product activate/deactivate.
+4. **[You + Claude Code]** Email delivery seam: an `EmailSender` protocol in
+   `app/services/email.py` with a console implementation that prints the link during development.
+   Add `EMAIL_SENDER` and `APP_BASE_URL` to `.env` and `.env.example`. Phase 6 adds the SES
+   implementation and nothing else changes — that is the point of the seam.
+5. **[You + Claude Code]** Enforce suspension and password invalidation: reject `is_active = false`
+   at login and in `get_current_user`, and reject any token issued before `password_changed_at`.
+6. **[You + Claude Code]** Customer self-service API: `PATCH /auth/me` (name, phone),
+   `POST /auth/change-email`, `POST /auth/change-password` (requires the current password), and
+   `DELETE /auth/me` (anonymises, per the constraint above).
+7. **[You + Claude Code]** Password reset API: `POST /auth/forgot-password` and
+   `POST /auth/reset-password`. Tokens are stored **hashed**, single-use and short-lived, and the
+   request endpoint answers identically whether or not the address exists (Section 8).
+8. **[You + Claude Code]** Two-factor API (TOTP): `POST /auth/2fa/setup` (secret + QR),
+   `POST /auth/2fa/enable` (verify a code, then issue recovery codes), `POST /auth/2fa/disable`,
+   and the login challenge — with 2FA on, `/auth/login` returns a short-lived challenge instead of
+   an access token, redeemed by `POST /auth/2fa/verify`.
+9. **[You + Claude Code]** Admin customer API: `GET /admin/customers` (search + pagination),
+   `GET /admin/customers/{id}` (orders, addresses, lifetime value),
+   `PATCH /admin/customers/{id}` (suspend/reactivate, change role),
+   `POST /admin/customers/{id}/password-reset`, and `POST /admin/customers/{id}/anonymise`.
+   Two guards, both enforced server-side: an admin cannot suspend or demote **themselves**, and the
+   **last remaining admin** cannot be suspended or demoted. Without them the store can be locked
+   out of its own portal with no way back in. Every one of these writes an audit event, as do the
+   credential changes in tasks 6–8 — a customer disputing "someone changed my password" needs that
+   record as much as the vendor does.
+10. **[You + Claude Code]** Web — customer: expand `/account` with editable profile, change password,
+   two-factor setup and account deletion. Add `/forgot-password` and `/reset-password`, plus the
+   second step in the login flow when 2FA is enabled.
+11. **[You + Claude Code]** Web — vendor: `/admin/customers` list and detail with suspend,
+    reactivate, send-reset and anonymise actions, reusing the Phase 3 primitives. The customer
+    detail page shows that customer's audit history, and `/admin/audit` shows the whole log,
+    filterable by action — read-only, with no delete control anywhere in the UI.
+12. **[You]** Walk the whole thing end to end: request a reset and complete it using the link
+    printed to the console; enable 2FA with a real authenticator app and sign in with a code; spend
+    a recovery code; suspend an account and confirm the already-open session dies on its next
+    request. Then check the audit log records every one of those actions with the right actor, and
+    confirm the append-only trigger actually refuses an `UPDATE` and a `DELETE` from `psql`.
+
+**Deliberately not in this phase:**
+
+- **Email verification on signup.** Real, but closes none of the gaps above.
+- **Admin impersonation** ("sign in as this customer"). Its safety depends entirely on the audit
+  trail this phase introduces, so it becomes *possible* to build responsibly after 4.5 — not
+  before. It also needs a visible banner, a time limit, and a decision about whether an impersonated
+  session may place orders or change credentials. That is its own discussion.
+- **Customer data portability** (a customer downloading their own data). A compliance feature,
+  scoped to one person, distinct from the vendor-side analytics below.
+- **Analytics export** (CSV of orders/customers for the vendor). Separate from portability despite
+  both being called "export": different consumer, different scope, no legal driver. Section 12
+  already defers sales reporting to post-v1, and the database is directly queryable in the
+  meantime — `COPY (SELECT ...) TO STDOUT WITH CSV HEADER` needs no code. Worth its own small phase
+  if the vendor ever needs it without SQL.
+
 ### Phase 5 — Payments (Stripe)
 
 1. **[You]** Create a **Stripe** account. Copy your **test-mode** API keys. Store them as
@@ -671,7 +773,47 @@ reference to another table's PK).
 | full_name | text | |
 | phone | text | nullable |
 | role | text | `'customer'` or `'admin'` (the store owner is admin) |
+| is_active | boolean | default true. False blocks sign-in and every authenticated request (Phase 4.5) |
+| password_changed_at | timestamptz | nullable. Tokens issued before this are rejected — the nearest thing to "sign out everywhere" without refresh tokens |
+| totp_secret | text | nullable. Base32 TOTP seed; present only once 2FA setup has begun |
+| totp_enabled | boolean | default false. Separate from the secret so a half-finished setup cannot lock anyone out |
 | created_at | timestamptz | default now() |
+
+**password_reset_tokens** (Phase 4.5)
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint | **PK** |
+| user_id | bigint | **FK** → users.id |
+| token_hash | text | Only the hash is stored. The raw token exists solely in the emailed link, so a leaked database cannot be used to reset anyone's password |
+| expires_at | timestamptz | Short — 30 minutes |
+| used_at | timestamptz | nullable; single use, so a forwarded or logged link cannot be replayed |
+| created_at | timestamptz | default now() |
+
+**user_recovery_codes** (Phase 4.5)
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint | **PK** |
+| user_id | bigint | **FK** → users.id |
+| code_hash | text | Hashed with bcrypt, exactly like a password — a recovery code *is* a credential |
+| used_at | timestamptz | nullable; each code works once |
+
+**audit_events** (Phase 4.5) — append-only
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint | **PK** |
+| actor_user_id | bigint | **FK** → users.id, nullable. Null for unauthenticated events such as a password reset completed from an emailed link |
+| actor_email | text | **Snapshot**, not a join. Anonymising an admin scrubs `users.email`, which would erase who performed every past action if this were resolved at read time. Same reasoning as `order_items.product_name_snapshot` |
+| action | text | Dotted verb, e.g. `customer.suspended`, `customer.role_changed`, `customer.anonymised`, `auth.password_changed`, `auth.2fa_enabled`, `order.status_changed` |
+| target_type | text | `user`, `order`, `product`, … |
+| target_id | bigint | nullable |
+| metadata | jsonb | Before/after values and any reason given. Never credentials — no tokens, hashes, or secrets, even scrubbed |
+| ip_address | text | nullable |
+| created_at | timestamptz | default now() |
+
+**Append-only is enforced by the database**, with a trigger that raises on `UPDATE` and `DELETE`.
+A log an application can quietly rewrite is not evidence of anything, and the whole point of this
+table is that it can be trusted after something has gone wrong. Retention and archiving are a
+Phase 8 concern; nothing prunes it in v1.
 
 **addresses**
 | Column | Type | Notes |
@@ -1001,6 +1143,36 @@ same service, training wheels off. Do not add that complexity earlier.
 - Distinguish **401 from 403**. Missing, malformed, or expired credentials are 401 ("who are you?");
   a valid identity without permission is 403 ("I know who you are, and no"). Note that FastAPI's
   `HTTPBearer` returns 403 for a missing header by default — set `auto_error=False` and raise 401.
+- **Password reset tokens are stored hashed, never raw** (Phase 4.5). The raw token lives only in
+  the emailed link. They are single-use and expire in ~30 minutes, and `POST /auth/forgot-password`
+  returns the *same* response whether or not the address exists — the same anti-enumeration rule as
+  login, applied to the one other endpoint that takes an email address.
+- **Changing a password sets `password_changed_at`**, and tokens issued before that instant are
+  rejected. Without refresh tokens this is the only way to end sessions on other devices after a
+  compromise, and it costs one column because `get_current_user` already reads the user row.
+- **Suspension is enforced on every request, not just at login.** `is_active = false` is checked in
+  `get_current_user`, so an open session stops working immediately rather than when its token
+  expires.
+- **Two-factor is TOTP and optional** (Phase 4.5), strongly encouraged for the admin account.
+  Recovery codes are bcrypt-hashed and single-use, because a recovery code is a credential. Note
+  the local tradeoff: `totp_secret` sits in the database in plain form, which is acceptable on a
+  development machine and should move behind KMS or Secrets Manager when this is real.
+- **Accounts are anonymised, not deleted.** `orders.user_id` is `NOT NULL` with `NO ACTION`, so
+  deleting a customer who has ordered is impossible without destroying order history. Scrubbing the
+  personal fields in place satisfies an erasure request while keeping the invoices tax rules
+  require.
+- **Consequential actions are recorded, and the record is append-only** (Phase 4.5). Suspension,
+  role changes, anonymisation, admin-triggered resets, and the customer's own credential changes all
+  write an `audit_events` row **in the same transaction as the action** — so an action cannot commit
+  without its record, and a record cannot exist for an action that rolled back. `actor_email` is
+  snapshotted rather than joined, because anonymising an admin must not erase who they were when
+  they acted. The audit trail never stores credentials of any kind.
+- **Impersonation is not a v1 feature, and the audit trail is why.** "Sign in as this customer"
+  makes an admin's actions indistinguishable from the customer's in every table that records them,
+  which is precisely the attribution the audit trail exists to provide. It is also the single
+  highest-value endpoint in a system — it mints a valid token for an arbitrary user, so a flaw in it
+  is total account takeover rather than one leaked row. Build it only with an audit trail, a visible
+  banner, a time limit, and an explicit decision about what an impersonated session may do.
 - **No refresh tokens in v1.** A deliberate omission, not an oversight: access tokens expire after
   `ACCESS_TOKEN_EXPIRE_MINUTES` and the user logs in again. Revisit if session length becomes a
   real complaint.
@@ -1038,6 +1210,17 @@ same service, training wheels off. Do not add that complexity earlier.
   temporarily removing `SELECT ... FOR UPDATE` and confirming it fails — a threaded test can
   otherwise pass simply because the threads happened to serialise. Same principle applies to
   constraint tests: make the constraint reject something before trusting it.
+- **Account and credential paths get the same scrutiny as money paths** (Phase 4.5). Specifically:
+  a reset token works exactly once; an expired token is refused; `forgot-password` is
+  indistinguishable for a known and an unknown address; a suspended user's *existing* session stops
+  on the next request, not at token expiry; a password change invalidates tokens issued earlier;
+  and the last admin cannot suspend or demote themselves. Each of these is a guard, so each must be
+  watched failing before it is trusted.
+- **The audit trail gets tested as a guard too.** Prove the event and the action share a
+  transaction by forcing the action to fail after the event is queued and confirming *neither*
+  lands. Prove append-only by attempting an `UPDATE` and a `DELETE` on `audit_events` from `psql`
+  and watching the trigger refuse both. An audit log nobody has tried to tamper with is not known
+  to be tamper-proof.
 - Load test against the **launch-tier concurrency target from Section 10.1**, not a flat assumed
   number, and tune RDS size and pool settings to that result.
 
@@ -1125,8 +1308,12 @@ Version 1 — the target for your first live store — is exactly this:
 1. The database from Section 6 (users, products, variants, inventory, orders, order_items, payments).
 2. API: auth, product listing/detail, cart, checkout, and admin CRUD.
 3. Web storefront plus the vendor portal.
-4. Stripe test-mode checkout.
-5. Deployed on AWS.
+4. **Account management (Phase 4.5):** password reset, customer self-service settings, optional
+   TOTP two-factor, and the vendor's customer list with suspend and anonymise. A store that cannot
+   help a customer who forgot their password is not launchable, so this is v1 scope, not a
+   follow-on.
+5. Stripe test-mode checkout.
+6. Deployed on AWS.
 
 After v1 launches, add reviews, richer search, sales reporting, and the mobile apps (Phase 7).
 

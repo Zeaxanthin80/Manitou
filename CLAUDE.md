@@ -90,6 +90,20 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
 - `order_items` snapshot product name and price at purchase time.
 - Wrap checkout (order + inventory decrement + payment) in a single DB transaction;
   guard inventory so stock can't go negative under concurrency.
+- **Accounts are anonymised, never deleted.** `orders.user_id` is NOT NULL with NO ACTION, so a
+  customer who has ordered cannot be removed. Scrub the personal fields and keep the order rows.
+- Password reset tokens are stored **hashed**, single-use, and short-lived; `forgot-password`
+  answers identically for a known and an unknown address, like login does.
+- Suspension (`users.is_active`) is checked in `get_current_user`, not only at login, so an open
+  session dies on its next request.
+- Never let an admin suspend or demote themselves, and never let the last admin be suspended or
+  demoted — that locks the store out of its own portal.
+- **Consequential actions write an `audit_events` row in the same transaction as the action** —
+  suspension, role change, anonymisation, credential changes. The table is append-only (a DB trigger
+  rejects UPDATE/DELETE), `actor_email` is snapshotted rather than joined, and it never stores
+  tokens, hashes, or secrets.
+- **Never propose admin impersonation** ("sign in as this customer") in v1. It makes an admin's
+  actions indistinguishable from the customer's, and it mints a token for an arbitrary user.
 - Secrets (DB password, Stripe keys) come from env vars / AWS Secrets Manager. Never commit them.
 - Validate all input at the API boundary with Pydantic.
 - Stripe handles card data; we store only Stripe reference IDs.

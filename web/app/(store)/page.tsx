@@ -17,7 +17,7 @@ export default async function Home() {
         {storeConfig.store.name}
       </h1>
       <p className="mt-4 max-w-prose font-body text-base text-muted">
-        Printed in small runs and restocked when they sell out.
+        {storeConfig.store.tagline}
       </p>
 
       <p className="mt-12 font-body text-xs uppercase tracking-tight text-muted">

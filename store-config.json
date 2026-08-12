@@ -5,35 +5,30 @@
       "This is NOT .env. .env holds secrets and per-environment values (database URL, Stripe keys) and is git-ignored. This file holds store identity, is committed, and is identical in development and production for the same store. A clone changes this file; it does not change .env for the same reasons.",
       "Read by both the backend (app/store.py) and the web app. One file, two readers - so currency and tax cannot disagree between what checkout charges and what the storefront displays.",
       "features.variants_enabled = false hides the variant picker in the UI. It does NOT mean products can exist without variants: inventory and cart_items both hang off product_variants, so a variant-less product is unsellable. A single-variant product with empty attributes is how a store with no meaningful variant dimensions is modelled - see seed.py's Canvas Tote Bag.",
-      "Feature flags are declared here before the UI that reads them exists (Phase 3 tasks 5-6). Until then they are inert on the web side, though the backend already honours the catalog and money values."
+      "Feature flags are declared here before the UI that reads them exists (Phase 3 tasks 5-6). Until then they are inert on the web side, though the backend already honours the catalog and money values.",
+      "store.tagline is the one line of store voice the storefront shows in two places (home hero and footer). It lives here rather than in a component because a clone selling candles must not have to edit page.tsx to change it."
     ]
   },
-
   "store": {
     "name": "Manitou",
-    "support_email": "support@manitou.example"
+    "support_email": "support@manitou.example",
+    "tagline": "Printed in small runs and restocked when they sell out."
   },
-
   "currency": {
     "code": "USD"
   },
-
   "locale": "en-US",
-
   "tax": {
     "mode": "none",
     "rate": "0.00"
   },
-
   "shipping": {
     "mode": "flat",
     "rate": "0.00"
   },
-
   "catalog": {
     "default_unit_of_measure": "each"
   },
-
   "features": {
     "variants_enabled": true,
     "weight_pricing_enabled": false

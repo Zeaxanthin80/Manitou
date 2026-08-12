@@ -3,68 +3,78 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { CloseIcon, MenuIcon } from "@/components/ui/icons";
-import { useDismissable } from "@/components/ui/use-dismissable";
 import { cn } from "@/lib/cn";
-import type { Category } from "@/lib/api";
+
+export type NavItem = { href: string; label: string };
 
 /**
- * Hamburger menu for the category links, shown at 768px and below.
+ * Hamburger menu for a set of navigation links.
  *
- * It sits to the LEFT of the wordmark, which is where a phone user's thumb and
+ * Used by both headers: the storefront passes categories, the portal passes its
+ * sections. It sits to the LEFT of the wordmark, where a phone user's thumb and
  * every other storefront put it.
  *
- * The panel is a real dropdown rather than a full-screen overlay: with three
- * categories an overlay would cover the page to show two lines of text. If the
- * category list grows past a screenful, this should become a <dialog> so focus
- * is trapped -- at this size, trapping focus would be more disorienting than
- * helpful.
+ * The panel is a dropdown rather than a full-screen overlay -- with a handful of
+ * links an overlay would cover the page to show three lines of text. If a store
+ * ever has more links than fit a screen this should become a <dialog> so focus
+ * is trapped; at this size trapping focus is more disorienting than helpful.
+ *
+ * `exact` matters for a link like /admin, which is a prefix of every other admin
+ * route and would otherwise always look active.
  */
-export function MobileMenu({ categories }: { categories: Category[] }) {
-  const { open, setOpen, ref } = useDismissable<HTMLDivElement>();
+export function MobileMenu({
+  items,
+  label,
+  panelId = "mobile-menu",
+  className,
+}: {
+  items: NavItem[];
+  label: string;
+  panelId?: string;
+  className?: string;
+}) {
   const pathname = usePathname();
 
   return (
-    <div ref={ref} className="relative wide:hidden">
-      <button
-        type="button"
-        data-menu-trigger
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        aria-controls="mobile-menu"
-        aria-label={open ? "Close menu" : "Open menu"}
-        className="-ml-2 flex size-9 items-center justify-center rounded-md text-text transition-colors hover:bg-background motion-reduce:transition-none"
+    <div className={className}>
+      <DropdownMenu
+        panelId={panelId}
+        align="left"
+        panelLabel={label}
+        panelClassName="w-56"
+        triggerLabel={(open) => (open ? "Close menu" : "Open menu")}
+        triggerClassName="-ml-2 flex size-9 items-center justify-center rounded-md text-text transition-colors hover:bg-background motion-reduce:transition-none"
+        trigger={(open) =>
+          open ? <CloseIcon className="size-6" /> : <MenuIcon className="size-6" />
+        }
       >
-        {open ? <CloseIcon className="size-6" /> : <MenuIcon className="size-6" />}
-      </button>
-
-      {open && (
-        <nav
-          id="mobile-menu"
-          aria-label="Categories"
-          className="absolute left-0 z-50 mt-2 w-56 overflow-hidden rounded-md border border-border bg-surface shadow-md"
-        >
+        <nav aria-label={label}>
           <ul>
-            {categories.map((c) => {
-              const active = pathname === `/categories/${c.slug}`;
+            {items.map((item) => {
+              const active =
+                item.href === "/" || item.href === "/admin"
+                  ? pathname === item.href
+                  : pathname.startsWith(item.href);
               return (
-                <li key={c.id} className="border-b border-border last:border-b-0">
+                <li key={item.href} className="border-b border-border last:border-b-0">
                   <Link
-                    href={`/categories/${c.slug}`}
+                    href={item.href}
                     aria-current={active ? "page" : undefined}
                     className={cn(
                       "block px-4 py-3 font-body text-sm hover:bg-background",
                       active ? "text-accent" : "text-text",
                     )}
                   >
-                    {c.name}
+                    {item.label}
                   </Link>
                 </li>
               );
             })}
           </ul>
         </nav>
-      )}
+      </DropdownMenu>
     </div>
   );
 }

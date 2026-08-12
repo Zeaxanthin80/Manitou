@@ -36,7 +36,7 @@ export default async function AdminLayout({
     // toasts yet, and useToast() throws outside a provider, so scoping it keeps
     // that error meaningful.
     <ToastProvider>
-      <AdminNav email={user.email} />
+      <AdminNav email={user.email} fullName={user.full_name} />
       {children}
     </ToastProvider>
   );

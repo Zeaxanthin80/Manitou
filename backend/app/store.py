@@ -27,6 +27,9 @@ CONFIG_PATH = Path(__file__).resolve().parents[2] / "store-config.json"
 class StoreIdentity(BaseModel):
     name: str = Field(min_length=1)
     support_email: str
+    # One line of store voice, shown on the home hero and in the footer. Here
+    # rather than in a component so a clone changes its pitch by editing config.
+    tagline: str = Field(min_length=1)
 
 
 class Currency(BaseModel):

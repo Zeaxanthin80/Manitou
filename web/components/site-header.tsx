@@ -35,7 +35,14 @@ export async function SiteHeader() {
         aria-label="Main"
         className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-4 wide:gap-8"
       >
-        <MobileMenu categories={categories} />
+        <MobileMenu
+          items={categories.map((c) => ({
+            href: `/categories/${c.slug}`,
+            label: c.name,
+          }))}
+          label="Categories"
+          className="wide:hidden"
+        />
 
         <Link
           href="/"
@@ -64,7 +71,19 @@ export async function SiteHeader() {
                 }
                 className="relative flex size-9 items-center justify-center rounded-md text-text transition-colors hover:bg-background motion-reduce:transition-none"
               >
-                <CartIcon className="size-6" />
+                {/* size-7, not size-6. The link box already matches the avatar's
+                    36px exactly and shares its centre line -- what read as
+                    "smaller" was optical: a thin outline glyph carries far less
+                    weight than a solid filled circle of the same box, so the
+                    glyph fills more of it to balance.
+
+                    translate-y-0.5 nudges it 2px down. Geometrically it was
+                    already centred; this is an optical correction, and the badge
+                    overhanging the top-right corner is most of why it needed
+                    one. A transform rather than a margin: inside an items-center
+                    flex row a 2px margin-top only moves the box 1px, because the
+                    margin box is what gets centred. */}
+                <CartIcon className="size-7 translate-y-0.5" />
                 {count > 0 && (
                   // aria-hidden because the link's own label already carries the
                   // number; announcing the badge too would say it twice.
