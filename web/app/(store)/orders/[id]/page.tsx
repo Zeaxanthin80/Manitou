@@ -36,6 +36,9 @@ export default async function OrderPage({
   try {
     order = await getOrder(token, orderId);
   } catch (error) {
+    // 403 means suspended, not "not yours" -- this endpoint answers 404 for
+    // someone else's order. Send them to sign in rather than 404ing.
+    if (error instanceof ApiError && error.status === 403) redirect("/login");
     if (error instanceof ApiError && (error.status === 404 || error.status === 401)) {
       notFound();
     }

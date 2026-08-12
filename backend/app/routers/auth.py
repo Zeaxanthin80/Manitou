@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.dependencies import get_current_user
+from app.dependencies import SUSPENDED_DETAIL, get_current_user
 from app.models import User
 from app.schemas import LoginRequest, Token, UserCreate, UserRead
 from app.security import create_access_token, hash_password, verify_password
@@ -71,6 +71,19 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> Token:
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # AFTER the password check, never before -- and that ordering is the whole
+    # point. Rejecting a suspended account up front would skip the hash
+    # comparison, and the resulting faster response would let anyone probe which
+    # addresses are suspended. That is the same timing oracle the _DUMMY_HASH
+    # path above exists to close.
+    #
+    # This does confirm to whoever holds it that the password was correct, which
+    # is reusable in credential stuffing. Accepted deliberately: the alternative
+    # is a suspended customer being told "incorrect password" and everyone
+    # debugging it as a password problem.
+    if not user.is_active:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, SUSPENDED_DETAIL)
 
     return Token(access_token=create_access_token(user.id, user.role))
 

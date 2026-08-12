@@ -110,7 +110,12 @@ export async function currentUser(): Promise<User | null> {
   try {
     return await getCurrentUser(token);
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) return null;
+    // 403 as well as 401. A suspended account holds a perfectly valid token, so
+    // the API answers 403 ("I know who you are, and no") rather than 401 -- and
+    // without this the storefront would throw and render a 500 at someone who
+    // should simply see the signed-out view. Task 10 adds the page that explains
+    // what happened; this only owes them a working site.
+    if (error instanceof ApiError && [401, 403].includes(error.status)) return null;
     throw error;
   }
 }

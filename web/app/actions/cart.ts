@@ -86,8 +86,9 @@ export async function currentCart(): Promise<Cart | null> {
   try {
     return await getCart(token);
   } catch (error) {
-    // An expired token renders as an empty cart rather than crashing the page.
-    if (error instanceof ApiError && error.status === 401) return null;
+    // An expired token -- or a suspended account, which answers 403 -- renders as
+    // an empty cart rather than crashing the page.
+    if (error instanceof ApiError && [401, 403].includes(error.status)) return null;
     throw error;
   }
 }

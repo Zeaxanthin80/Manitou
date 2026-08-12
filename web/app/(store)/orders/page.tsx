@@ -40,6 +40,10 @@ export default async function OrdersPage({
   try {
     orders = await listOrders(token, PER_PAGE, offset);
   } catch (error) {
+    // A suspended account holds a valid token, so the API answers 403 rather than
+    // 401. Without this the page throws and renders a 500 at someone who should
+    // be sent to sign in.
+    if (error instanceof ApiError && error.status === 403) redirect("/login");
     if (error instanceof ApiError && error.status === 401) redirect("/login");
     throw error;
   }

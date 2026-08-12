@@ -28,7 +28,8 @@ export async function currentAddresses(): Promise<Address[]> {
   try {
     return await listAddresses(token);
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) return [];
+    // 403 too: a suspended account still holds a valid token.
+    if (error instanceof ApiError && [401, 403].includes(error.status)) return [];
     throw error;
   }
 }
