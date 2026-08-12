@@ -49,13 +49,20 @@ def create_order(
             db, user, payload.shipping_address_id, payload.billing_address_id
         )
     except CartEmpty:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Cart is empty")
+        # from None: CartEmpty carries no payload, so the HTTP translation is
+        # total and the original adds nothing a reader would want.
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "Cart is empty"
+        ) from None
     except AddressNotFound:
         # 404, not 403: confirming the address exists would itself be a
-        # disclosure, same reasoning as the address router.
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Address not found")
+        # disclosure, same reasoning as the address router. from None for the
+        # same reason as CartEmpty above.
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Address not found") from None
     except InsufficientStock as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(exc))
+        # from exc here, unlike the two above: this exception's message IS the
+        # response body, so it is the source of what the caller is told.
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
     return _owned_order(db, order.id, user.id)
 

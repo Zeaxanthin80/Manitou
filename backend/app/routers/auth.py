@@ -36,7 +36,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> User:
     db.add(user)
     try:
         db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         # The unique constraint on users.email. Checking first with a SELECT would
         # usually catch this, but two concurrent registrations can both pass that
         # check before either inserts -- the same check-then-act race Section 6.7
@@ -46,7 +46,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> User:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered",
-        )
+        ) from exc
 
     db.refresh(user)
     return user

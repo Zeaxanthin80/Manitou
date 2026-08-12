@@ -85,11 +85,11 @@ def get_current_user(
 
     try:
         payload = decode_access_token(credentials.credentials)
-    except jwt.InvalidTokenError:
+    except jwt.InvalidTokenError as exc:
         # Covers a tampered signature, the wrong secret, and expiry alike. The
         # response says no more than "invalid" -- which failure it was is not the
         # caller's business.
-        raise _unauthorized("Invalid or expired token")
+        raise _unauthorized("Invalid or expired token") from exc
 
     user_id = payload.get("sub")
     if user_id is None:

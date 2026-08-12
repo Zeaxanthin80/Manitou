@@ -194,13 +194,13 @@ def create_product(
     db.add(product)
     try:
         db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         # products.slug and product_variants.sku are both unique. Returning the
         # database error as a 500 would blame the server for a bad request.
         db.rollback()
         raise HTTPException(
             status.HTTP_409_CONFLICT, "Duplicate product slug or variant SKU"
-        )
+        ) from exc
 
     audit.record(
         db,
@@ -241,9 +241,11 @@ def update_product(
 
     try:
         db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, "Duplicate product slug")
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Duplicate product slug"
+        ) from exc
 
     after = {f: getattr(product, f) for f in AUDITED}
     diff = audit.changes(before, after, *AUDITED)
@@ -435,9 +437,11 @@ def add_variant(
     db.add(variant)
     try:
         db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, "Duplicate variant SKU")
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Duplicate variant SKU"
+        ) from exc
 
     return _to_product(_get_product(db, product_id))
 
@@ -455,9 +459,11 @@ def update_variant(
 
     try:
         db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, "Duplicate variant SKU")
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Duplicate variant SKU"
+        ) from exc
 
     return _to_product(_get_product(db, variant.product_id))
 
