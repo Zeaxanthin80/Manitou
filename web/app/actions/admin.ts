@@ -5,11 +5,15 @@ import { redirect } from "next/navigation";
 
 import {
   ApiError,
+  adminAnonymise,
+  adminDisableTwoFactor,
   addProductImage,
   addVariant,
   createProduct,
   deactivateProduct,
   deleteProductImage,
+  sendAdminPasswordReset,
+  updateAdminUser,
   updateOrderStatus,
   updateProduct,
   updateInventory,
@@ -299,4 +303,117 @@ export async function updateInventoryAction(
   const slug = text(formData, "slug");
   if (slug) revalidatePath(`/products/${slug}`);
   return { ok: "Saved." };
+}
+
+/* --------------------------------------------------------------- users -- */
+
+function revalidateUser(id: number) {
+  revalidatePath("/admin/users");
+  revalidatePath(`/admin/users/${id}`);
+  revalidatePath("/admin/audit");
+}
+
+/**
+ * Suspend, reactivate, promote or demote.
+ *
+ * The specific change arrives as `intent` rather than raw field values, so the
+ * form cannot express something meaningless like {is_active: null}. Which
+ * intents are offered comes from the API's allowed_actions -- this never decides
+ * for itself what is legal.
+ */
+export async function updateUserAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+
+  const id = Number(formData.get("user_id"));
+  const intent = String(formData.get("intent") ?? "");
+
+  const body = {
+    suspend: { is_active: false },
+    reactivate: { is_active: true },
+    promote: { role: "admin" },
+    demote: { role: "customer" },
+  }[intent];
+  if (!body) return { error: "Unknown action." };
+
+  try {
+    await updateAdminUser(token, id, body);
+  } catch (err) {
+    // 409 here means a lockout guard fired -- suspending yourself, or demoting
+    // the last admin. The API's sentence explains which; it is shown as written.
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+
+  revalidateUser(id);
+  return { ok: `Done: ${intent}.` };
+}
+
+export async function sendUserPasswordResetAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+  const id = Number(formData.get("user_id"));
+
+  try {
+    const { detail } = await sendAdminPasswordReset(token, id);
+    revalidateUser(id);
+    return { ok: detail };
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+}
+
+export async function disableUserTwoFactorAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+  const id = Number(formData.get("user_id"));
+
+  try {
+    await adminDisableTwoFactor(token, id);
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+
+  revalidateUser(id);
+  return { ok: "Two-factor turned off. Tell them to set it up again." };
+}
+
+export async function anonymiseUserAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+
+  const id = Number(formData.get("user_id"));
+  const expected = String(formData.get("expected_email") ?? "");
+  const typed = String(formData.get("confirm_email") ?? "").trim();
+
+  // The API demands the admin's password. This second check is the UI's own:
+  // an admin arrives here from a list of users, so the mistake worth preventing
+  // is erasing the WRONG ROW, which a password prompt does nothing about.
+  if (typed !== expected) {
+    return { error: "The email you typed does not match this account." };
+  }
+
+  try {
+    await adminAnonymise(token, id, String(formData.get("current_password") ?? ""));
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+
+  revalidateUser(id);
+  return { ok: "Account anonymised. Their orders are kept, without their details." };
 }

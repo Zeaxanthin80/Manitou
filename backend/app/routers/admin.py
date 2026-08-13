@@ -1153,6 +1153,17 @@ def list_audit_events(
         .limit(limit)
         .offset(offset)
     ).all()
+    # Unfiltered on purpose: the dropdown must offer every action that exists,
+    # not only those surviving the current filter -- otherwise choosing one
+    # removes every other option and there is no way back.
+    known_actions = db.scalars(
+        select(AuditEvent.action).distinct().order_by(AuditEvent.action)
+    ).all()
+
     return AdminAuditPage(
-        items=list(events), total=total or 0, limit=limit, offset=offset
+        items=list(events),
+        total=total or 0,
+        limit=limit,
+        offset=offset,
+        actions=list(known_actions),
     )

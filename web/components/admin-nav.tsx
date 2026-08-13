@@ -16,6 +16,8 @@ const SECTIONS: NavItem[] = [
   { href: "/admin/orders", label: "Orders" },
   { href: "/admin/products", label: "Products" },
   { href: "/admin/inventory", label: "Inventory" },
+  { href: "/admin/users", label: "Users" },
+  { href: "/admin/audit", label: "Audit" },
 ];
 
 /**
@@ -29,9 +31,13 @@ const SECTIONS: NavItem[] = [
  * direction reserves the accent for.
  *
  * Collapses below `lg` (1024px), not at the storefront's 769px. That is measured
- * rather than assumed: this bar carries four sections plus View store, an email
- * and Sign out, and it does not fit on one line until 1024px. Using the
+ * rather than assumed: this bar carries six sections plus View store and the
+ * account menu, and it does not fit on one line until 1024px. Using the
  * storefront's breakpoint would have left a three-row stack between 769 and 1023.
+ *
+ * Re-measured when Users and Audit were added in task 11 -- six links still fit
+ * at 1024 with no overflow, so the breakpoint held. Worth re-checking rather
+ * than assuming if a seventh is ever added.
  */
 export function AdminNav({
   email,

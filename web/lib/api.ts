@@ -252,6 +252,43 @@ export type AdminSummary = {
   low_stock: AdminLowStock[];
 };
 
+export type AdminUserSummary = {
+  id: number;
+  email: string;
+  full_name: string;
+  role: string;
+  is_active: boolean;
+  totp_enabled: boolean;
+  created_at: string;
+  order_count: number;
+  lifetime_value: string;
+};
+
+export type AdminUserDetail = AdminUserSummary & {
+  phone: string | null;
+  password_changed_at: string | null;
+  addresses: Address[];
+  recent_orders: AdminOrderSummary[];
+  /** What the API will actually permit against this user right now. The portal
+   *  renders one control per entry and computes nothing itself -- the same
+   *  contract as AdminOrderDetail.allowed_transitions. It is how the
+   *  self-lockout and last-admin guards become visible rather than merely
+   *  enforced: your own row simply has no suspend button. */
+  allowed_actions: string[];
+};
+
+export type AdminAuditEvent = {
+  id: number;
+  actor_user_id: number | null;
+  actor_email: string;
+  action: string;
+  target_type: string;
+  target_id: number | null;
+  details: Record<string, unknown>;
+  ip_address: string | null;
+  created_at: string;
+};
+
 export type AdminOrderSummary = OrderSummary & {
   user_id: number;
   user_email: string;
@@ -559,3 +596,69 @@ export const twoFactorDisable = (token: string, current_password: string) =>
 
 export const twoFactorVerify = (challenge: string, code: string) =>
   request<Token>("/auth/2fa/verify", { body: { challenge, code } });
+
+/* --------------------------------------------------------- admin: users -- */
+
+export const listAdminUsers = (
+  token: string,
+  {
+    q,
+    role,
+    active,
+    limit = 20,
+    offset = 0,
+  }: { q?: string; role?: string; active?: boolean; limit?: number; offset?: number } = {},
+) => {
+  const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (q) p.set("q", q);
+  if (role) p.set("role", role);
+  if (active !== undefined) p.set("active", String(active));
+  return request<Page<AdminUserSummary>>(`/admin/users?${p}`, { token });
+};
+
+export const getAdminUser = (token: string, id: number) =>
+  request<AdminUserDetail>(`/admin/users/${id}`, { token });
+
+export const updateAdminUser = (
+  token: string,
+  id: number,
+  body: { is_active?: boolean; role?: string },
+) => request<AdminUserDetail>(`/admin/users/${id}`, { token, method: "PATCH", body });
+
+export const sendAdminPasswordReset = (token: string, id: number) =>
+  request<{ detail: string }>(`/admin/users/${id}/password-reset`, { token, body: {} });
+
+export const adminDisableTwoFactor = (token: string, id: number) =>
+  request<void>(`/admin/users/${id}/disable-2fa`, { token, body: {} });
+
+export const adminAnonymise = (token: string, id: number, current_password: string) =>
+  request<void>(`/admin/users/${id}/anonymise`, { token, body: { current_password } });
+
+/** Read-only by design. There is deliberately no create, update or delete
+ *  counterpart: audit_events is append-only in the database via a trigger, and
+ *  an API door would make that guarantee decorative. */
+export const listAuditEvents = (
+  token: string,
+  {
+    action,
+    target_type,
+    target_id,
+    limit = 50,
+    offset = 0,
+  }: {
+    action?: string;
+    target_type?: string;
+    target_id?: number;
+    limit?: number;
+    offset?: number;
+  } = {},
+) => {
+  const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (action) p.set("action", action);
+  if (target_type) p.set("target_type", target_type);
+  if (target_id !== undefined) p.set("target_id", String(target_id));
+  return request<Page<AdminAuditEvent> & { actions: string[] }>(
+    `/admin/audit?${p}`,
+    { token },
+  );
+};

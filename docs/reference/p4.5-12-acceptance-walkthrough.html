@@ -1,0 +1,1742 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Acceptance Walkthrough — Manitou Reference</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ground: #0e141b;
+        --surface: #161f29;
+        --surface-2: #1d2833;
+        --line: #2a3947;
+        --ink: #e6edf4;
+        --muted: #8496a6;
+        --client: #4db6e2;
+        --server: #d4a32c;
+        --safe: #8fa98b;
+        --risk: #d9775b;
+        --display: "Barlow Condensed", system-ui, sans-serif;
+        --body: "IBM Plex Sans", system-ui, sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+        font-family: var(--body);
+        font-size: 16px;
+        line-height: 1.65;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 24px 96px;
+      }
+
+      .masthead {
+        padding: 72px 0 40px;
+        border-bottom: 1px solid var(--line);
+      }
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 18px;
+      }
+      h1 {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: clamp(44px, 8vw, 86px);
+        line-height: 0.92;
+        letter-spacing: -0.01em;
+        margin: 0 0 20px;
+        text-transform: uppercase;
+      }
+      .standfirst {
+        max-width: 64ch;
+        color: var(--muted);
+        font-size: 17px;
+        margin: 0;
+      }
+      .standfirst strong {
+        color: var(--ink);
+        font-weight: 500;
+      }
+
+      .toc {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: rgba(14, 20, 27, 0.92);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--line);
+        margin-bottom: -1px;
+      }
+      /* The scroller is the inner element, not the sticky bar: overflow on a
+         sticky parent is what makes a mobile nav look empty rather than
+         scrollable. */
+      .toc-inner {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 10px 24px;
+        display: flex;
+        gap: 2px;
+        overflow-x: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--line) transparent;
+      }
+      /* Default scrollbars render as a bright bar across a dark page. These
+         only appear when there is actually something to scroll to. */
+      .toc-inner::-webkit-scrollbar,
+      pre::-webkit-scrollbar,
+      .table-wrap::-webkit-scrollbar {
+        height: 6px;
+      }
+      .toc-inner::-webkit-scrollbar-track,
+      pre::-webkit-scrollbar-track,
+      .table-wrap::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .toc-inner::-webkit-scrollbar-thumb,
+      pre::-webkit-scrollbar-thumb,
+      .table-wrap::-webkit-scrollbar-thumb {
+        background: var(--line);
+        border-radius: 3px;
+      }
+      .toc a {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-decoration: none;
+        /* 10px, not 12: at 12 the six labels ran 12px past 1080 and the bar
+           showed a scrollbar on a desktop screen where nothing was hidden. */
+        padding: 6px 10px;
+        border-radius: 2px;
+        white-space: nowrap;
+      }
+      .toc a:hover,
+      .toc a:focus-visible {
+        color: var(--ink);
+        background: var(--surface-2);
+      }
+
+      section {
+        padding: 64px 0 0;
+        /* The sticky bar measures 61px; anything smaller lands a heading
+           underneath it when you follow a link from the contents. */
+        scroll-margin-top: 72px;
+      }
+      .sec-head {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        margin: 0 0 8px;
+        flex-wrap: wrap;
+      }
+      .sec-num {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        padding: 3px 8px;
+        border-radius: 2px;
+        flex: none;
+      }
+      h2 {
+        font-family: var(--display);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: clamp(26px, 4vw, 38px);
+        line-height: 1;
+        margin: 0;
+      }
+      h3 {
+        font-family: var(--display);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        font-size: 20px;
+        color: var(--ink);
+        margin: 40px 0 4px;
+      }
+      .lede {
+        color: var(--muted);
+        max-width: 72ch;
+        margin: 12px 0 28px;
+      }
+      .counter {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin-left: auto;
+        white-space: nowrap;
+      }
+      .counter.done {
+        color: var(--safe);
+      }
+
+      /* ---------------------------------------------------------- checklist */
+      ol.check {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        counter-reset: item;
+      }
+      ol.check > li {
+        counter-increment: item;
+        display: grid;
+        grid-template-columns: 26px 1fr;
+        gap: 14px;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--line);
+        align-items: start;
+      }
+      ol.check > li:last-child {
+        border-bottom: 0;
+      }
+      /* Without this a grid item refuses to shrink below its content's
+         min-content width, so a long command in a <pre> widens the whole page
+         instead of scrolling inside its own box. Measured: 755px of sideways
+         scroll at 375px before this line. */
+      ol.check > li > div {
+        min-width: 0;
+      }
+      ol.check input[type="checkbox"] {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 20px;
+        height: 20px;
+        margin: 2px 0 0;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        background: var(--surface);
+        cursor: pointer;
+        display: grid;
+        place-content: center;
+        flex: none;
+      }
+      ol.check input[type="checkbox"]::after {
+        content: "";
+        width: 10px;
+        height: 6px;
+        border-left: 2px solid var(--ground);
+        border-bottom: 2px solid var(--ground);
+        transform: rotate(-45deg) translateY(-1px);
+        opacity: 0;
+      }
+      ol.check input[type="checkbox"]:checked {
+        background: var(--safe);
+        border-color: var(--safe);
+      }
+      ol.check input[type="checkbox"]:checked::after {
+        opacity: 1;
+      }
+      ol.check input[type="checkbox"]:focus-visible {
+        outline: 2px solid var(--client);
+        outline-offset: 2px;
+      }
+      ol.check > li.ticked .do {
+        color: var(--muted);
+        text-decoration: line-through;
+        text-decoration-color: var(--line);
+      }
+      .do {
+        font-weight: 500;
+        margin: 0;
+      }
+      .expect {
+        color: var(--muted);
+        font-size: 14.5px;
+        margin: 4px 0 0;
+      }
+      .expect::before {
+        content: "Expect ";
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--safe);
+        margin-right: 6px;
+      }
+      .where {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--client);
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        padding: 1px 6px;
+        margin-right: 8px;
+        white-space: nowrap;
+      }
+      .tag {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        border: 1px solid var(--server);
+        color: var(--server);
+        border-radius: 2px;
+        padding: 1px 6px;
+        margin-left: 8px;
+        white-space: nowrap;
+      }
+      code {
+        font-family: var(--mono);
+        font-size: 0.88em;
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        padding: 1px 5px;
+      }
+      pre {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        line-height: 1.6;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-left: 2px solid var(--server);
+        border-radius: 3px;
+        padding: 12px 14px;
+        overflow-x: auto;
+        margin: 10px 0 0;
+      }
+      pre code {
+        background: none;
+        border: 0;
+        padding: 0;
+        font-size: inherit;
+        display: block;
+      }
+      var {
+        font-style: normal;
+        color: var(--client);
+        border-bottom: 1px dotted var(--client);
+      }
+      kbd {
+        font-family: var(--mono);
+        font-size: 0.82em;
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 3px;
+        padding: 1px 5px;
+        color: var(--ink);
+      }
+      .out {
+        color: var(--safe);
+      }
+      .note {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-left: 2px solid var(--client);
+        border-radius: 3px;
+        padding: 14px 16px;
+        margin: 20px 0;
+        color: var(--muted);
+        font-size: 15px;
+      }
+      .note strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .warn {
+        border-left-color: var(--risk);
+      }
+      .table-wrap {
+        overflow-x: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--line) transparent;
+      }
+      table {
+        width: 100%;
+        min-width: 520px;
+        border-collapse: collapse;
+        margin-top: 16px;
+        font-size: 14.5px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 400;
+      }
+      .toolbar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        padding: 16px 0 0;
+      }
+      button.reset {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        padding: 8px 14px;
+        cursor: pointer;
+      }
+      button.reset:hover,
+      button.reset:focus-visible {
+        color: var(--risk);
+        border-color: var(--risk);
+      }
+      footer {
+        margin-top: 72px;
+        padding-top: 28px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      @media print {
+        .toc,
+        .toolbar,
+        button.reset {
+          display: none;
+        }
+        body {
+          background: #fff;
+          color: #000;
+        }
+        pre,
+        .note,
+        code {
+          background: #f4f4f4;
+          color: #000;
+        }
+        ol.check input[type="checkbox"] {
+          appearance: auto;
+          -webkit-appearance: auto;
+        }
+        a {
+          color: #000;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="masthead">
+        <p class="eyebrow">Manitou · Phase 4.5 · Task 12</p>
+        <h1>Acceptance<br />Walkthrough</h1>
+        <p class="standfirst">
+          The hand-run gate before Phase 5 adds real payments. Everything Phase 4.5
+          built — suspension, password reset, two-factor, anonymisation and the
+          audit trail — plus the storefront and portal around it.
+          <strong
+            >Each item says what to do and what you should see</strong
+          >, because "test 2FA" leaves you deciding what counts as a pass. Your
+          ticks are saved in this browser.
+        </p>
+      </header>
+    </div>
+
+    <nav class="toc" aria-label="Sections">
+      <div class="toc-inner">
+        <a href="#start">0 · Before you start</a>
+        <a href="#admin-browser">1 · Admin — browser</a>
+        <a href="#admin-terminal">2 · Admin — terminal</a>
+        <a href="#customer">3 · Customer — browser</a>
+        <a href="#floor">4 · Customer — quality floor</a>
+        <a href="#record">5 · Record</a>
+      </div>
+    </nav>
+
+    <div class="wrap">
+      <!-- ============================================================ 0 -->
+      <section id="start">
+        <div class="sec-head">
+          <span class="sec-num">00</span>
+          <h2>Before you start</h2>
+          <span class="counter" data-for="s0"></span>
+        </div>
+        <p class="lede">
+          Three services, two accounts. The rest of this document assumes all of
+          them.
+        </p>
+
+        <div class="note warn">
+          <strong>Decide about the data first.</strong> The development database
+          has accumulated test accounts from building this phase — several
+          already-anonymised <code>deleted-N@invalid</code> rows among them. You
+          can walk through as-is, or re-seed for a clean run. Re-seeding
+          <strong>wipes the audit trail</strong>, which is fine here: this
+          walkthrough rebuilds it. What you must not do is re-seed halfway
+          through and wonder why the log is empty.
+        </div>
+
+        <ol class="check" data-section="s0">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Start PostgreSQL.</p>
+              <pre><code>docker compose up -d</code></pre>
+              <p class="expect">
+                <code>db</code> running. Check with <code>docker compose ps</code>.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Start the API <em>in a terminal you can see</em> — the password
+                reset link is printed there.
+              </p>
+              <pre><code>cd backend
+source .venv/bin/activate
+uvicorn app.main:app --reload</code></pre>
+              <p class="expect">
+                <code>http://localhost:8000/health</code> returns
+                <code>{"status":"ok"}</code>.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Start the web app.</p>
+              <pre><code>cd web
+npm run dev</code></pre>
+              <p class="expect"><code>http://localhost:3000</code> shows the storefront.</p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Optional — reset to clean data. Skip if you would rather keep the
+                existing accounts.
+              </p>
+              <pre><code>cd backend &amp;&amp; source .venv/bin/activate
+python seed.py</code></pre>
+              <p class="expect">
+                Seeded products and two accounts:
+                <code>admin@manitou.example / admin</code> and
+                <code>customer@manitou.example / customer</code>.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Have an authenticator app ready on your phone (Google
+                Authenticator, 1Password, Aegis, anything TOTP).
+              </p>
+              <p class="expect">
+                Needed for the two-factor steps. There is no way to fake this —
+                that is the point of the feature.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ============================================================ 1 -->
+      <section id="admin-browser">
+        <div class="sec-head">
+          <span class="sec-num">01</span>
+          <h2>Administrator — in the browser</h2>
+          <span class="counter" data-for="s1"></span>
+        </div>
+        <p class="lede">
+          Sign in as <code>admin@manitou.example / admin</code>. Items marked
+          <span class="tag">task 12</span> come straight from the plan.
+        </p>
+
+        <h3>Getting in</h3>
+        <ol class="check" data-section="s1a">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Sign in as the admin, then open the avatar menu in the header.
+              </p>
+              <p class="expect">
+                A <strong>Vendor portal</strong> link in accent red, above Your
+                account. It does not appear for customers.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                <span class="where">/admin</span> Open the portal.
+              </p>
+              <p class="expect">
+                The <strong>VENDOR PORTAL</strong> badge, and six nav sections:
+                Summary, Orders, Products, Inventory, Users, Audit.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                In a private window, sign in as
+                <code>customer@manitou.example</code> and visit
+                <code>/admin</code>.
+              </p>
+              <p class="expect">
+                A <strong>404</strong>, not an "access denied". 403 would confirm
+                the page exists.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Sign out entirely and visit <code>/admin</code>.</p>
+              <p class="expect">
+                Redirected to <code>/login</code> — they might be an admin, so
+                they are asked.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <h3>Orders</h3>
+        <ol class="check" data-section="s1b">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                <span class="where">/admin/orders</span> Filter by each status
+                along the top.
+              </p>
+              <p class="expect">
+                Counts change; the count in the heading matches the rows shown.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Open a <em>pending</em> order and advance it: Mark paid → Mark
+                shipped → Mark delivered.
+              </p>
+              <p class="expect">
+                The buttons change at each step. After delivered there are none,
+                and it says the order reached a final status.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Check the customer's own view: sign in as that customer and open
+                the same order.
+              </p>
+              <p class="expect">
+                The status matches, and the line items show the price
+                <em>as charged</em>, not today's price.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <h3>Products and stock</h3>
+        <ol class="check" data-section="s1c">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                <span class="where">/admin/products/new</span> Create a product
+                with one variant.
+              </p>
+              <p class="expect">
+                Redirected to its edit page; it appears on the storefront
+                immediately.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Add a second variant, then add an image by URL.</p>
+              <p class="expect">
+                Try <code>/product-placeholder.png</code>. The first image
+                becomes primary automatically.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Add a second image and press <strong>Make primary</strong>.
+              </p>
+              <p class="expect">
+                The badge moves. Only ever one primary — the database enforces it.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Try to create another product with the <em>same slug</em>.
+              </p>
+              <p class="expect">
+                A readable "Duplicate product slug" message, not a server error.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Hide a product that has <em>already been ordered</em>, then find
+                that old order.
+              </p>
+              <p class="expect">
+                Gone from the storefront, still listed in the portal marked
+                Hidden, and the past receipt still shows it.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                <span class="where">/admin/inventory</span> Set a variant's stock
+                below its reorder level.
+              </p>
+              <p class="expect">
+                It flips to <strong>Reorder</strong> and jumps to the top of the
+                list. At 0 it reads <strong>Out of stock</strong> and the
+                storefront shows Sold out.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Enter <code>-1</code> as a stock level.</p>
+              <p class="expect">Refused with a readable message.</p>
+            </div>
+          </li>
+        </ol>
+
+        <h3>Summary</h3>
+        <ol class="check" data-section="s1d">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                <span class="where">/admin</span> Compare Revenue against Orders
+                by status.
+              </p>
+              <p class="expect">
+                Revenue counts <strong>paid, shipped and delivered only</strong>.
+                Cancelled orders are excluded and pending is shown separately as
+                Awaiting payment.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Cancel an order, then reload the summary.
+              </p>
+              <p class="expect">
+                Revenue does <em>not</em> rise. The cancelled row's value does.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <h3>Users — the guards</h3>
+        <ol class="check" data-section="s1e">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                <span class="where">/admin/users</span> Search by name, then
+                filter Customers / Admins / Suspended.
+              </p>
+              <p class="expect">
+                Admins appear in the list. A list that hid them could never show
+                who has access.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Open <strong>your own</strong> row.</p>
+              <p class="expect">
+                Only <strong>Send password reset</strong>. No suspend, no
+                anonymise, no role change — you cannot lock yourself out, and the
+                buttons simply are not there.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Open another customer's row.</p>
+              <p class="expect">
+                Suspend, Make admin, Send password reset and Anonymise all
+                present.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Promote a customer to admin, then open their row again.
+              </p>
+              <p class="expect">
+                Now says <strong>Remove admin</strong>. With two admins you can
+                demote either — the guard counts, it does not blanket-refuse.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <h3>Suspension <span class="tag">task 12</span></h3>
+        <ol class="check" data-section="s1f">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                In a <strong>separate private window</strong>, sign in as a test
+                customer and leave <code>/account</code> open.
+              </p>
+              <p class="expect">
+                Use a private window, not another tab — same-browser tabs share
+                one cookie jar and you would only be watching your own session.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                As the admin, suspend that customer. Then in the private window,
+                click any link.
+              </p>
+              <p class="expect">
+                Signed out <em>on the next request</em> — not when their token
+                expires. The storefront still renders; no error page.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Have them try to sign in again with the correct password.
+              </p>
+              <p class="expect">
+                <strong>"This account has been suspended. Contact
+                support@…"</strong> — and with a <em>wrong</em> password, the
+                ordinary "Incorrect email or password". The difference matters:
+                the second stops the first becoming a way to probe who is
+                suspended.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Reactivate them and confirm they can sign in.</p>
+              <p class="expect">Back to normal, same password.</p>
+            </div>
+          </li>
+        </ol>
+
+        <h3>Reset, two-factor, anonymise</h3>
+        <ol class="check" data-section="s1g">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Press <strong>Send password reset</strong> on a customer.
+              </p>
+              <p class="expect">
+                Confirmation naming <em>their</em> address. The link is printed
+                in the API terminal — you never see or set their password.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Press it again immediately.</p>
+              <p class="expect">
+                Refused — one link a minute, so this cannot be used to bombard
+                someone's inbox.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                On a customer who has two-factor on, press
+                <strong>Turn off two-factor</strong>.
+              </p>
+              <p class="expect">
+                The button disappears afterwards and the sidebar reads
+                <strong>Two-factor: Off</strong>. This is the escape hatch for
+                someone who lost their phone <em>and</em> their recovery codes.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Open <strong>Anonymise this account</strong> on a test customer
+                and try to arm it: password alone, then password plus a
+                <em>wrong</em> email.
+              </p>
+              <p class="expect">
+                Disabled both times. Only the exact address arms it — the mistake
+                worth preventing here is erasing the wrong row.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Anonymise them properly, then find their old order.</p>
+              <p class="expect">
+                Row becomes <code>deleted-N@invalid</code> / "Deleted account".
+                The order survives with its shipping address — that is the
+                despatch record, and tax rules require keeping it.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <h3>Audit <span class="tag">task 12</span></h3>
+        <ol class="check" data-section="s1h">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                <span class="where">/admin/audit</span> Find every action you
+                just performed.
+              </p>
+              <p class="expect">
+                <code>customer.suspended</code>,
+                <code>customer.reactivated</code>,
+                <code>customer.role_changed</code>,
+                <code>customer.password_reset_sent</code>,
+                <code>customer.2fa_disabled</code>,
+                <code>customer.anonymised</code>, plus the product, inventory and
+                order events. Each names <strong>you</strong> as the actor.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Use the action filter, then clear it.</p>
+              <p class="expect">
+                The dropdown keeps offering every action even while filtered.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Look for any way to edit or delete an entry.
+              </p>
+              <p class="expect">
+                <strong>There is none</strong>, on this page or anywhere else. The
+                table is append-only in the database; section 02 proves it.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Open a user's detail page and read their History section.
+              </p>
+              <p class="expect">
+                Only that account's events, newest first.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ============================================================ 2 -->
+      <section id="admin-terminal">
+        <div class="sec-head">
+          <span class="sec-num">02</span>
+          <h2>Administrator — from the terminal</h2>
+          <span class="counter" data-for="s2"></span>
+        </div>
+        <p class="lede">
+          Four checks the browser cannot make. Every command below has been run
+          against this project — the expected output is the real output, not an
+          approximation.
+        </p>
+
+        <ol class="check" data-section="s2">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Find a reset link in the API terminal.
+                <span class="tag">task 12</span>
+              </p>
+              <p class="expect">
+                A boxed banner. If you redirected uvicorn to a file, grep it
+                instead:
+              </p>
+              <pre><code>grep -A6 "EMAIL (console sender" <var>your-api-log</var></code>
+<code class="out">┌─ EMAIL (console sender — not actually sent) ──────
+│ To:      customer@manitou.example
+│ Subject: Reset your Manitou password
+│ http://localhost:3000/reset-password?token=…</code></pre>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Prove the audit trail refuses <code>UPDATE</code>.
+                <span class="tag">task 12</span>
+              </p>
+              <pre><code>docker compose exec db psql -U manitou -d manitou \
+  -c "UPDATE audit_events SET action='tampered' WHERE id=(SELECT min(id) FROM audit_events);"</code>
+<code class="out">ERROR:  audit_events is append-only; UPDATE is not permitted</code></pre>
+              <p class="expect">
+                That exact error, and <code>0</code> rows changed. You are
+                connecting as the application's own database user — this is not a
+                permissions trick.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Prove it refuses <code>DELETE</code>.
+                <span class="tag">task 12</span>
+              </p>
+              <pre><code>docker compose exec db psql -U manitou -d manitou \
+  -c "DELETE FROM audit_events WHERE id=(SELECT min(id) FROM audit_events);"</code>
+<code class="out">ERROR:  audit_events is append-only; DELETE is not permitted</code></pre>
+              <p class="expect">
+                Both refused by a database trigger, not by application code — so
+                a bug in the API cannot rewrite history.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Confirm an anonymised row is genuinely scrubbed.</p>
+              <pre><code>docker compose exec db psql -U manitou -d manitou \
+  -c "SELECT id, email, full_name, is_active FROM users WHERE email LIKE 'deleted-%' ORDER BY id DESC LIMIT 3;"</code>
+<code class="out"> id  |        email        |    full_name    | is_active
+-----+---------------------+-----------------+-----------
+ 206 | deleted-206@invalid | Deleted account | f</code></pre>
+              <p class="expect">
+                No real name, no real address, sign-in disabled.
+                <code>.invalid</code> is a reserved suffix — it can never be a
+                deliverable address.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Confirm the audit records <em>who</em> erased an account, and
+                that a customer erasing themselves is not re-identified by the
+                log.
+              </p>
+              <pre><code>docker compose exec db psql -U manitou -d manitou \
+  -c "SELECT actor_email, details->>'initiated_by' AS by FROM audit_events WHERE action='customer.anonymised' ORDER BY id DESC LIMIT 4;"</code>
+<code class="out">      actor_email      |  by
+-----------------------+-------
+ admin@manitou.example | admin
+ deleted-199@invalid   | self</code></pre>
+              <p class="expect">
+                Admin-initiated names the admin. Self-initiated shows the
+                <em>already scrubbed</em> address — writing their real one into
+                an append-only table would undo the erasure they just asked for.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Run the automated suite once.</p>
+              <pre><code>cd backend &amp;&amp; source .venv/bin/activate
+python -m pytest</code></pre>
+              <p class="expect"><code class="out">99 passed</code></p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ============================================================ 3 -->
+      <section id="customer">
+        <div class="sec-head">
+          <span class="sec-num">03</span>
+          <h2>Beta customer — in the browser</h2>
+          <span class="counter" data-for="s3"></span>
+        </div>
+        <p class="lede">
+          Do this as a real shopper would, in a private window, with an address
+          you can actually receive at — you will need to read a reset link. A
+          fresh registration is better than the seeded account: it exercises the
+          path a real customer takes.
+        </p>
+
+        <h3>Shopping</h3>
+        <ol class="check" data-section="s3a">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                <span class="where">/register</span> Create an account.
+              </p>
+              <p class="expect">
+                Signed in immediately, no second form. Try a password under 8
+                characters first — it should be refused.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Browse the catalogue and each category from the nav.
+              </p>
+              <p class="expect">
+                Prices shown; multi-variant products read
+                <strong>From $X</strong>.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Open a product and try to add it without choosing a size.
+              </p>
+              <p class="expect">
+                The button says <strong>Select an option</strong> and is
+                disabled. A sold-out variant cannot be selected.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Add two different items, then add the <em>same</em> one twice.
+              </p>
+              <p class="expect">
+                The repeat merges into one line with quantity 2 — it does not
+                create a second line. Header count updates.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                <span class="where">/cart</span> Change a quantity, then remove a
+                line.
+              </p>
+              <p class="expect">Subtotal follows both changes.</p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Check out. You have no saved address, so add one.
+              </p>
+              <p class="expect">
+                The address form appears automatically. After saving, it is
+                selectable and "Billing same as delivery" is pre-ticked.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Place the order.</p>
+              <p class="expect">
+                A receipt with an order number, the items, and the address. Cart
+                now empty; nothing was charged — payments arrive in Phase 5.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                <span class="where">/orders</span> Find the order, then try
+                changing the number in the URL to someone else's.
+              </p>
+              <p class="expect">
+                Yours renders. Another's gives <strong>404</strong> — not "403",
+                which would confirm it exists.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <h3>Account</h3>
+        <ol class="check" data-section="s3b">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                <span class="where">/account</span> Change your name, leaving
+                Phone blank.
+              </p>
+              <p class="expect">
+                Name updates in the header. If you had a phone number saved, it
+                is still there — an untouched field is not wiped.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Add a second address, then remove it.</p>
+              <p class="expect">
+                Removes cleanly. Now try removing the address used by your
+                order — refused, because it is part of the despatch record.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <h3>Password and sessions</h3>
+        <ol class="check" data-section="s3c">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Sign in on a <strong>second device or private window</strong> and
+                leave it open.
+              </p>
+              <p class="expect">Two live sessions.</p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                <span class="where">/account/security</span> Change your
+                password. Try a wrong current password first.
+              </p>
+              <p class="expect">
+                Wrong one refused. After success,
+                <strong>this window stays signed in</strong>.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Now click something in the other window.</p>
+              <p class="expect">
+                <strong>Signed out.</strong> That is the point — after a
+                compromise, changing your password ends every other session while
+                keeping the one you are using.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Change your email address.</p>
+              <p class="expect">
+                A notice sent to your <em>previous</em> address (check the API
+                terminal). You now sign in with the new one.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <h3>Forgotten password <span class="tag">task 12</span></h3>
+        <ol class="check" data-section="s3d">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Sign out. <span class="where">/forgot-password</span> Request a
+                link for an address that <em>does not exist</em>, then for yours.
+              </p>
+              <p class="expect">
+                <strong>Identical wording both times.</strong> The page must not
+                reveal which addresses have accounts.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Take the link from the API terminal and set a new password.
+              </p>
+              <p class="expect">
+                Returned to sign-in with a confirmation banner. You are
+                <em>not</em> auto-signed-in — a link in an inbox should never
+                produce a live session.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Open the same link a second time.</p>
+              <p class="expect">
+                Refused. One use only, and it expires after 30 minutes.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Sign in with the new password.</p>
+              <p class="expect">Works; the old one does not.</p>
+            </div>
+          </li>
+        </ol>
+
+        <h3>Two-factor <span class="tag">task 12</span></h3>
+        <ol class="check" data-section="s3e">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                <span class="where">/account/security</span> Set up two-factor
+                and scan the QR with your authenticator.
+              </p>
+              <p class="expect">
+                A QR code plus a typed secret for apps that cannot scan.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Before entering a code, sign out and back in.
+              </p>
+              <p class="expect">
+                <strong>No code asked for.</strong> An abandoned setup must not
+                lock you out — only finishing it turns two-factor on.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Finish setup: enter a wrong code, then the real one.
+              </p>
+              <p class="expect">
+                Wrong one refused. Then <strong>ten recovery codes</strong>,
+                shown once. Write them down — they are hashed and cannot be shown
+                again.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Sign out and sign in again.</p>
+              <p class="expect">
+                Password, then a second screen asking for a code. Your password
+                alone reaches nothing.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Enter the code your app is showing — if you just used it to
+                enable, wait for the next one.
+              </p>
+              <p class="expect">
+                Signed in. A code already used is refused even while still on
+                screen, which is why you may need to wait 30 seconds.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Sign out, sign in, and use a <strong>recovery code</strong>
+                instead. <span class="tag">task 12</span>
+              </p>
+              <p class="expect">
+                Signed in. Try the same code again — refused; each works once.
+                Another one still works.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Turn two-factor off, using your password.</p>
+              <p class="expect">
+                Sign-in stops asking for a code. Your password, not a code — the
+                usual reason to turn it off is that the authenticator is gone.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <h3>Closing the account</h3>
+        <ol class="check" data-section="s3f">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                <span class="where">/account/security</span> Open Close my
+                account and try to arm it with the password alone, then with
+                lowercase <code>delete</code>.
+              </p>
+              <p class="expect">
+                Disabled both times. Only password plus <code>DELETE</code> in
+                capitals arms it.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Close the account.</p>
+              <p class="expect">
+                Returned to the storefront, signed out. Your old credentials no
+                longer work, and <code>/account</code> sends you to sign in.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                As the admin, find that order in the portal.
+              </p>
+              <p class="expect">
+                The order is still there with its total and address, attributed
+                to a deleted account. Receipts survive; the person does not.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ============================================================ 4 -->
+      <section id="floor">
+        <div class="sec-head">
+          <span class="sec-num">04</span>
+          <h2>Beta customer — quality floor</h2>
+          <span class="counter" data-for="s4"></span>
+        </div>
+        <p class="lede">
+          Section 4.3 calls these non-negotiable on every screen. Check them on at
+          least the home page, a product page, the cart, checkout and
+          <code>/account/security</code>.
+        </p>
+
+        <ol class="check" data-section="s4">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Narrow the window to about 375px, or use a phone.
+              </p>
+              <p class="expect">
+                No sideways scrolling anywhere. The nav collapses to a hamburger;
+                the cart and avatar stay in the header.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Put the mouse away. <kbd>Tab</kbd> through a whole purchase.
+              </p>
+              <p class="expect">
+                Every control reachable, and you can always see where you are.
+                <kbd>Esc</kbd> closes the menus and returns focus to the button
+                that opened them.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Turn on "reduce motion" in your OS settings and reload.
+              </p>
+              <p class="expect">Nothing animates or slides.</p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Check the images have alt text — browser reader mode, or
+                right-click → Inspect.
+              </p>
+              <p class="expect">
+                Descriptions of the product, not "image1.png".
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Read the footer and the suspension message.
+              </p>
+              <p class="expect">
+                Store name, tagline and support address all present. These come
+                from <code>store-config.json</code>, so a cloned store changes
+                them in one file.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Trigger an error on purpose — a wrong password, a duplicate
+                email.
+              </p>
+              <p class="expect">
+                Every message says what went wrong <em>and</em> what to do about
+                it. No stack traces, no raw status codes.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Empty your cart and visit <code>/cart</code>; visit
+                <code>/orders</code> with no orders.
+              </p>
+              <p class="expect">
+                Empty states invite an action ("Browse products"), rather than
+                just reporting emptiness.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ============================================================ 5 -->
+      <section id="record">
+        <div class="sec-head">
+          <span class="sec-num">05</span>
+          <h2>Record what failed</h2>
+          <span class="counter" data-for="s5"></span>
+        </div>
+        <p class="lede">
+          This is the last gate before Phase 5 puts real card details through
+          checkout. Anything unticked is worth writing down before moving on.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Where</th>
+                <th>What you did</th>
+                <th>What happened instead</th>
+                <th>Blocks Phase 5?</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="4" style="color: var(--muted)">
+                  Print this page, or keep notes alongside — anything touching
+                  money, stock or credentials should block; cosmetic issues
+                  should not.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <ol class="check" data-section="s5">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                All five of task 12's own checks are ticked.
+              </p>
+              <p class="expect">
+                Reset via the console link; 2FA with a real app; a recovery code
+                spent; a suspended session dying; and the audit trail refusing
+                <code>UPDATE</code> and <code>DELETE</code>.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Update the <em>Current phase</em> line in
+                <code>CLAUDE.md</code>.
+              </p>
+              <p class="expect">
+                <code>Phase 5 — Payments (Stripe)</code>.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <div class="toolbar">
+          <button class="reset" type="button" id="reset">
+            Reset all progress
+          </button>
+          <span class="counter" data-for="all"></span>
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          Manitou · Phase 4.5 task 12 · companion to
+          <code>PROJECT_PLAN.md</code>. Ticks are stored in this browser only —
+          they are not shared and do not sync.
+        </p>
+      </footer>
+    </div>
+
+    <script>
+      // Progress lives in localStorage so the walkthrough survives a closed tab.
+      // Keys are section + index rather than the item's text, so re-wording an
+      // item does not silently lose a tick.
+      (function () {
+        const KEY = "manitou-p45-t12";
+        let saved = {};
+        try {
+          saved = JSON.parse(localStorage.getItem(KEY) || "{}");
+        } catch {
+          saved = {};
+        }
+
+        const boxes = [];
+        document.querySelectorAll("ol.check").forEach((list) => {
+          const section = list.dataset.section;
+          list.querySelectorAll('input[type="checkbox"]').forEach((box, i) => {
+            const id = section + ":" + i;
+            box.id = id;
+            box.checked = Boolean(saved[id]);
+            box.closest("li").classList.toggle("ticked", box.checked);
+            box.addEventListener("change", () => {
+              saved[id] = box.checked;
+              localStorage.setItem(KEY, JSON.stringify(saved));
+              box.closest("li").classList.toggle("ticked", box.checked);
+              render();
+            });
+            boxes.push({ id, box, group: section.slice(0, 2) });
+          });
+        });
+
+        function render() {
+          const groups = {};
+          boxes.forEach((b) => {
+            groups[b.group] = groups[b.group] || { done: 0, total: 0 };
+            groups[b.group].total++;
+            if (b.box.checked) groups[b.group].done++;
+          });
+          document.querySelectorAll(".counter").forEach((el) => {
+            const key = el.dataset.for;
+            const g =
+              key === "all"
+                ? {
+                    done: boxes.filter((b) => b.box.checked).length,
+                    total: boxes.length,
+                  }
+                : groups[key];
+            if (!g) return (el.textContent = "");
+            el.textContent = g.done + " / " + g.total + " done";
+            el.classList.toggle("done", g.done === g.total && g.total > 0);
+          });
+        }
+
+        document.getElementById("reset").addEventListener("click", () => {
+          if (!confirm("Clear every tick on this page?")) return;
+          saved = {};
+          localStorage.removeItem(KEY);
+          boxes.forEach((b) => {
+            b.box.checked = false;
+            b.box.closest("li").classList.remove("ticked");
+          });
+          render();
+        });
+
+        render();
+      })();
+    </script>
+  </body>
+</html>

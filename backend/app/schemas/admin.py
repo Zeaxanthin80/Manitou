@@ -342,3 +342,9 @@ class AdminAuditPage(BaseModel):
     total: int
     limit: int
     offset: int
+    #: Every distinct action present in the trail, for the filter dropdown.
+    #: Sent rather than hardcoded in the web app because `action` is free text
+    #: with no CHECK constraint -- new actions need no migration, so any list
+    #: kept elsewhere goes stale the first time one is recorded. Phase 5's
+    #: payment events will appear here on their own.
+    actions: list[str]
