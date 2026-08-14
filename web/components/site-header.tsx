@@ -5,6 +5,7 @@ import { currentCart } from "@/app/actions/cart";
 import { AccountMenu } from "@/components/account-menu";
 import { CategoryNav } from "@/components/category-nav";
 import { MobileMenu } from "@/components/mobile-menu";
+import { buttonClasses } from "@/components/ui/button";
 import { CartIcon } from "@/components/ui/icons";
 import { listCategories } from "@/lib/api";
 import { storeConfig } from "@/lib/store-config";
@@ -100,9 +101,30 @@ export async function SiteHeader() {
             </>
           ) : (
             <>
+              {/* Two links 8px apart, styled identically, read as one run of
+                  text rather than two choices. Weight is what separates them:
+                  "Sign in" takes a border and full-strength text, "Create
+                  account" stays a plain muted link beside it.
+
+                  buttonClasses rather than <Button>: this navigates, so it has
+                  to stay an <a> -- openable in a new tab, copyable, announced as
+                  a link. The helper exists for exactly that case.
+
+                  ghost, not accent: the accent is reserved for states needing
+                  attention (Section 4.3), and a permanent nav link is not one.
+                  Bordered-on-transparent is also the language OrderStatus and
+                  the VENDOR PORTAL badge already speak.
+
+                  h-9 py-0 overrides the variant's py-2, which computes to 38px.
+                  Every other control in this header -- hamburger, cart, avatar
+                  -- is size-9. Matching 36px keeps the header exactly as tall
+                  signed out as signed in, so signing in shifts nothing. */}
               <Link
                 href="/login"
-                className="shrink-0 text-muted transition-colors hover:text-text motion-reduce:transition-none"
+                className={buttonClasses({
+                  variant: "ghost",
+                  className: "h-9 shrink-0 py-0",
+                })}
               >
                 Sign in
               </Link>

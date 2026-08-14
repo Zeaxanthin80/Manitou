@@ -106,6 +106,14 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
   tokens, hashes, or secrets.
 - **Never propose admin impersonation** ("sign in as this customer") in v1. It makes an admin's
   actions indistinguishable from the customer's, and it mints a token for an arbitrary user.
+- **Never propose social sign-in** ("Continue with Google") for v1. `password_hash` is NOT NULL and
+  five operations re-authenticate by password, so a passwordless account is a second identity model,
+  not a login button. See PROJECT_PLAN.md Section 12.
+- **Delivery method is store config, never hardcoded** (`fulfilment.method`: `carrier` / `courier` /
+  `pickup`) — T-shirts and candles ship by carrier, the grocery clone uses its own delivery staff.
+  Every delivery event records a `source` (`admin` / `carrier` / `courier` / `customer`), so
+  a status an admin asserted is distinguishable from one a carrier confirmed. Never auto-mark an
+  order delivered on a timer. See PROJECT_PLAN.md Phase 5.5.
 - Secrets (DB password, Stripe keys) come from env vars / AWS Secrets Manager. Never commit them.
 - Validate all input at the API boundary with Pydantic.
 - Stripe handles card data; we store only Stripe reference IDs.

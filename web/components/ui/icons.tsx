@@ -7,7 +7,7 @@
  * icon font or a coloured asset would be a hardcoded colour by another name,
  * which Section 4.3 forbids.
  *
- * All three are aria-hidden. An icon that sits inside a control never carries
+ * All of them are aria-hidden. An icon that sits inside a control never carries
  * the accessible name -- the control does, via its own text or aria-label.
  * Announcing the icon too would just say everything twice.
  */
@@ -50,6 +50,33 @@ export function CloseIcon({ className }: IconProps) {
     <svg {...base} className={className}>
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
+    </svg>
+  );
+}
+
+/**
+ * The pair below follows the convention every browser and password manager
+ * already uses: the OPEN eye is what you see while the password is hidden,
+ * because it offers the action "reveal". The struck-through eye appears once
+ * the password is showing. Reading them as status rather than as an action is
+ * the easy way to get this backwards.
+ */
+export function EyeIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+export function EyeOffIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      {/* No pupil on this one. At 20px a stroked circle behind the slash turns
+          into a smudge; the outline plus the slash stays legible. */}
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <path d="m3 3 18 18" />
     </svg>
   );
 }

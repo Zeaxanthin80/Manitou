@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 
 /** Shared feedback block, so every form on this page reports the same way. */
 function Feedback({ error, ok }: { error?: string; ok?: string }) {
@@ -40,10 +41,9 @@ export function ChangePasswordForm() {
     <form action={action} className="flex max-w-md flex-col gap-4">
       <FormField id="current_password" label="Current password" required>
         {(c) => (
-          <Input
+          <PasswordInput
             {...c}
             name="current_password"
-            type="password"
             autoComplete="current-password"
           />
         )}
@@ -55,10 +55,9 @@ export function ChangePasswordForm() {
         hint="At least 8 characters."
       >
         {(c) => (
-          <Input
+          <PasswordInput
             {...c}
             name="new_password"
-            type="password"
             autoComplete="new-password"
             minLength={8}
           />
@@ -91,10 +90,9 @@ export function ChangeEmailForm({ current }: { current: string }) {
       </FormField>
       <FormField id="email_password" label="Current password" required>
         {(c) => (
-          <Input
+          <PasswordInput
             {...c}
             name="current_password"
-            type="password"
             autoComplete="current-password"
           />
         )}
@@ -151,10 +149,9 @@ export function TwoFactorSection({ enabled }: { enabled: boolean }) {
         </p>
         <FormField id="disable_password" label="Current password" required>
           {(c) => (
-            <Input
+            <PasswordInput
               {...c}
               name="current_password"
-              type="password"
               autoComplete="current-password"
             />
           )}
@@ -259,10 +256,9 @@ export function CloseAccountForm() {
         </p>
         <FormField id="close_password" label="Current password" required>
           {(c) => (
-            <Input
+            <PasswordInput
               {...c}
               name="current_password"
-              type="password"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

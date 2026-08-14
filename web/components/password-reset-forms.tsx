@@ -6,6 +6,7 @@ import { forgotPasswordAction, resetPasswordAction } from "@/app/actions/account
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 
 export function ForgotPasswordForm() {
   const [state, action, pending] = useActionState(forgotPasswordAction, {});
@@ -62,10 +63,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
         hint="At least 8 characters."
       >
         {(c) => (
-          <Input
+          <PasswordInput
             {...c}
             name="new_password"
-            type="password"
             autoComplete="new-password"
             minLength={8}
           />

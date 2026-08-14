@@ -23,6 +23,19 @@ body {
   font-family: var(--font-body);
 }
 
+/* Edge on Windows draws its own reveal control inside every password input.
+   Beside PasswordInput's toggle that is two eyes in one field, and the native
+   one does not know about our state -- so the icons can end up disagreeing
+   about whether the password is showing. Ours stays because it is the one that
+   is labelled, keyboard-reachable and styled from the tokens.
+
+   Invisible on Linux and macOS, which is exactly why it needs to be written
+   down rather than discovered by a Windows customer. */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
 /* Toast entrance. Defined here rather than pulled from a plugin -- `animate-in`
    belongs to tailwindcss-animate, which is not installed, so that class silently
    did nothing.

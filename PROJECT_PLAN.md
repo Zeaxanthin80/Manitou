@@ -70,14 +70,21 @@ configuration and content, not by rewriting the architecture.
 
 ## 1.1 Reusability Seams (deliberate, minimal)
 
-These three seams exist so the repo can be cloned and adapted without a rewrite. They cost almost
+These four seams exist so the repo can be cloned and adapted without a rewrite. They cost almost
 nothing in the default T-shirt build. **Nothing beyond this list should be generalized in advance.**
+
+The fourth was added deliberately, after the first three, when planning Phase 5.5 — recorded here
+rather than smuggled in. It passes the same test as the others: a `method` column costs nothing in
+a store that ships by carrier, while retrofitting a second delivery-confirmation path onto a schema
+with no shipment table is a migration plus a rewrite of every fulfilment code path. It is the same
+argument `unit_of_measure` already won, for the same clone.
 
 | Seam                               | What it is                                                                                                                              | Why now, not later                                                                                                       |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | **Store configuration**            | One config source for store name, currency, locale, tax behavior, and feature flags (e.g. `variants_enabled`, `weight_pricing_enabled`) | If these values scatter across API code and React components, cloning means hunting through files instead of editing one |
 | **`unit_of_measure` on products**  | `each` (default), `lb`, `kg`, `oz`, `g`                                                                                                 | A grocery store sells by weight. Without this column, that store type is a rewrite rather than a clone                   |
 | **`attributes` JSONB on variants** | Free-form key/value per variant: `{"size":"L","color":"red"}` or `{"scent":"cedar","wax":"soy"}`                                        | Lets each store type define its own variant dimensions with no schema change                                             |
+| **`fulfilment.method` + event `source`** (Phase 5.5) | `carrier` (default), `courier`, `pickup` in store config; every delivery event records what confirmed it — `admin`, `carrier`, `courier`, `customer` | A store running its own delivery staff confirms from an app, not a carrier's API. Without these columns that store is a rewrite rather than a clone, and the evidence quality of a delivery is unrecoverable after the fact |
 
 Everything else — the catalog, cart, checkout, order, and payment model — is already store-type
 agnostic as designed in Section 6.
@@ -704,6 +711,61 @@ is safe only when every action taken inside it is attributable, which is impossi
 5. **[You + Claude Code]** Record payment references in the `payments` table (Section 6.3).
 6. **[You]** Run the full checkout using Stripe's test cards and confirm the order is marked paid.
 
+### Phase 5.5 — Fulfilment, Tracking & Delivery Confirmation
+
+Until this phase, `delivered` means an admin clicked a button. The audit trail records *who claimed
+it and when they claimed it* — provenance, not evidence — and `orders` carries no carrier, no
+tracking number and no dispatch or delivery timestamp. Three things need that fixed: a payment
+processor answering a "product not received" dispute wants `shipping_carrier`,
+`shipping_tracking_number` and `shipping_date` and will not accept a status word; a customer
+currently sees no tracking link or dates at all; and the vendor has no record of what was sent.
+
+After Phase 5 rather than before it: nothing in Phase 5 consumes shipment data, and dispute evidence
+only matters once real money moves, which is Phase 6 onward. Before Phase 6 rather than after,
+because that is when it starts mattering.
+
+1. **[You + Claude Code]** Migration: `shipments` and `shipment_events` (Section 6.3), four CHECK
+   constraints, the append-only trigger, indexes. Autogenerate does not detect CHECK constraints
+   (Section 6.8) — write them by hand, drop them explicitly in `downgrade()`, and verify against
+   `pg_constraint`.
+2. **[You + Claude Code]** Models, plus the `fulfilment` block in store config: `method` and a
+   carrier list of `{code, name, tracking_url}`. Carrier lists are store-specific — a UK clone uses
+   Royal Mail — so they belong in config, not code. Validate at startup that `method: "carrier"`
+   has a non-empty list.
+3. **[You + Claude Code]** Service layer: create a shipment, record an event, couple both to the
+   order status in one transaction.
+4. **[You + Claude Code]** `POST /admin/orders/{id}/shipment` records dispatch and advances the
+   order to `shipped`; `POST /admin/orders/{id}/shipment/events` records `delivered` or `failed`.
+   `ALLOWED_TRANSITIONS` stays the single authority on legality — but `shipped` and `delivered` now
+   require evidence, so `PATCH /admin/orders/{id}/status` 409s for those two and names the endpoint
+   that does the job. Manual delivery remains possible (there is no carrier webhook yet) and is
+   recorded honestly as `source: 'admin'`.
+5. **[You + Claude Code]** Vendor portal: a dispatch form (carrier picker from config plus tracking
+   number) in place of the bare "Mark shipped" button, a shipment panel with the tracking link, and
+   the event timeline.
+6. **[You + Claude Code]** Storefront: the tracking timeline on the customer's order page — Ordered
+   → Paid → Dispatched with a working carrier link → Delivered, with dates. This is the
+   transparency the phase exists for.
+7. **[You + Claude Code]** Tests, including mutation-testing each new guard: break the CHECK, break
+   the transition rule, and watch the test fail before fixing it.
+8. **[You]** Walk it end to end with a real tracking number, then confirm from `psql` that
+   `shipment_events` refuses an `UPDATE` and a `DELETE`.
+
+**Deliberately not in this phase:**
+
+- **Carrier tracking webhooks** (EasyPost, Shippo, AfterShip, or a carrier API directly). Needs an
+  external account, and Phase 5 task 4 builds the webhook pattern — signature verification,
+  idempotency, out-of-order events — that this should copy rather than reinvent. Its own phase.
+- **The `courier` role, its confirmation endpoint, and the delivery app.** The grocery clone adds
+  all three; the schema accepts them with no migration, which is the whole point of the seam.
+  Building them now means a role nobody holds and an endpoint with no client, guessing at the auth
+  model of an app that does not exist yet.
+- **Buying shipping labels, partial shipments, and stored proof-of-delivery files.** The last needs
+  S3, which arrives in Phase 6.
+- **Auto-marking an order delivered N days after dispatch.** Tempting and wrong: it writes a fact
+  nobody observed into the row later handed to a payment processor as evidence, and it is wrong
+  precisely when the parcel was lost — the only case that matters.
+
 ### Phase 6 — AWS Deployment
 
 1. **[You]** Create an **AWS account** at aws.amazon.com. A payment method is required, but you'll
@@ -840,6 +902,38 @@ reference to another table's PK).
 A log an application can quietly rewrite is not evidence of anything, and the whole point of this
 table is that it can be trusted after something has gone wrong. Retention and archiving are a
 Phase 8 concern; nothing prunes it in v1.
+
+**shipments** (Phase 5.5)
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint | **PK** |
+| order_id | bigint | **FK** → orders.id, **unique**. One parcel per order in v1. The constraint is easy to drop later; code that must ask "which shipment?" everywhere is not. Partial shipments would need a `shipment_items` join table — deliberately out of scope |
+| method | text | `'carrier'`, `'courier'` or `'pickup'` — CHECK. The Section 1.1 seam: the T-shirt and candle stores ship by carrier, the grocery clone delivers with its own staff |
+| carrier | text | nullable; matches a `code` in the store config's carrier list |
+| tracking_number | text | nullable |
+| dispatched_at | timestamptz | not null |
+| delivered_at | timestamptz | nullable. Denormalised from `shipment_events` so "delivered in the last 30 days" is one indexed query rather than a subquery |
+| created_at | timestamptz | default now() |
+
+CHECK `method_requires_tracking`: a `carrier` shipment must have both `carrier` and
+`tracking_number`. That row is exactly what a payment processor asks for during a "not received"
+dispute, so the database refuses to store one without it — an optional field ends up empty
+precisely on the orders where it matters.
+
+**shipment_events** (Phase 5.5) — append-only
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint | **PK** |
+| shipment_id | bigint | **FK** → shipments.id, indexed |
+| status | text | `dispatched`, `in_transit`, `out_for_delivery`, `delivered`, `failed`, `returned` — CHECK |
+| occurred_at | timestamptz | When it happened, according to the source |
+| recorded_at | timestamptz | When we learned. Separate on purpose: a webhook arriving Tuesday about a Monday delivery must record Monday, or the customer's timeline lies and the dispute evidence carries the wrong shipping date |
+| source | text | `admin`, `carrier`, `courier`, `customer` — CHECK. The second half of the Section 1.1 seam, and what makes evidence quality legible: a status set by an admin clicking a button is not the same fact as one confirmed by a carrier |
+| actor_email | text | nullable **snapshot**, never a join — same rule as `audit_events` |
+| detail | jsonb | Proof payload: signature URL, photo, geolocation, courier id. Named `detail`, not `metadata`, for the same SQLAlchemy reason as `audit_events.details` |
+
+Append-only by trigger, like `audit_events` and for the same reason: evidence an application can
+rewrite is not evidence. This table is what answers a chargeback.
 
 **addresses**
 | Column | Type | Notes |
@@ -1341,9 +1435,33 @@ Version 1 — the target for your first live store — is exactly this:
    help a customer who forgot their password is not launchable, so this is v1 scope, not a
    follow-on.
 5. Stripe test-mode checkout.
-6. Deployed on AWS.
+6. **Fulfilment and tracking (Phase 5.5):** a carrier and tracking number recorded against every
+   dispatch, an append-only delivery event log, and a tracking timeline the customer can see. A
+   store that cannot evidence a delivery cannot answer a chargeback, so this is v1 scope, not a
+   follow-on — for the same reason password reset was.
+7. Deployed on AWS.
 
 After v1 launches, add reviews, richer search, sales reporting, and the mobile apps (Phase 7).
+
+**Deliberately not in v1:**
+
+- **Social / federated sign-in** ("Continue with Google", Apple, GitHub). Not a button — a second
+  identity model. `users.password_hash` is `NOT NULL`, and five operations re-check the password to
+  re-authenticate: change password, change email, close account, disable two-factor, and admin
+  anonymise. A passwordless account needs a separate answer for each of those before the first
+  provider is wired up. Linking a provider to an existing account by email address is also an
+  account-takeover route unless the provider's `email_verified` claim is required *and* the link is
+  confirmed by the account holder: otherwise someone who registers `victim@gmail.com` with a
+  password first inherits the victim's later Google sign-in. Each provider is additionally an
+  external account, a consent screen, and — for Google in production — an app review. Revisit
+  after v1 as its own phase, not as an addition to an existing one.
+- **Guest checkout.** Accounts are required to buy, deliberately. `orders.user_id` is `NOT NULL`
+  with `NO ACTION`, and that single constraint is what makes order history, "anonymise never
+  delete", and the audit trail's actor column work. Supporting guests means a nullable `user_id`
+  plus a contact-details snapshot on the order, which weakens the anonymisation rule — an order
+  with no user row is a personal record with nothing to scrub. The conversion cost of forcing
+  registration is real and known; the trade is accepted for v1 and worth revisiting once Phase 5
+  makes conversion measurable.
 
 ---
 

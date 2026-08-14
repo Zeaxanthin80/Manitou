@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import type { AdminUserDetail } from "@/lib/api";
 
 /**
@@ -143,10 +144,9 @@ function AnonymiseForm({ user }: { user: AdminUserDetail }) {
 
         <FormField id="anon_password" label="Your password" required>
           {(c) => (
-            <Input
+            <PasswordInput
               {...c}
               name="current_password"
-              type="password"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

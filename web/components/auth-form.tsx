@@ -6,6 +6,7 @@ import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import type { FormState } from "@/app/actions/auth";
 
 /**
@@ -61,9 +62,8 @@ export function AuthForm({
           required
         >
           {(control) => (
-            <Input
+            <PasswordInput
               name="password"
-              type="password"
               // Tells a password manager whether to offer a saved password or
               // generate a new one.
               autoComplete={includeName ? "new-password" : "current-password"}
