@@ -9,12 +9,25 @@ import { Input } from "@/components/ui/input";
 import type { AdminProduct } from "@/lib/api";
 
 /**
- * Product images, referenced by URL.
+ * Product images, chosen from the files in web/public/.
  *
- * No file picker: Phase 6 moves storage to S3 + CloudFront and a container
- * filesystem is ephemeral, so anything uploaded to local disk now would be
- * thrown away. What changes in Phase 6 is where the URL comes from, not this
- * screen.
+ * `available` is read on the server by lib/public-images.ts and passed in --
+ * this is a Client Component and cannot read a filesystem.
+ *
+ * It used to be a free-text URL box, which is how an external address reached
+ * the database and made next/image throw at RENDER time on the home page, the
+ * product page and this page at once. This screen being one of the casualties is
+ * what made it bad: the only control that can remove a broken image lived on a
+ * page the broken image had already taken down. A list of real files removes the
+ * possibility rather than validating against it -- though the API-side validator
+ * stays too, because a Server Action is a reachable POST endpoint and not
+ * everything that calls it is this form.
+ *
+ * No upload yet: a container filesystem is ephemeral and the API is a separate
+ * service, so anything written to local disk now would be thrown away. Phase 6
+ * moves storage to S3 + CloudFront and turns this into a real file input --
+ * `accept="image/*"` alone offers camera and photo library on a phone. What the
+ * API receives, a url string, does not change.
  *
  * Exactly one image is primary, enforced by a partial unique index
  * (uq_product_images_one_primary) rather than by this component. Promoting a new
@@ -22,7 +35,13 @@ import type { AdminProduct } from "@/lib/api";
  * oldest survivor. Both happen server-side, so a stale tab cannot leave a
  * product with no primary image.
  */
-export function ProductImagesEditor({ product }: { product: AdminProduct }) {
+export function ProductImagesEditor({
+  product,
+  available,
+}: {
+  product: AdminProduct;
+  available: string[];
+}) {
   const [addState, addAction, adding] = useActionState(addImageAction, {});
   const [rowState, rowAction, busy] = useActionState(imageAction, {});
 
@@ -102,10 +121,56 @@ export function ProductImagesEditor({ product }: { product: AdminProduct }) {
         <form action={addAction} className="mt-4 grid max-w-2xl gap-4">
           <input type="hidden" name="product_id" value={product.id} />
           <input type="hidden" name="slug" value={product.slug} />
-          <label className="flex flex-col gap-1 font-body text-sm text-text">
-            Image URL
-            <Input name="url" required placeholder="/placeholder-product.png" />
-          </label>
+          <fieldset className="flex flex-col gap-1">
+            <legend className="font-body text-sm text-text">Image</legend>
+            {available.length === 0 ? (
+              <p className="mt-1 font-body text-sm text-muted">
+                No images found in <code>web/public/</code>. Add a file there and
+                reload this page.
+              </p>
+            ) : (
+              <ul className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {available.map((url) => (
+                  <li key={url}>
+                    {/* The whole tile is the label, so the picture is the click
+                        target rather than a radio dot beside it. */}
+                    <label className="group flex cursor-pointer flex-col gap-1">
+                      {/* Nothing preselected on purpose. Alphabetical order is
+                          not a meaningful default, and this writes to the live
+                          storefront -- `required` making the admin choose beats
+                          a silent wrong pick. */}
+                      <input
+                        type="radio"
+                        name="url"
+                        value={url}
+                        required
+                        className="peer sr-only"
+                      />
+                      <span className="relative block aspect-[4/5] overflow-hidden rounded-sm border border-border bg-background peer-checked:border-accent peer-focus-visible:outline peer-focus-visible:outline-2">
+                        <Image
+                          src={url}
+                          alt=""
+                          fill
+                          sizes="120px"
+                          className="object-cover"
+                        />
+                      </span>
+                      <span className="truncate font-body text-xs text-muted peer-checked:text-text">
+                        {url}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <span className="mt-2 font-body text-xs text-muted">
+              Only files in <code>web/public/</code>. There is no free-text field
+              on purpose: a link to another site is accepted by the form and then
+              fails when the page renders, which breaks the storefront for every
+              visitor. Drop a file in that folder to add to this list. Phase 6
+              replaces this with a real upload.
+            </span>
+          </fieldset>
           <label className="flex flex-col gap-1 font-body text-sm text-text">
             Alt text
             <Input

@@ -7,6 +7,7 @@ import { ProductImagesEditor } from "@/components/product-images-editor";
 import { ProductVariantsEditor } from "@/components/product-variants-editor";
 import { ProductVisibility } from "@/components/product-visibility";
 import { ApiError, listAdminProducts, listCategories } from "@/lib/api";
+import { listPublicImages } from "@/lib/public-images";
 import { getSession } from "@/lib/session";
 
 /**
@@ -28,6 +29,10 @@ export default async function EditProductPage({
   const { id } = await params;
   const productId = Number(id);
   if (!Number.isInteger(productId)) notFound();
+
+  // available is a local filesystem read, so it cannot fail the way the two API
+  // calls can -- listPublicImages swallows its own errors and returns [].
+  const available = await listPublicImages();
 
   let products, categories;
   try {
@@ -84,7 +89,7 @@ export default async function EditProductPage({
         </section>
 
         <ProductVariantsEditor product={product} />
-        <ProductImagesEditor product={product} />
+        <ProductImagesEditor product={product} available={available} />
 
         <section>
           <h2 className="mb-4 font-body text-sm uppercase tracking-tight text-muted">

@@ -343,7 +343,21 @@ async function request<T>(path: string, options: Options = {}): Promise<T> {
     let detail = `${method} ${path} -> ${res.status}`;
     try {
       const payload = await res.json();
-      if (typeof payload?.detail === "string") detail = payload.detail;
+      if (typeof payload?.detail === "string") {
+        // HTTPException: `detail` is the sentence the endpoint wrote.
+        detail = payload.detail;
+      } else if (Array.isArray(payload?.detail)) {
+        // Pydantic validation (422) puts an ARRAY of {loc, msg, type} here, not
+        // a string. Without this branch every schema-level rejection fell
+        // through to the generic message above, so a careful error written in a
+        // validator reached the admin as "POST /admin/products/36/images -> 422".
+        // Pydantic v2 prefixes a raised ValueError with "Value error, "; that is
+        // an implementation detail of the library, not something to show a user.
+        const messages = payload.detail
+          .map((e: { msg?: string }) => e?.msg?.replace(/^Value error, /, ""))
+          .filter(Boolean);
+        if (messages.length > 0) detail = messages.join(" ");
+      }
     } catch {
       /* non-JSON error body; keep the generic message */
     }

@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.address import AddressRead
 from app.schemas.order import OrderItemRead
@@ -90,6 +90,17 @@ class AdminImageRead(BaseModel):
     is_primary: bool
 
 
+# One sentence, reused by every branch below. The person reading it is the store
+# owner, so it says what to do instead rather than just what was wrong -- and it
+# never echoes the rejected value back, which would only invite pasting it again.
+_URL_ERROR = (
+    "Image URL must be a site-relative path such as /product-placeholder.png. "
+    "Put the file in web/public/ and reference it by path. External URLs are "
+    "rejected because the storefront only renders images from hosts it "
+    "allowlists, so an unlisted one breaks the page for every visitor."
+)
+
+
 class AdminImageCreate(BaseModel):
     """A product image, referenced by URL.
 
@@ -102,6 +113,46 @@ class AdminImageCreate(BaseModel):
     url: str = Field(min_length=1)
     alt_text: str = Field(min_length=1)
     is_primary: bool = False
+
+    @field_validator("url")
+    @classmethod
+    def url_is_site_relative(cls, value: str) -> str:
+        """Only a path inside this site.
+
+        Learned the hard way: an external URL is accepted happily here and then
+        fails at RENDER time, because next/image refuses any host not listed in
+        web/next.config.ts (which deliberately lists none -- see the comment
+        there). So one bad row took down the home page, the product page and the
+        admin edit page at once, and the edit page is the only place that can
+        remove the image. Validating on the way in is what stops a single typo
+        becoming an outage you cannot click your way out of.
+
+        Phase 6 moves images to S3 + CloudFront and this widens to allow that one
+        host. Until then, site-relative or nothing.
+        """
+        url = value.strip()
+
+        if not url.startswith("/"):
+            raise ValueError(_URL_ERROR)
+        # The one that matters. "//host/x.png" starts with "/", so a bare
+        # startswith check waves it straight through -- and a browser reads a
+        # protocol-relative URL as external. Any version of this guard that
+        # misses this case is decorative.
+        if url.startswith("//"):
+            raise ValueError(_URL_ERROR)
+        # Backslashes because some parsers fold them to "/", which turns
+        # "/\host" back into "//host" after this check has already passed.
+        if "\\" in url:
+            raise ValueError(_URL_ERROR)
+        # Traversal out of web/public/.
+        if ".." in url:
+            raise ValueError(_URL_ERROR)
+        # Any internal whitespace or control character: never legitimate, and it
+        # produces a URL nobody can debug by looking at it.
+        if any(c.isspace() or ord(c) < 32 for c in url):
+            raise ValueError(_URL_ERROR)
+
+        return url
 
 
 class AdminImageUpdate(BaseModel):

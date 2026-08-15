@@ -4,6 +4,8 @@ import pytest
 
 ROUTES = [
     ("get", "/admin/products", None),
+    ("get", "/admin/products/1", None),
+    ("get", "/admin/inventory", None),
     ("get", "/admin/orders", None),
     ("post", "/admin/products", {"name": "x", "slug": "x", "category_id": 1,
                                  "base_price": "1.00",
@@ -173,3 +175,91 @@ def test_inventory_update_reaches_the_storefront(
 
     assert client.patch(f"/admin/variants/{variant.id}/inventory", headers=h,
                         json={"quantity_available": -1}).status_code == 422
+
+
+# --------------------------------------------------------- image URL guard --
+#
+# A product image is stored as a URL and rendered by next/image, which refuses
+# any host not listed in web/next.config.ts -- and that file deliberately lists
+# none. So an external URL is accepted by the API and then explodes at render
+# time, taking out the home page, the product page and the admin edit page at
+# once. These tests are the reason that cannot happen twice.
+
+REJECTED_URLS = [
+    pytest.param("https://example.com/shirt.png", id="https"),
+    pytest.param("http://example.com/shirt.png", id="http"),
+    # The one a naive startswith("/") check waves straight through. A browser
+    # reads a protocol-relative URL as external, so this is the case that
+    # decides whether the guard is real.
+    pytest.param("//example.com/shirt.png", id="protocol-relative"),
+    pytest.param("/\\example.com/shirt.png", id="slash-backslash"),
+    pytest.param("\\\\example.com\\shirt.png", id="unc-path"),
+    pytest.param("/../../etc/passwd", id="traversal"),
+    pytest.param("/img/../../secret.png", id="traversal-midpath"),
+    pytest.param("data:image/png;base64,iVBORw0KGgo=", id="data-uri"),
+    pytest.param("javascript:alert(1)", id="javascript"),
+    pytest.param("product-placeholder.png", id="no-leading-slash"),
+    pytest.param("/img/two words.png", id="internal-space"),
+]
+
+
+@pytest.mark.parametrize("url", REJECTED_URLS)
+def test_external_image_urls_are_refused(
+    client, db, make_user, make_product, auth_headers, url
+):
+    from app.models import ProductImage
+
+    admin = make_user(email="admin@manitou.example", role="admin")
+    product = make_product()
+
+    r = client.post(
+        f"/admin/products/{product.id}/images",
+        headers=auth_headers(admin),
+        json={"url": url, "alt_text": "A shirt"},
+    )
+    assert r.status_code == 422, f"{url!r} was accepted"
+
+    # The message has to survive the trip, not just the rejection: the web
+    # client renders Pydantic's `msg`, so an empty or generic one leaves the
+    # admin staring at "-> 422".
+    assert "site-relative" in str(r.json()["detail"])
+
+    # And nothing was written. Checked against the table rather than an endpoint
+    # because there is no GET /admin/products/{id} -- the list is the only read.
+    assert db.query(ProductImage).filter_by(product_id=product.id).count() == 0
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["/product-placeholder.png", "/img/nested/deep/shirt.webp", "/a.png?v=2"],
+)
+def test_site_relative_image_urls_are_accepted(
+    client, make_user, make_product, auth_headers, url
+):
+    admin = make_user(email="admin@manitou.example", role="admin")
+    product = make_product()
+
+    r = client.post(
+        f"/admin/products/{product.id}/images",
+        headers=auth_headers(admin),
+        json={"url": url, "alt_text": "A shirt"},
+    )
+    assert r.status_code == 201
+    assert r.json()["images"][0]["url"] == url
+
+
+def test_image_url_whitespace_is_stripped_not_rejected(
+    client, make_user, make_product, auth_headers
+):
+    """A trailing space from a paste is benign -- clean it rather than refuse."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    product = make_product()
+
+    r = client.post(
+        f"/admin/products/{product.id}/images",
+        headers=auth_headers(admin),
+        json={"url": "  /product-placeholder.png  ", "alt_text": "A shirt"},
+    )
+    assert r.status_code == 201
+    assert r.json()["images"][0]["url"] == "/product-placeholder.png"
+
