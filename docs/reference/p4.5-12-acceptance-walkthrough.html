@@ -682,7 +682,7 @@ python seed.py</code></pre>
           </li>
         </ol>
 
-        <h3>Products and stock</h3>
+        <h3>Products</h3>
         <ol class="check" data-section="s1c">
           <li>
             <input type="checkbox" />
@@ -700,10 +700,13 @@ python seed.py</code></pre>
           <li>
             <input type="checkbox" />
             <div>
-              <p class="do">Add a second variant, then add an image by URL.</p>
+              <p class="do">Add a second variant, then add an image.</p>
               <p class="expect">
-                Try <code>/product-placeholder.png</code>. The first image
-                becomes primary automatically.
+                <strong>Add an image</strong> offers a grid of the files in
+                <code>web/public/</code> — there is no URL box, because a link to
+                another site is accepted by the form and then breaks the page
+                when it renders. Nothing is preselected; pick one. The first
+                image on a product becomes primary automatically.
               </p>
             </div>
           </li>
@@ -746,8 +749,76 @@ python seed.py</code></pre>
             <input type="checkbox" />
             <div>
               <p class="do">
+                <span class="where">/admin/products</span> Sort by
+                <strong>Price</strong>, then click the same heading again.
+              </p>
+              <p class="expect">
+                The order reverses, and the sort appears in the address bar. It is
+                done by the database over the whole catalogue, not by the browser
+                over the rows on screen — so it stays correct on page two.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Filter to one category, then sort, then go to page two if there is
+                one.
+              </p>
+              <p class="expect">
+                All three hold together. Copy the URL into a new tab and the same
+                view comes back.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <h3>Inventory</h3>
+
+        <div class="note">
+          <strong>How this screen works</strong>, because it does not look like
+          the other tables. Every row is one <em>variant</em>, not one product —
+          a shirt in three sizes is three rows.
+          <ul style="margin: 10px 0 0; padding-left: 20px">
+            <li>
+              <strong>In stock</strong> and <strong>Reorder at</strong> are
+              editable boxes, not readouts. Click into one and type.
+            </li>
+            <li>
+              <strong>Save applies that row only.</strong> Nothing saves
+              automatically and there is no save-all — editing five rows means
+              pressing Save five times. Each row reports its own success or
+              failure, so an error belongs to the row that caused it. Leaving the
+              page discards anything typed but not saved.
+            </li>
+            <li>
+              Stock is an <strong>absolute count</strong>, not an adjustment: type
+              what you counted on the shelf, not the difference. Entering
+              <code>12</code> sets it to 12 regardless of what it was.
+            </li>
+            <li>
+              <strong>Status</strong> is worked out by the API, never by the
+              browser — <code>Reorder</code> means stock is at or below the
+              reorder level. One rule in one place is why the storefront and the
+              portal cannot disagree about what "low" means.
+            </li>
+            <li>
+              The last column has no visible heading on purpose: it holds the Save
+              buttons, and its header is read aloud as "Actions" by a screen
+              reader without taking up space for everyone else.
+            </li>
+          </ul>
+        </div>
+
+        <ol class="check" data-section="s1c2">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
                 <span class="where">/admin/inventory</span> Set a variant's stock
-                below its reorder level.
+                below its reorder level, then press <strong>Save</strong> on that
+                row.
               </p>
               <p class="expect">
                 It flips to <strong>Reorder</strong> and jumps to the top of the
@@ -759,7 +830,45 @@ python seed.py</code></pre>
           <li>
             <input type="checkbox" />
             <div>
-              <p class="do">Enter <code>-1</code> as a stock level.</p>
+              <p class="do">
+                Type a new number into <em>two</em> rows, then press Save on only
+                one of them.
+              </p>
+              <p class="expect">
+                Only the saved row changes. Reload the page and the other row is
+                back to its old value — proof that Save is per row and nothing
+                autosaves.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Use the <strong>Needs reorder</strong> and
+                <strong>Out of stock</strong> filters, then <strong>All</strong>.
+              </p>
+              <p class="expect">
+                The counts beside each filter match the number of rows it shows.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Sort by a column heading, then click the same heading again.
+              </p>
+              <p class="expect">
+                The order reverses. The sort survives changing pages and stays in
+                the URL, so the view can be bookmarked or shared.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Enter <code>-1</code> as a stock level and save.</p>
               <p class="expect">Refused with a readable message.</p>
             </div>
           </li>

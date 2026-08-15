@@ -786,6 +786,55 @@ because that is when it starts mattering.
    scaling setup App Runner used to handle.
 8. **[You + Claude Code]** Deploy the web app to **Amplify Hosting**, connected to your Git repo.
 9. **[You + Claude Code]** Set up **S3 + CloudFront** for product images and switch uploads to use them.
+   This is where the admin image field becomes a real upload. Until now it is a picker listing the
+   files already in `web/public/` — deliberately not a free-text URL box, because an external
+   address is accepted by the form and then makes `next/image` throw at *render* time, taking down
+   the storefront and the admin edit page together. The upload uses a **presigned PUT**: the browser
+   asks the API for a URL, sends the file straight to S3, and posts back only the key, so the API
+   never handles the bytes and there is no request-size ceiling. `accept="image/*"` on one file
+   input is all that is needed for a phone to offer both camera and photo library — a `capture`
+   attribute would force the camera and remove the library, which is the opposite of useful. Add
+   the single CloudFront host to `images.remotePatterns`, which is the one host `next.config.ts`
+   was always written to expect, and widen the `AdminImageCreate.url` validator to allow it.
+
+   **Uploading is the primary path, not browsing.** The vendor's normal action is "I photographed
+   this shirt, attach it to this product" — so the file input lives on the product create/edit
+   page and the upload happens there. Browsing an existing library is the *secondary* path, for
+   reusing a photo across products. Building it the other way round is what produces admin screens
+   where adding an image means first going somewhere else to put it.
+
+   Presigned uploads need a **confirm step**, because the browser PUTs straight to S3 and the API
+   never sees it happen: after the PUT succeeds the client posts the key back, and only then does a
+   row exist. An abandoned upload leaves an object nobody references, so the bucket needs a
+   lifecycle rule expiring unconfirmed keys — otherwise it fills with orphans nobody can see.
+
+9b. **[You + Claude Code]** Media library: a modal picker for reusing images already uploaded.
+
+   The Phase 5.5-era picker renders every file as a thumbnail inline on the product page. That is
+   right for the six files in `web/public/` and unusable at two hundred — the page becomes a wall
+   of images with no way to find anything. Replace it with a scrollable modal built on
+   `web/components/ui/modal.tsx`, which already gives a focus trap, Escape-to-close, an inert
+   background and focus return via the native `<dialog>` element. It exists and is currently used
+   only by `/preview`, so this is reuse rather than new UI.
+
+   Inside: search by filename and alt text, sort by upload date (newest first, the default anyone
+   actually wants), name or size, and a grid/list toggle — a list is faster to scan when the names
+   are meaningful and the pictures all look alike.
+
+   **This needs a `media_assets` table, not just an S3 bucket**, and that is the part worth deciding
+   before writing code. `ListObjectsV2` paginates by continuation token rather than offset, so it
+   cannot drive `components/pagination.tsx`; it sorts only by key; it cannot search; and it carries
+   no alt text, dimensions or "which products use this". A table indexed on `uploaded_at` gives all
+   of it and matches how `/admin/orders`, `/admin/users` and `/admin/audit` already paginate. The
+   row is written by the confirm step above: key, original filename, content type, byte size,
+   width, height, `uploaded_at`, `uploaded_by`.
+
+   Then `product_images` references the asset (`asset_id` **FK** → `media_assets.id`) rather than
+   storing a loose URL string. That is what makes "where is this image used?" answerable, and it
+   lets the FK refuse to delete an asset a product still shows — the same `NO ACTION` reasoning
+   used everywhere else in this schema. Deleting an unused asset removes both the row and the S3
+   object; deleting a used one is refused with the list of products holding it.
+
 10. **[You]** Register a domain in **Route 53** and issue an **ACM** certificate for HTTPS.
 11. **[You + Claude Code]** Move secrets into **Secrets Manager** and set up **CloudWatch** logs and alarms.
 
