@@ -407,6 +407,28 @@ def create_product(
     return _to_product(_get_product(db, product.id))
 
 
+@router.get("/products/{product_id}", response_model=AdminProductRead)
+def get_admin_product(
+    product_id: int, db: Session = Depends(get_db)
+) -> AdminProductRead:
+    """One product, for the edit screen.
+
+    Added late, and worth saying why. The edit page used to fetch the whole
+    product list and pick its product out in JavaScript, which is fine while the
+    catalogue fits in one page and quietly wrong afterwards: product 51 came back
+    as a 404 indistinguishable from a deleted one. Sorting made it worse, because
+    WHICH products land in the first page then depends on the sort order -- so the
+    page could break for a different product depending on how the list was last
+    sorted.
+
+    Everything it needs already existed; only the route was missing. `_get_product`
+    eager-loads the variants, their inventory and the images and raises the 404,
+    and `_to_product` orders images primary-first -- the same pair every write
+    endpoint here already returns through.
+    """
+    return _to_product(_get_product(db, product_id))
+
+
 @router.patch("/products/{product_id}", response_model=AdminProductRead)
 def update_product(
     product_id: int,

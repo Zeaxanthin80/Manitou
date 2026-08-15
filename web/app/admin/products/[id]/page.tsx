@@ -6,17 +6,19 @@ import { ProductForm } from "@/components/product-form";
 import { ProductImagesEditor } from "@/components/product-images-editor";
 import { ProductVariantsEditor } from "@/components/product-variants-editor";
 import { ProductVisibility } from "@/components/product-visibility";
-import { ApiError, listAdminProducts, listCategories } from "@/lib/api";
+import { ApiError, getAdminProduct, listCategories } from "@/lib/api";
 import { listPublicImages } from "@/lib/public-images";
 import { getSession } from "@/lib/session";
 
 /**
  * Edit one product: its own fields, its variants, its images, its visibility.
  *
- * There is no GET /admin/products/{id} -- the list endpoint already returns
- * everything this page needs, so it filters rather than adding an endpoint that
- * would duplicate _to_product. If the catalog outgrows one page of results, that
- * trade flips and the endpoint should be added.
+ * Reads GET /admin/products/{id}. It used to fetch the whole list and pick the
+ * product out with .find(), which is the trade this comment used to describe as
+ * acceptable "until the catalog outgrows one page of results". It did not need to
+ * outgrow anything: the list is paged at 50, so product 51 came back as a 404
+ * indistinguishable from a deleted one, and adding sorting made WHICH products
+ * were reachable depend on how the list was last sorted.
  */
 export default async function EditProductPage({
   params,
@@ -34,20 +36,19 @@ export default async function EditProductPage({
   // calls can -- listPublicImages swallows its own errors and returns [].
   const available = await listPublicImages();
 
-  let products, categories;
+  let product, categories;
   try {
-    [products, categories] = await Promise.all([
-      listAdminProducts(token),
+    [product, categories] = await Promise.all([
+      getAdminProduct(token, productId),
       listCategories(),
     ]);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) redirect("/login");
-    if (error instanceof ApiError && error.status === 403) notFound();
+    // 403 and 404 both land on the not-found page: a non-admin must not be able
+    // to tell a product that exists from one that does not.
+    if (error instanceof ApiError && [403, 404].includes(error.status)) notFound();
     throw error;
   }
-
-  const product = products.items.find((p) => p.id === productId);
-  if (!product) notFound();
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-12">

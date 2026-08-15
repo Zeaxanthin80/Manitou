@@ -4,6 +4,7 @@ import pytest
 
 ROUTES = [
     ("get", "/admin/products", None),
+    ("get", "/admin/products/1", None),
     ("get", "/admin/inventory", None),
     ("get", "/admin/orders", None),
     ("post", "/admin/products", {"name": "x", "slug": "x", "category_id": 1,
@@ -414,3 +415,55 @@ def test_inventory_counts_describe_the_catalogue_not_the_page(
     # `total` DOES follow the filter -- it is what pagination needs.
     assert client.get("/admin/inventory?filter=out", headers=h).json()["total"] == 1
 
+
+# ------------------------------------------------------- product detail -----
+
+
+def test_get_product_by_id_is_independent_of_paging(
+    client, make_user, make_product, auth_headers
+):
+    """The bug this endpoint exists for.
+
+    The edit page used to fetch the product LIST and .find() its product in it,
+    so a product outside the first page came back as a 404 that looked exactly
+    like a deleted one. Rather than creating 51 fixtures, this pins the property
+    that actually matters: a product the list is not currently returning is still
+    reachable by id.
+    """
+    admin = make_user(email="admin@manitou.example", role="admin")
+    make_product()
+    make_product()
+    third = make_product()
+    h = auth_headers(admin)
+
+    listed = client.get("/admin/products?limit=1", headers=h).json()
+    assert len(listed["items"]) == 1
+    assert third.id not in [p["id"] for p in listed["items"]], "fixture assumption"
+
+    r = client.get(f"/admin/products/{third.id}", headers=h)
+    assert r.status_code == 200
+    assert r.json()["id"] == third.id
+
+
+def test_get_product_matches_the_list_representation(
+    client, make_user, make_product, auth_headers
+):
+    """Same builder as every other product response, so the edit page cannot see
+    a different shape than the list did."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    product = make_product(variants=2, stock=1)  # reorder_level 2 -> needs_reorder
+    h = auth_headers(admin)
+
+    detail = client.get(f"/admin/products/{product.id}", headers=h).json()
+    from_list = next(
+        p for p in client.get("/admin/products", headers=h).json()["items"]
+        if p["id"] == product.id
+    )
+    assert detail == from_list
+
+
+def test_get_unknown_product_is_404(client, make_user, auth_headers):
+    admin = make_user(email="admin@manitou.example", role="admin")
+    r = client.get("/admin/products/999999", headers=auth_headers(admin))
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Product not found"

@@ -570,6 +570,11 @@ export const listAdminInventory = (
   return request<AdminInventoryPage>(`/admin/inventory?${q}`, { token });
 };
 
+/** One product. Use this over filtering listAdminProducts: the list is paged, so
+ *  a .find() over it only sees whichever page came back. */
+export const getAdminProduct = (token: string, id: number) =>
+  request<AdminProduct>(`/admin/products/${id}`, { token });
+
 export const createProduct = (token: string, body: unknown) =>
   request<AdminProduct>("/admin/products", { token, body });
 
