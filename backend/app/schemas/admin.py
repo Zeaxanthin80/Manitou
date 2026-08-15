@@ -198,6 +198,42 @@ class AdminProductPage(BaseModel):
     offset: int
 
 
+class AdminInventoryRow(BaseModel):
+    """One VARIANT's stock, with enough product context to be readable.
+
+    A row here is a variant, not a product -- a shirt in three sizes is three
+    rows, because stock is counted per variant. That is why inventory needs its
+    own endpoint rather than reading GET /admin/products: paging by product
+    cannot order or page rows that are variants.
+    """
+
+    variant_id: int
+    sku: str
+    variant_name: str
+    product_id: int
+    product_name: str
+    product_slug: str
+    product_active: bool
+    quantity_available: int
+    reorder_level: int
+    needs_reorder: bool
+
+
+class AdminInventoryPage(BaseModel):
+    items: list[AdminInventoryRow]
+    total: int
+    limit: int
+    offset: int
+    #: Counts across the WHOLE catalogue -- not this page, and not the current
+    #: filter. The portal puts them on its filter buttons, so they have to
+    #: describe what each button would show. `total` above cannot serve: it is
+    #: the count matching the ACTIVE filter, which is what pagination needs and
+    #: the wrong number for a button offering a different filter.
+    all_count: int
+    low_count: int
+    out_count: int
+
+
 class AdminOrderSummary(BaseModel):
     """Order as the vendor sees it -- with the customer attached, because a
     vendor dashboard is useless without knowing who ordered."""

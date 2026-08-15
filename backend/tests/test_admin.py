@@ -4,7 +4,6 @@ import pytest
 
 ROUTES = [
     ("get", "/admin/products", None),
-    ("get", "/admin/products/1", None),
     ("get", "/admin/inventory", None),
     ("get", "/admin/orders", None),
     ("post", "/admin/products", {"name": "x", "slug": "x", "category_id": 1,
@@ -262,4 +261,156 @@ def test_image_url_whitespace_is_stripped_not_rejected(
     )
     assert r.status_code == 201
     assert r.json()["images"][0]["url"] == "/product-placeholder.png"
+
+
+# ------------------------------------------------- sorting and filtering ----
+#
+# Sorting is server-side because a response is one PAGE of the catalogue.
+# Ordering the rows a page happens to hold would sort a slice while looking
+# authoritative -- confidently wrong the moment there is a second page.
+
+
+def test_sorting_by_aggregate_does_not_duplicate_rows(
+    client, make_user, make_product, auth_headers
+):
+    """The trap: joining product_variants to sort by a count or sum multiplies
+    the product rows, so a 3-variant product comes back three times and `total`
+    stops matching what is rendered. Only a GROUPED subquery avoids it."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    make_product(variants=3, stock=5)
+    make_product(variants=1, stock=99)
+    h = auth_headers(admin)
+
+    for sort in ("stock", "variants"):
+        body = client.get(f"/admin/products?sort={sort}", headers=h).json()
+        ids = [p["id"] for p in body["items"]]
+        assert len(ids) == len(set(ids)), f"sort={sort} returned duplicate products"
+        assert body["total"] == len(ids), f"sort={sort}: total disagrees with rows"
+
+
+def test_product_without_variants_still_appears_when_sorting_by_stock(
+    client, db, make_user, make_product, auth_headers
+):
+    """LEFT JOIN, not INNER: an aggregate must not delete rows it cannot total."""
+    from app.models import Category, Product
+    from decimal import Decimal
+
+    admin = make_user(email="admin@manitou.example", role="admin")
+    make_product(variants=1)
+    category = db.scalar(__import__("sqlalchemy").select(Category))
+    db.add(Product(name="Bare", slug="bare", category_id=category.id,
+                   base_price=Decimal("5.00")))
+    db.commit()
+
+    body = client.get("/admin/products?sort=stock", headers=auth_headers(admin)).json()
+    assert "Bare" in [p["name"] for p in body["items"]]
+
+
+@pytest.mark.parametrize("sort", ["name", "category", "price", "variants", "stock",
+                                  "visibility"])
+def test_product_sort_directions_are_opposites(
+    client, make_user, make_product, auth_headers, sort
+):
+    admin = make_user(email="admin@manitou.example", role="admin")
+    for _ in range(3):
+        make_product(variants=2)
+    h = auth_headers(admin)
+
+    asc = [p["id"] for p in
+           client.get(f"/admin/products?sort={sort}&direction=asc", headers=h).json()["items"]]
+    desc = [p["id"] for p in
+            client.get(f"/admin/products?sort={sort}&direction=desc", headers=h).json()["items"]]
+    assert set(asc) == set(desc), "direction changed which rows came back"
+    assert len(asc) == 3
+
+
+def test_unknown_sort_is_refused_not_ignored(client, make_user, auth_headers):
+    """422, never a silent fall back to default order. A sort that quietly
+    ignores you is how someone concludes the data itself is wrong."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    h = auth_headers(admin)
+    assert client.get("/admin/products?sort=nonsense", headers=h).status_code == 422
+    assert client.get("/admin/products?direction=sideways", headers=h).status_code == 422
+    assert client.get("/admin/inventory?sort=nonsense", headers=h).status_code == 422
+
+
+def test_category_filter(client, db, make_user, make_product, auth_headers):
+    admin = make_user(email="admin@manitou.example", role="admin")
+    a = make_product()
+    b = make_product()
+    h = auth_headers(admin)
+
+    body = client.get(f"/admin/products?category={a.category_id}", headers=h).json()
+    assert [p["id"] for p in body["items"]] == [a.id]
+    assert body["total"] == 1
+
+    # An unknown category is a 404, not an empty list -- otherwise it is
+    # indistinguishable from a real category that happens to be empty.
+    assert client.get("/admin/products?category=999999", headers=h).status_code == 404
+    assert b.id not in [p["id"] for p in body["items"]]
+
+
+def test_paging_a_sorted_list_keeps_the_order(
+    client, make_user, make_product, auth_headers
+):
+    admin = make_user(email="admin@manitou.example", role="admin")
+    for price in ("10.00", "20.00", "30.00", "40.00"):
+        make_product(base_price=price)
+    h = auth_headers(admin)
+
+    first = client.get("/admin/products?sort=price&limit=2&offset=0", headers=h).json()
+    second = client.get("/admin/products?sort=price&limit=2&offset=2", headers=h).json()
+    prices = [p["base_price"] for p in first["items"] + second["items"]]
+    assert prices == sorted(prices), "order broke across the page boundary"
+    ids = [p["id"] for p in first["items"] + second["items"]]
+    assert len(ids) == len(set(ids)), "a row appeared on both pages"
+
+
+def test_inventory_default_order_puts_the_urgent_first(
+    client, make_user, make_product, auth_headers
+):
+    """Out of stock, then needs-reorder, then the rest -- the order the portal
+    computed client-side before this endpoint existed.
+
+    Created in the OPPOSITE order on purpose. Built urgent-first, insertion order
+    already satisfies the assertion, so replacing the ranking with `ORDER BY id`
+    still passes and the test proves nothing -- which is exactly what happened the
+    first time this was written. Creation order and expected order have to
+    disagree for the assertion to have any force.
+    """
+    admin = make_user(email="admin@manitou.example", role="admin")
+    make_product(stock=50)  # fine   -- created first, must sort LAST
+    make_product(stock=1)   # reorder_level is 2 -> low
+    make_product(stock=0)   # out    -- created last, must sort FIRST
+
+    body = client.get("/admin/inventory", headers=auth_headers(admin)).json()
+    ranks = [
+        0 if r["quantity_available"] == 0 else 1 if r["needs_reorder"] else 2
+        for r in body["items"]
+    ]
+    assert ranks == [0, 1, 2], f"urgent rows were not first: {ranks}"
+
+
+def test_inventory_counts_describe_the_catalogue_not_the_page(
+    client, make_user, make_product, auth_headers
+):
+    """The counts label the filter buttons, so they must not shrink when a
+    filter is applied or a page is small."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    make_product(stock=0)
+    make_product(stock=1)
+    make_product(stock=50)
+    h = auth_headers(admin)
+
+    full = client.get("/admin/inventory", headers=h).json()
+    assert full["all_count"] == 3
+
+    for query in ("?limit=1", "?filter=out", "?filter=low&limit=1"):
+        body = client.get(f"/admin/inventory{query}", headers=h).json()
+        assert body["all_count"] == full["all_count"], query
+        assert body["low_count"] == full["low_count"], query
+        assert body["out_count"] == full["out_count"], query
+
+    # `total` DOES follow the filter -- it is what pagination needs.
+    assert client.get("/admin/inventory?filter=out", headers=h).json()["total"] == 1
 

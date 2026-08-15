@@ -6,7 +6,7 @@ import { useActionState } from "react";
 import { updateInventoryAction } from "@/app/actions/admin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { SortableTH, Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { cn } from "@/lib/cn";
 
 export type InventoryRow = {
@@ -123,7 +123,26 @@ function Row({ row }: { row: InventoryRow }) {
   );
 }
 
-export function InventoryTable({ rows }: { rows: InventoryRow[] }) {
+const SORTS = [
+  { column: "product", label: "Product" },
+  { column: "sku", label: "SKU" },
+  { column: "stock", label: "In stock" },
+  { column: "reorder", label: "Reorder at" },
+  { column: "status", label: "Status" },
+];
+
+export function InventoryTable({
+  rows,
+  sort,
+  direction,
+  params,
+}: {
+  rows: InventoryRow[];
+  sort: string;
+  direction: "asc" | "desc";
+  /** Filter to preserve when a heading is clicked. */
+  params?: Record<string, string | undefined>;
+}) {
   if (rows.length === 0) {
     return (
       <p className="mt-10 font-body text-base text-muted">
@@ -137,11 +156,19 @@ export function InventoryTable({ rows }: { rows: InventoryRow[] }) {
       <Table>
         <THead>
           <TR>
-            <TH>Product</TH>
-            <TH>SKU</TH>
-            <TH>In stock</TH>
-            <TH>Reorder at</TH>
-            <TH>Status</TH>
+            {SORTS.map((s) => (
+              <SortableTH
+                key={s.column}
+                column={s.column}
+                label={s.label}
+                sort={sort}
+                direction={direction}
+                basePath="/admin/inventory"
+                params={params}
+              />
+            ))}
+            {/* Holds the Save buttons. The heading is screen-reader-only: an
+                actions column needs a name announced, not a word printed. */}
             <TH>
               <span className="sr-only">Actions</span>
             </TH>

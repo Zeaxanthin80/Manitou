@@ -498,10 +498,77 @@ export const updateOrderStatus = (token: string, id: number, status: string) =>
 
 /* ------------------------------------------------------- admin: catalog -- */
 
-export const listAdminProducts = (token: string, limit = 50, offset = 0) =>
-  request<Page<AdminProduct>>(`/admin/products?limit=${limit}&offset=${offset}`, {
-    token,
+export type ProductSort =
+  | "name"
+  | "category"
+  | "price"
+  | "variants"
+  | "stock"
+  | "visibility";
+export type SortDirection = "asc" | "desc";
+
+export const listAdminProducts = (
+  token: string,
+  opts: {
+    limit?: number;
+    offset?: number;
+    sort?: ProductSort;
+    direction?: SortDirection;
+    category?: number;
+  } = {},
+) => {
+  const q = new URLSearchParams({
+    limit: String(opts.limit ?? 50),
+    offset: String(opts.offset ?? 0),
+    sort: opts.sort ?? "name",
+    direction: opts.direction ?? "asc",
   });
+  if (opts.category !== undefined) q.set("category", String(opts.category));
+  return request<Page<AdminProduct>>(`/admin/products?${q}`, { token });
+};
+
+export type InventorySort = "status" | "product" | "sku" | "stock" | "reorder";
+
+export type AdminInventoryRow = {
+  variant_id: number;
+  sku: string;
+  variant_name: string;
+  product_id: number;
+  product_name: string;
+  product_slug: string;
+  product_active: boolean;
+  quantity_available: number;
+  reorder_level: number;
+  needs_reorder: boolean;
+};
+
+/** low_count and out_count describe the whole catalogue, not this page and not
+ *  the current filter -- they label the filter buttons. */
+export type AdminInventoryPage = Page<AdminInventoryRow> & {
+  all_count: number;
+  low_count: number;
+  out_count: number;
+};
+
+export const listAdminInventory = (
+  token: string,
+  opts: {
+    limit?: number;
+    offset?: number;
+    sort?: InventorySort;
+    direction?: SortDirection;
+    filter?: "low" | "out";
+  } = {},
+) => {
+  const q = new URLSearchParams({
+    limit: String(opts.limit ?? 50),
+    offset: String(opts.offset ?? 0),
+    sort: opts.sort ?? "status",
+    direction: opts.direction ?? "asc",
+  });
+  if (opts.filter) q.set("filter", opts.filter);
+  return request<AdminInventoryPage>(`/admin/inventory?${q}`, { token });
+};
 
 export const createProduct = (token: string, body: unknown) =>
   request<AdminProduct>("/admin/products", { token, body });

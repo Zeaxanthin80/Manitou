@@ -2,86 +2,107 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { InventoryTable } from "@/components/inventory-table";
-import type { InventoryRow } from "@/components/inventory-table";
-import { ApiError, listAdminProducts } from "@/lib/api";
+import { Pagination } from "@/components/pagination";
+import {
+  ApiError,
+  listAdminInventory,
+  type InventorySort,
+  type SortDirection,
+} from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { getSession } from "@/lib/session";
 
+const PER_PAGE = 50;
+
+const SORTS: InventorySort[] = ["status", "product", "sku", "stock", "reorder"];
+
 /**
- * Stock across the whole catalog.
+ * Stock across the whole catalog, one row per variant.
  *
- * Built from GET /admin/products rather than a new endpoint: that response
- * already carries every variant with its inventory, so a second endpoint would
- * be a second copy of the same join and the same needs_reorder rule. If the
- * catalog ever outgrows one page of results this flips, and inventory should get
- * its own paged, server-sorted endpoint.
+ * Reads GET /admin/inventory, not GET /admin/products. It used to derive from
+ * the products response, which worked only while the whole catalog fitted in one
+ * page: a row here is a VARIANT, and an endpoint that pages by product cannot
+ * order or page variants. Sorting what one page happened to contain would order
+ * a slice of the catalog while looking authoritative.
  *
- * `needs_reorder` is computed by the API, never here. The threshold rule lives
- * in one place -- recomputing `qty <= reorder` client-side is how the storefront
- * and the portal end up disagreeing about what "low" means.
+ * `needs_reorder` is computed by the API, never here. The threshold rule lives in
+ * one place -- on the Inventory model, as a hybrid_property, so the Python
+ * boolean and the SQL used to sort and filter by it are the same expression.
+ * Recomputing `qty <= reorder` client-side is how the storefront and the portal
+ * end up disagreeing about what "low" means.
+ *
+ * low_count and out_count come from the API too, because they label the filter
+ * links: counting the rows this page received would report the page rather than
+ * the catalog, and "Out of stock (3)" would change as you paged.
  */
 export default async function InventoryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    filter?: string;
+    sort?: string;
+    direction?: string;
+  }>;
 }) {
   const token = await getSession();
   if (!token) redirect("/login");
 
-  const { filter } = await searchParams;
-  if (filter && !["low", "out"].includes(filter)) notFound();
+  const sp = await searchParams;
+  if (sp.filter && !["low", "out"].includes(sp.filter)) notFound();
+  const filter = sp.filter as "low" | "out" | undefined;
 
-  let products;
+  const sort = (SORTS.includes(sp.sort as InventorySort)
+    ? sp.sort
+    : "status") as InventorySort;
+  const direction: SortDirection = sp.direction === "desc" ? "desc" : "asc";
+  const page = Math.max(1, Number(sp.page) || 1);
+
+  let data;
   try {
-    products = await listAdminProducts(token);
+    data = await listAdminInventory(token, {
+      limit: PER_PAGE,
+      offset: (page - 1) * PER_PAGE,
+      sort,
+      direction,
+      filter,
+    });
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) redirect("/login");
     if (error instanceof ApiError && error.status === 403) notFound();
     throw error;
   }
 
-  const all: InventoryRow[] = products.items.flatMap((p) =>
-    p.variants.map((v) => ({
-      variantId: v.id,
-      sku: v.sku,
-      variantName: v.variant_name,
-      productId: p.id,
-      productName: p.name,
-      productSlug: p.slug,
-      productActive: p.is_active,
-      quantityAvailable: v.quantity_available,
-      reorderLevel: v.reorder_level,
-      needsReorder: v.needs_reorder,
-    })),
-  );
+  const rows = data.items.map((r) => ({
+    variantId: r.variant_id,
+    sku: r.sku,
+    variantName: r.variant_name,
+    productId: r.product_id,
+    productName: r.product_name,
+    productSlug: r.product_slug,
+    productActive: r.product_active,
+    quantityAvailable: r.quantity_available,
+    reorderLevel: r.reorder_level,
+    needsReorder: r.needs_reorder,
+  }));
 
-  // Sorted so the rows that need action are first, then by product for scanning.
-  // Out of stock outranks merely low.
-  const ordered = [...all].sort((a, b) => {
-    const rank = (r: InventoryRow) =>
-      r.quantityAvailable === 0 ? 0 : r.needsReorder ? 1 : 2;
-    return (
-      rank(a) - rank(b) ||
-      a.productName.localeCompare(b.productName) ||
-      a.sku.localeCompare(b.sku)
-    );
-  });
-
-  const rows =
-    filter === "out"
-      ? ordered.filter((r) => r.quantityAvailable === 0)
-      : filter === "low"
-        ? ordered.filter((r) => r.needsReorder)
-        : ordered;
-
-  const lowCount = all.filter((r) => r.needsReorder).length;
-  const outCount = all.filter((r) => r.quantityAvailable === 0).length;
-
-  const FILTERS: { key?: string; label: string; count: number }[] = [
-    { key: undefined, label: "All", count: all.length },
-    { key: "low", label: "Needs reorder", count: lowCount },
-    { key: "out", label: "Out of stock", count: outCount },
+  // Every count here is catalog-wide, straight from the API. Deliberately NOT
+  // `data.total` -- that is the count matching the ACTIVE filter, which is what
+  // Pagination needs and the wrong number for a button offering a different one.
+  // Using it would make "All (2)" appear while the Out of stock filter was on.
+  const FILTERS: { key?: "low" | "out"; label: string; count: number }[] = [
+    { key: undefined, label: "All", count: data.all_count },
+    { key: "low", label: "Needs reorder", count: data.low_count },
+    { key: "out", label: "Out of stock", count: data.out_count },
   ];
+
+  const carried = { sort, direction, filter };
+
+  const filterHref = (key?: "low" | "out") => {
+    const q = new URLSearchParams({ sort, direction });
+    if (key) q.set("filter", key);
+    return `/admin/inventory?${q}`;
+  };
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-12">
@@ -90,9 +111,9 @@ export default async function InventoryPage({
           Inventory
         </h1>
         <p className="font-body text-sm text-muted">
-          {lowCount === 0
+          {data.low_count === 0
             ? "Everything above its reorder level."
-            : `${lowCount} ${lowCount === 1 ? "variant needs" : "variants need"} reordering.`}
+            : `${data.low_count} ${data.low_count === 1 ? "variant needs" : "variants need"} reordering.`}
         </p>
       </div>
 
@@ -102,7 +123,7 @@ export default async function InventoryPage({
           return (
             <Link
               key={f.label}
-              href={f.key ? `/admin/inventory?filter=${f.key}` : "/admin/inventory"}
+              href={filterHref(f.key)}
               aria-current={active ? "page" : undefined}
               className={cn(
                 "font-body text-sm transition-colors motion-reduce:transition-none",
@@ -119,10 +140,24 @@ export default async function InventoryPage({
 
       <p className="mt-6 max-w-prose font-body text-sm text-muted">
         Stock is an absolute count, not an adjustment — enter what you actually
-        have. Checkout decrements it automatically as orders are placed.
+        have, then press Save on that row. Nothing saves automatically. Checkout
+        decrements it as orders are placed.
       </p>
 
-      <InventoryTable rows={rows} />
+      <InventoryTable
+        rows={rows}
+        sort={sort}
+        direction={direction}
+        params={carried}
+      />
+
+      <Pagination
+        total={data.total}
+        limit={data.limit}
+        offset={data.offset}
+        basePath="/admin/inventory"
+        params={{ ...carried }}
+      />
     </main>
   );
 }

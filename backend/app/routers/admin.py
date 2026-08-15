@@ -8,9 +8,10 @@ returned instead of a boolean, and GET /admin/orders reads across every customer
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select, update
+from sqlalchemy import case, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -29,6 +30,8 @@ from app.models import (
     User,
 )
 from app.schemas.admin import (
+    AdminInventoryPage,
+    AdminInventoryRow,
     AdminImageCreate,
     AdminImageRead,
     AdminImageUpdate,
@@ -115,10 +118,10 @@ def _to_product(product: Product) -> AdminProductRead:
                 price_override=v.price_override,
                 quantity_available=v.inventory.quantity_available if v.inventory else 0,
                 reorder_level=v.inventory.reorder_level if v.inventory else 0,
-                needs_reorder=(
-                    v.inventory is not None
-                    and v.inventory.quantity_available <= v.inventory.reorder_level
-                ),
+                # Inventory.needs_reorder -- the threshold lives on the model so
+                # Python and SQL cannot drift apart. The None guard stays: a
+                # variant with no inventory row has nothing to compare.
+                needs_reorder=(v.inventory is not None and v.inventory.needs_reorder),
             )
             for v in product.variants
         ],
@@ -146,26 +149,94 @@ def _get_product(db: Session, product_id: int) -> Product:
     return product
 
 
+ProductSort = Literal["name", "category", "price", "variants", "stock", "visibility"]
+SortDirection = Literal["asc", "desc"]
+
+
+def _product_totals():
+    """Per-product variant count and total stock, as a GROUPED subquery.
+
+    The whole reason this is a subquery rather than a join onto the main select:
+    joining product_variants directly multiplies the product rows -- a shirt with
+    three variants comes back three times, `total` stops matching what is
+    rendered, and the page silently shows duplicates. Aggregating first, then
+    joining one row per product, keeps the outer query one-row-per-product.
+
+    LEFT JOIN at the call site, because a product with no variants must still
+    appear (with 0), not vanish from the list it is being sorted in.
+    """
+    return (
+        select(
+            ProductVariant.product_id.label("product_id"),
+            func.count(ProductVariant.id).label("variant_count"),
+            func.coalesce(func.sum(Inventory.quantity_available), 0).label("stock"),
+        )
+        .outerjoin(Inventory, Inventory.variant_id == ProductVariant.id)
+        .group_by(ProductVariant.product_id)
+        .subquery()
+    )
+
+
 @router.get("/products", response_model=AdminProductPage)
 def list_all_products(
     db: Session = Depends(get_db),
     limit: int = Query(20, ge=1, le=MAX_PAGE_SIZE),
     offset: int = Query(0, ge=0),
+    sort: ProductSort = "name",
+    direction: SortDirection = "asc",
+    category: int | None = None,
 ) -> AdminProductPage:
     """Every product, including inactive ones.
 
     Deliberately does NOT filter is_active -- the vendor has to be able to find a
     hidden product in order to unhide it. That asymmetry with GET /products is
     the whole reason this endpoint exists.
+
+    Sorting and filtering are done here rather than in the browser because the
+    response is one PAGE of the catalogue. Sorting the rows a page happens to
+    hold would order a slice while looking authoritative, which is worse than not
+    sorting: it is confidently wrong as soon as there is a second page.
+
+    `sort` and `direction` are Literals, so an unrecognised value is a 422 rather
+    than a silent fall back to default order. A sort that quietly ignores you is
+    how someone concludes the data itself is wrong.
     """
-    total = db.scalar(select(func.count()).select_from(Product))
+    totals = _product_totals()
+
+    base = select(Product).outerjoin(totals, totals.c.product_id == Product.id)
+    if category is not None:
+        # Checked rather than returning an empty list, which would be
+        # indistinguishable from a real category that happens to be empty.
+        if db.get(Category, category) is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Category not found")
+        base = base.where(Product.category_id == category)
+
+    columns = {
+        "name": Product.name,
+        "category": Category.name,
+        "price": Product.base_price,
+        "variants": func.coalesce(totals.c.variant_count, 0),
+        "stock": func.coalesce(totals.c.stock, 0),
+        "visibility": Product.is_active,
+    }
+    column = columns[sort]
+    if sort == "category":
+        base = base.outerjoin(Category, Category.id == Product.category_id)
+
+    ordering = column.desc() if direction == "desc" else column.asc()
+
+    total = db.scalar(
+        select(func.count()).select_from(base.order_by(None).subquery())
+    )
     products = db.scalars(
-        select(Product)
-        .options(
+        base.options(
             selectinload(Product.variants).selectinload(ProductVariant.inventory),
             selectinload(Product.images),
         )
-        .order_by(Product.name)
+        # Product.id last so a page boundary can never split or repeat a row:
+        # ties on the sorted column would otherwise come back in whatever order
+        # the planner chose that time, and a row could appear on both pages.
+        .order_by(ordering, Product.id)
         .limit(limit)
         .offset(offset)
     ).all()
@@ -174,6 +245,109 @@ def list_all_products(
         total=total or 0,
         limit=limit,
         offset=offset,
+    )
+
+
+InventorySort = Literal["status", "product", "sku", "stock", "reorder"]
+InventoryFilter = Literal["low", "out"]
+
+
+@router.get("/inventory", response_model=AdminInventoryPage)
+def list_inventory(
+    db: Session = Depends(get_db),
+    limit: int = Query(50, ge=1, le=MAX_PAGE_SIZE),
+    offset: int = Query(0, ge=0),
+    sort: InventorySort = "status",
+    direction: SortDirection = "asc",
+    filter: InventoryFilter | None = None,
+) -> AdminInventoryPage:
+    """Stock across the catalogue, one row per variant.
+
+    Its own endpoint rather than a re-read of GET /admin/products, which is what
+    the portal did before. That worked while everything fitted on one page and
+    stops working the moment it does not: a row here is a VARIANT, and an
+    endpoint that pages by product cannot order or page variants. Sorting the
+    page's own rows in the browser would sort a slice of the catalogue while
+    looking authoritative.
+
+    The default order reproduces what the portal used to compute client-side:
+    out of stock first, then needs-reorder, then everything else, tie-broken by
+    product name and SKU. The urgent rows are the reason anyone opens this page.
+    """
+    urgency = case(
+        (Inventory.quantity_available == 0, 0),
+        # The model's hybrid, so this cannot drift from the badge the row shows.
+        (Inventory.needs_reorder, 1),
+        else_=2,
+    )
+
+    base = (
+        select(Inventory, ProductVariant, Product)
+        .join(ProductVariant, ProductVariant.id == Inventory.variant_id)
+        .join(Product, Product.id == ProductVariant.product_id)
+    )
+
+    # Counts are deliberately taken BEFORE the filter is applied and are never
+    # paged: they label the filter buttons, so they have to describe the whole
+    # catalogue. Counting the returned rows would make "Out of stock (3)" mean
+    # "3 on this page".
+    counts = select(
+        func.count().label("total"),
+        func.count().filter(Inventory.needs_reorder).label("low"),
+        func.count().filter(Inventory.quantity_available == 0).label("out"),
+    ).select_from(Inventory)
+    totals = db.execute(counts).one()
+
+    if filter == "low":
+        base = base.where(Inventory.needs_reorder)
+    elif filter == "out":
+        base = base.where(Inventory.quantity_available == 0)
+
+    columns = {
+        "status": urgency,
+        "product": Product.name,
+        "sku": ProductVariant.sku,
+        "stock": Inventory.quantity_available,
+        "reorder": Inventory.reorder_level,
+    }
+    column = columns[sort]
+    ordering = column.desc() if direction == "desc" else column.asc()
+
+    filtered_total = db.scalar(
+        select(func.count()).select_from(base.order_by(None).subquery())
+    )
+
+    rows = db.execute(
+        # Product name and SKU as tiebreakers everywhere, not just on the default
+        # sort: without a deterministic final key, tied rows come back in
+        # whatever order the planner picked and a row can appear on two pages.
+        base.order_by(ordering, Product.name, ProductVariant.sku)
+        .limit(limit)
+        .offset(offset)
+    ).all()
+
+    return AdminInventoryPage(
+        items=[
+            AdminInventoryRow(
+                variant_id=variant.id,
+                sku=variant.sku,
+                variant_name=variant.variant_name,
+                product_id=product.id,
+                product_name=product.name,
+                product_slug=product.slug,
+                product_active=product.is_active,
+                quantity_available=inventory.quantity_available,
+                reorder_level=inventory.reorder_level,
+                needs_reorder=inventory.needs_reorder,
+            )
+            for inventory, variant, product in rows
+        ],
+        total=filtered_total or 0,
+        limit=limit,
+        offset=offset,
+        all_count=totals.total,
+        low_count=totals.low,
+        out_count=totals.out,
     )
 
 
@@ -536,7 +710,7 @@ def update_inventory(
         price_override=variant.price_override,
         quantity_available=inventory.quantity_available,
         reorder_level=inventory.reorder_level,
-        needs_reorder=inventory.quantity_available <= inventory.reorder_level,
+        needs_reorder=inventory.needs_reorder,
     )
 
 
@@ -774,10 +948,11 @@ def store_summary(db: Session = Depends(get_db)) -> AdminSummary:
             )
             .join(ProductVariant, ProductVariant.id == Inventory.variant_id)
             .join(Product, Product.id == ProductVariant.product_id)
-            # The same rule AdminVariantRead.needs_reorder uses, expressed once
-            # more -- in SQL this time, because filtering in Python would mean
-            # fetching every variant in the catalogue to discard most of them.
-            .where(Inventory.quantity_available <= Inventory.reorder_level)
+            # The hybrid_property compiles to SQL here, so this filter and the
+            # boolean in the response body are literally the same expression.
+            # Filtering in Python would mean fetching every variant in the
+            # catalogue to discard most of them.
+            .where(Inventory.needs_reorder)
             .order_by(Inventory.quantity_available, Product.name)
         )
     ]

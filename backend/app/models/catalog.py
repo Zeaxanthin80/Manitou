@@ -13,6 +13,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -116,3 +117,20 @@ class Inventory(Base):
     reorder_level: Mapped[int] = mapped_column(server_default=text("0"))
 
     variant: Mapped["ProductVariant"] = relationship(back_populates="inventory")
+
+    @hybrid_property
+    def needs_reorder(self) -> bool:
+        """Stock at or below the level the vendor said to reorder at.
+
+        A hybrid_property because this rule is needed in two languages: as a
+        Python bool when serialising a loaded row, and as SQL when filtering or
+        ORDERING BY it -- filtering in Python would mean fetching the whole
+        catalogue to discard most of it.
+
+        It was previously written out three separate times (twice in Python, once
+        in SQL) and sorting the inventory table would have made a fourth. Four
+        copies of a threshold is how the portal and the storefront end up
+        disagreeing about what "low" means. Written here once, `inv.needs_reorder`
+        and `Inventory.needs_reorder` are the same rule by construction.
+        """
+        return self.quantity_available <= self.reorder_level
