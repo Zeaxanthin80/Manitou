@@ -30,12 +30,28 @@ import path from "node:path";
  */
 const RENDERABLE = /\.(png|jpe?g|webp|avif|gif)$/i;
 
+/**
+ * Names the API would refuse, so the picker never offers an unusable option.
+ *
+ * AdminImageCreate.url rejects internal whitespace, backslashes and "..". A file
+ * called "AI_Celestial Navigation.png" was listed by the picker and then 422'd on
+ * submit, with nothing on screen explaining why -- the offer and the guard
+ * disagreed. Filtering here keeps them in step: if it cannot be saved, it is not
+ * shown.
+ *
+ * The rule is duplicated rather than shared because the validator lives in the
+ * Python API. Kept deliberately narrow so the two cannot drift far, and the API
+ * stays the one that actually decides.
+ */
+const SAVEABLE = (name: string) =>
+  !/\s/.test(name) && !name.includes("\\") && !name.includes("..");
+
 export async function listPublicImages(): Promise<string[]> {
   try {
     const dir = path.join(process.cwd(), "public");
     const entries = await readdir(dir, { withFileTypes: true });
     return entries
-      .filter((e) => e.isFile() && RENDERABLE.test(e.name))
+      .filter((e) => e.isFile() && RENDERABLE.test(e.name) && SAVEABLE(e.name))
       .map((e) => `/${e.name}`)
       .sort();
   } catch {
