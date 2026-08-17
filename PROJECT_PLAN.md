@@ -761,6 +761,18 @@ happens); a per-variant primary image; zoom or lightbox.
    - Payment confirmed (the task 4 webhook) decrements `quantity_available` and releases the
      reservation **in the same transaction as the status change**, so the two can never disagree.
    - Cancelling or expiring releases the reservation without touching `quantity_available`.
+   - **Cancelling a PAID order must put the stock back**, and today nothing does. Measured: place
+     an order, cancel it, and `quantity_available` stays decremented — there is no restock path
+     anywhere in the codebase, so every cancelled order permanently leaks its inventory. The
+     reservation work does not fix this on its own: it covers orders that were never paid, while a
+     paid order has already had stock deducted and takes a different route back.
+   - **Refunding is not the same as restocking, and must not be automatic.** A cancelled order was
+     never dispatched, so its stock is still on the shelf and returning it is safe. A refunded one
+     may have been shipped, and what comes back may be damaged, opened, or never returned at all.
+     Silently adding it to sellable stock would invent inventory that does not exist. So:
+     `→ cancelled` restocks automatically; `→ refunded` does not, and the vendor restocks
+     deliberately from `/admin/inventory` if the goods actually came back. Both write an
+     `audit_events` row, because "where did those twelve units come from?" has to be answerable.
    - `needs_reorder` keeps comparing against `quantity_available`, not the sellable figure:
      reordering is about physical stock on a shelf, not about what is currently spoken for.
    - The concurrency guard moves with it. `checkout.py` already takes `SELECT ... FOR UPDATE` row
@@ -770,7 +782,16 @@ happens); a per-variant primary image; zoom or lightbox.
    sell** figure beside the physical count, so "why is this sold out when I have twelve on the
    shelf?" is answerable from the screen rather than from the database. Sortable like the rest.
 
-   Two decisions to settle when building it, not now:
+   **Also settle the cart's partial-stock gap here**, because `in_stock` is being redefined in this
+   task anyway. Today the cart labels a line only at zero stock: hold 3 of something and the vendor
+   drops to 1, and the cart looks entirely fine until checkout fails with "only 1 in stock". The
+   cart carries a boolean, not a count. Showing "only 1 left" means publishing an exact figure,
+   which `VariantRead`'s docstring deliberately avoids for the public catalogue — but a count *for
+   something already in a customer's own cart* is a much narrower disclosure than a catalogue-wide
+   one, and it is the difference between fixing the problem in the cart and discovering it at the
+   till. A decision to take, not a bug to fix silently.
+
+   Two more decisions to settle when building it, not now:
 
    - **Counter or derived?** A maintained `quantity_reserved` counter is cheap to read and can
      drift if any release is ever missed — and a drifted reservation is invisible stock loss
