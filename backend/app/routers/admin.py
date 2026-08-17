@@ -62,7 +62,7 @@ from app.schemas.admin import (
 from app.schemas.catalog import MAX_PAGE_SIZE
 from app.config import settings
 from app.dependencies import get_email_sender
-from app.services import audit
+from app.services import audit, image_match
 from app.services.account import anonymise, count_admins, password_matches
 from app.services.email import EmailMessage, EmailSender
 from app.services.password_reset import TOKEN_TTL, request_reset
@@ -512,6 +512,40 @@ def _get_variant(db: Session, variant_id: int) -> ProductVariant:
     return variant
 
 
+def _check_applies_to(product: Product, applies_to: dict) -> None:
+    """Refuse a tag whose keys no variant of this product uses.
+
+    Without this the failure is silent and expensive to diagnose: tag an image
+    {"colour": "Black"} on a product whose variants say "color" and it matches no
+    variant, appears nowhere, and reports nothing. The vendor sees an image they
+    uploaded that will not show up, with no error to search for.
+
+    The database cannot enforce it -- the keys live in JSONB on another table --
+    which is the same split CLAUDE.md already describes for variant attributes:
+    the API validates key consistency, the DB cannot.
+
+    Values are deliberately NOT checked. Tagging a colour the product does not
+    stock yet is a reasonable thing to do just before adding that variant, and
+    an image that matches nothing today is recoverable; a key that can never
+    match is not.
+    """
+    if not applies_to:
+        return
+    allowed = image_match.allowed_keys(product.variants)
+    unknown = sorted(set(applies_to) - allowed)
+    if unknown:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"Unknown option {'names' if len(unknown) > 1 else 'name'} "
+            f"{', '.join(repr(u) for u in unknown)}. "
+            + (
+                f"This product's variants use: {', '.join(sorted(allowed))}."
+                if allowed
+                else "This product's variants have no options to match on."
+            ),
+        )
+
+
 def _clear_primary(db: Session, product_id: int, keep_id: int | None = None) -> None:
     """Demote whichever image is currently primary for this product.
 
@@ -542,6 +576,7 @@ def add_product_image(
     db: Session = Depends(get_db),
 ) -> AdminProductRead:
     product = _get_product(db, product_id)
+    _check_applies_to(product, payload.applies_to)
 
     # The first image is always primary. A product with images but no primary
     # renders "No image" on the storefront, which looks like data loss rather
@@ -556,6 +591,7 @@ def add_product_image(
             url=payload.url,
             alt_text=payload.alt_text,
             is_primary=make_primary,
+            applies_to=payload.applies_to,
         )
     )
     db.commit()
@@ -573,6 +609,8 @@ def update_product_image(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
 
     changes = payload.model_dump(exclude_unset=True)
+    if "applies_to" in changes and changes["applies_to"] is not None:
+        _check_applies_to(_get_product(db, image.product_id), changes["applies_to"])
     if changes.get("is_primary") is True:
         _clear_primary(db, image.product_id, keep_id=image.id)
     if changes.get("is_primary") is False and image.is_primary:

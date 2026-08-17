@@ -9,6 +9,27 @@ import { Input } from "@/components/ui/input";
 import type { AdminProduct } from "@/lib/api";
 
 /**
+ * Every option a product's variants actually offer, as "key=value" pairs.
+ *
+ * Derived from the variants rather than typed, for the same reason the image
+ * URL became a picker: a free-text tag lets you write {"colour":"Black"} on a
+ * product whose variants say "color", and the image then matches nothing and
+ * silently never appears. The API rejects unknown keys; offering only real ones
+ * means never hitting that rejection.
+ */
+function variantOptions(product: AdminProduct): { value: string; label: string }[] {
+  const seen = new Map<string, string>();
+  for (const v of product.variants) {
+    for (const [k, val] of Object.entries(v.attributes ?? {})) {
+      seen.set(`${k}=${val}`, `${k}: ${val}`);
+    }
+  }
+  return [...seen].map(([value, label]) => ({ value, label })).sort((a, b) =>
+    a.label.localeCompare(b.label),
+  );
+}
+
+/**
  * Product images, chosen from the files in web/public/.
  *
  * `available` is read on the server by lib/public-images.ts and passed in --
@@ -44,6 +65,7 @@ export function ProductImagesEditor({
 }) {
   const [addState, addAction, adding] = useActionState(addImageAction, {});
   const [rowState, rowAction, busy] = useActionState(imageAction, {});
+  const options = variantOptions(product);
 
   return (
     <section>
@@ -85,6 +107,36 @@ export function ProductImagesEditor({
                   <input type="hidden" name="slug" value={product.slug} />
                   <Button type="submit" variant="ghost" size="sm" disabled={busy}>
                     Make primary
+                  </Button>
+                </form>
+              )}
+
+              {options.length > 0 && (
+                <form action={rowAction} className="flex flex-col gap-1">
+                  <input type="hidden" name="image_id" value={img.id} />
+                  <input type="hidden" name="product_id" value={product.id} />
+                  <input type="hidden" name="slug" value={product.slug} />
+                  <input type="hidden" name="intent" value="applies" />
+                  <label className="font-body text-xs uppercase tracking-tight text-muted">
+                    Shows for
+                  </label>
+                  <select
+                    name="applies_to"
+                    defaultValue={
+                      Object.entries(img.applies_to ?? {})
+                        .map(([k, v]) => `${k}=${v}`)[0] ?? ""
+                    }
+                    className="w-full rounded-md border border-border bg-surface px-2 py-1 font-body text-sm text-text"
+                  >
+                    <option value="">Every option</option>
+                    {options.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                  <Button type="submit" variant="ghost" size="sm" disabled={busy}>
+                    Save
                   </Button>
                 </form>
               )}
@@ -183,6 +235,30 @@ export function ProductImagesEditor({
               part of the quality floor, not optional metadata.
             </span>
           </label>
+          {options.length > 0 && (
+            <label className="flex flex-col gap-1 font-body text-sm text-text">
+              Shows for
+              <select
+                name="applies_to"
+                defaultValue=""
+                className="w-full max-w-xs rounded-md border border-border bg-surface px-3 py-2 font-body text-base text-text"
+              >
+                <option value="">Every option</option>
+                {options.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <span className="font-body text-xs text-muted">
+                Restrict this photo to one option, so choosing it on the
+                storefront shows this picture. A list, not a text box: a typed
+                option name that no variant uses would match nothing and the
+                image would silently never appear.
+              </span>
+            </label>
+          )}
+
           <label className="flex items-center gap-2 font-body text-sm text-text">
             <input type="checkbox" name="is_primary" className="accent-text" />
             Make this the primary image

@@ -581,3 +581,116 @@ def test_partial_update_normalises_only_what_was_sent(
                      json={"name": "New Name"})
     assert r.status_code == 200
     assert r.json()["slug"] == "renamed-product"
+
+
+# ------------------------------------------------------ image applies_to -----
+
+
+def _product_with_colours(client, admin, make_product, auth_headers):
+    """A product whose variants use size + color, via the API so attributes are
+    exactly what the endpoints would store."""
+    existing = make_product()
+    r = client.post("/admin/products", headers=auth_headers(admin), json={
+        "name": "Colour Tee", "slug": "colour-tee",
+        "category_id": existing.category_id, "base_price": "20.00",
+        "variants": [
+            {"sku": "CT-L-BLK", "variant_name": "Large/Black",
+             "attributes": {"size": "L", "color": "Black"}},
+            {"sku": "CT-L-WHT", "variant_name": "Large/White",
+             "attributes": {"size": "L", "color": "White"}},
+        ]})
+    assert r.status_code == 201
+    return r.json()
+
+
+def test_applies_to_defaults_to_empty_and_is_returned(
+    client, make_user, make_product, auth_headers
+):
+    """Untagged is the default so every image predating the column keeps
+    showing for every variant."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    p = _product_with_colours(client, admin, make_product, auth_headers)
+
+    r = client.post(f"/admin/products/{p['id']}/images",
+                    headers=auth_headers(admin),
+                    json={"url": "/a.png", "alt_text": "A"})
+    assert r.status_code == 201
+    assert r.json()["images"][0]["applies_to"] == {}
+
+
+def test_applies_to_is_stored_and_visible_to_the_storefront(
+    client, make_user, make_product, auth_headers
+):
+    admin = make_user(email="admin@manitou.example", role="admin")
+    p = _product_with_colours(client, admin, make_product, auth_headers)
+
+    client.post(f"/admin/products/{p['id']}/images", headers=auth_headers(admin),
+                json={"url": "/black.png", "alt_text": "Black",
+                      "applies_to": {"color": "Black"}})
+
+    # The storefront needs it too -- the browser does the filtering.
+    public = client.get(f"/products/{p['slug']}").json()
+    assert public["images"][0]["applies_to"] == {"color": "Black"}
+
+
+@pytest.mark.parametrize("bad", [
+    {"colour": "Black"},          # British spelling
+    {"Color": "Black"},           # wrong case
+    {"material": "Cotton"},       # a dimension this product does not have
+    {"color": "Black", "fit": "Slim"},  # one good key, one not
+])
+def test_unknown_applies_to_keys_are_refused(
+    client, make_user, make_product, auth_headers, bad
+):
+    """The failure this prevents is silent: a key no variant uses can never
+    match, so the image is accepted, stored, and simply never appears -- with no
+    error for the vendor to search for."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    p = _product_with_colours(client, admin, make_product, auth_headers)
+
+    r = client.post(f"/admin/products/{p['id']}/images",
+                    headers=auth_headers(admin),
+                    json={"url": "/x.png", "alt_text": "X", "applies_to": bad})
+    assert r.status_code == 422, f"{bad} was accepted"
+    # The message has to say what IS valid, or the admin is guessing.
+    assert "color" in r.json()["detail"] and "size" in r.json()["detail"]
+
+
+def test_applies_to_values_are_not_policed(
+    client, make_user, make_product, auth_headers
+):
+    """Tagging a colour not stocked yet is reasonable just before adding that
+    variant. An image matching nothing today is recoverable; a key that can
+    never match is not."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    p = _product_with_colours(client, admin, make_product, auth_headers)
+
+    r = client.post(f"/admin/products/{p['id']}/images",
+                    headers=auth_headers(admin),
+                    json={"url": "/navy.png", "alt_text": "Navy",
+                          "applies_to": {"color": "Navy"}})
+    assert r.status_code == 201
+
+
+def test_applies_to_is_editable_in_place(
+    client, make_user, make_product, auth_headers
+):
+    """PATCH carries applies_to so re-tagging does not mean delete-and-re-add,
+    which churns ids and can leave a product without a primary between calls."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    p = _product_with_colours(client, admin, make_product, auth_headers)
+    h = auth_headers(admin)
+
+    created = client.post(f"/admin/products/{p['id']}/images", headers=h,
+                          json={"url": "/x.png", "alt_text": "X"}).json()
+    image_id = created["images"][0]["id"]
+
+    r = client.patch(f"/admin/images/{image_id}", headers=h,
+                     json={"applies_to": {"color": "White"}})
+    assert r.status_code == 200
+    assert r.json()["images"][0]["applies_to"] == {"color": "White"}
+    assert r.json()["images"][0]["id"] == image_id, "id must survive a re-tag"
+
+    # And the same validation applies on update, not just create.
+    assert client.patch(f"/admin/images/{image_id}", headers=h,
+                        json={"applies_to": {"colour": "White"}}).status_code == 422

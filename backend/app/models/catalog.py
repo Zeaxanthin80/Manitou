@@ -94,6 +94,23 @@ class ProductImage(Base):
     alt_text: Mapped[str] = mapped_column(Text)
     is_primary: Mapped[bool] = mapped_column(server_default=text("false"))
 
+    #: Which variants this image is FOR. Empty means "all of them", which is why
+    #: it defaults to {} and every image that predates this column keeps working.
+    #:
+    #: A subset test, not equality: {"color": "Black"} matches a variant whose
+    #: attributes are {"size": "L", "color": "Black"}. Keyed on the dimension
+    #: that is actually visual, so one photo of a black shirt covers every size
+    #: of it -- a variant_id FK would duplicate that photo once per size, and
+    #: size is not something a photograph varies by.
+    #:
+    #: The keys must exist on that product's variants. The database cannot check
+    #: that, so the API does -- the same split Section 1.1 already relies on for
+    #: variant attributes. Without it, {"colour": "Black"} matches nothing and
+    #: the image silently never appears.
+    applies_to: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+
     product: Mapped["Product"] = relationship(back_populates="images")
 
 

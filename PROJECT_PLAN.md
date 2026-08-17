@@ -700,6 +700,38 @@ is safe only when every action taken inside it is attributable, which is impossi
   meantime — `COPY (SELECT ...) TO STDOUT WITH CSV HEADER` needs no code. Worth its own small phase
   if the vendor ever needs it without SQL.
 
+### Phase 4.6 — Product Imagery
+
+Adding a second image to a product used to do nothing a customer could see: the product page took
+the primary and discarded the rest, so extra images existed in the database, showed in the portal,
+and reached nobody. Choosing "Large / White" also still showed the black shirt, which is worse than
+showing nothing — the customer is looking at a photograph of the thing they did not pick.
+
+1. **[You + Claude Code]** `product_images.applies_to` (JSONB, default `{}`). Empty means the image
+   shows for every variant, so every row that predates the column keeps behaving exactly as before
+   and the migration needs no backfill.
+2. **[You + Claude Code]** The matching rule, in `services/image_match.py` and mirrored in
+   `web/lib/image-match.ts`: an image shows when every pair in `applies_to` matches the selected
+   variant's `attributes`. A **subset** test — `{"color": "Black"}` matches
+   `{"size": "L", "color": "Black"}`: a photo of a black shirt is a photo of every size of one.
+   Keyed on the visual dimension rather than a `variant_id`, so one photo covers all sizes of a
+   colour instead of being duplicated per size. Images tagged *for* the selection lead the gallery;
+   untagged ones follow.
+3. **[You + Claude Code]** The API rejects `applies_to` keys no variant of that product uses. The
+   database cannot check it (the keys live in JSONB on another table), and without it a misspelling
+   like `colour` matches nothing, appears nowhere, and reports no error at all.
+4. **[You + Claude Code]** `ProductGallery`: main image plus a keyboard-navigable thumbnail strip,
+   filtered live as options are picked. The selection moved out of `AddToCart` into a context
+   provider so the gallery and the picker share it — the provider takes `children`, so the name,
+   price and description stay server-rendered.
+5. **[You + Claude Code]** Portal: a "Shows for" picker on each image, offering the options that
+   product's variants actually define. A list, not a text box — the same reason the image URL
+   became a picker.
+
+**Deliberately not in this phase:** carousels on the catalogue grid (`ProductListItem` stays
+light — the grid is for choosing which product to look at, the product page is where the decision
+happens); a per-variant primary image; zoom or lightbox.
+
 ### Phase 5 — Payments (Stripe)
 
 1. **[You]** Create a **Stripe** account. Copy your **test-mode** API keys. Store them as

@@ -23,6 +23,9 @@ export type Image = {
   url: string;
   alt_text: string;
   is_primary: boolean;
+  /** Which variants this image is for; {} means all of them. Filtered on in the
+   *  browser by lib/image-match.ts as the customer picks options. */
+  applies_to: Record<string, string>;
 };
 
 export type Category = {
@@ -202,6 +205,7 @@ export type AdminImage = {
   url: string;
   alt_text: string;
   is_primary: boolean;
+  applies_to: Record<string, string>;
 };
 
 export type AdminProduct = {

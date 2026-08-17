@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 
 import { addToCartAction } from "@/app/actions/cart";
 import { Button } from "@/components/ui/button";
+import { useVariantSelection } from "@/components/variant-selection";
 import type { Variant } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
 
@@ -20,9 +21,10 @@ import { formatMoney } from "@/lib/format";
  */
 export function AddToCart({ variants }: { variants: Variant[] }) {
   const sellable = variants.filter((v) => v.in_stock);
-  const [selected, setSelected] = useState<number | null>(
-    sellable.length === 1 ? sellable[0].id : null,
-  );
+  // Selection moved to a context so the gallery can react to it too -- picking
+  // "White" has to change the photograph, not just what gets added to the cart.
+  const { variant, select } = useVariantSelection();
+  const selected = variant?.id ?? null;
   const [state, formAction, pending] = useActionState(addToCartAction, {});
 
   if (variants.length === 0) return null;
@@ -58,7 +60,7 @@ export function AddToCart({ variants }: { variants: Variant[] }) {
                   value={v.id}
                   disabled={!v.in_stock}
                   checked={selected === v.id}
-                  onChange={() => setSelected(v.id)}
+                  onChange={() => select(v.id)}
                   className="accent-text"
                 />
                 <span className={v.in_stock ? "text-text" : "text-muted line-through"}>

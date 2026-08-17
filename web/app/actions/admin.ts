@@ -225,6 +225,15 @@ export async function updateVariantAction(
   return { ok: "Variant saved." };
 }
 
+/** The picker sends one "key=value" pair, or "" for "shows on everything".
+ *  Reassembled here rather than posted as JSON so the form stays a plain form
+ *  and the admin never types a brace. */
+function parseAppliesTo(raw: string): Record<string, string> {
+  if (!raw) return {};
+  const at = raw.indexOf("=");
+  return at === -1 ? {} : { [raw.slice(0, at)]: raw.slice(at + 1) };
+}
+
 export async function addImageAction(
   _prev: AdminActionState,
   formData: FormData,
@@ -238,6 +247,7 @@ export async function addImageAction(
       url: text(formData, "url"),
       alt_text: text(formData, "alt_text"),
       is_primary: formData.get("is_primary") === "on",
+      applies_to: parseAppliesTo(text(formData, "applies_to")),
     });
     revalidateCatalog(id, text(formData, "slug"));
   } catch (err) {
@@ -254,17 +264,28 @@ export async function imageAction(
   const { token, error } = await adminToken();
   if (!token) return { error };
   const imageId = Number(formData.get("image_id"));
-  const remove = formData.get("intent") === "delete";
+  const intent = formData.get("intent");
+  const remove = intent === "delete";
 
   try {
     if (remove) await deleteProductImage(token, imageId);
+    else if (intent === "applies")
+      await updateProductImage(token, imageId, {
+        applies_to: parseAppliesTo(text(formData, "applies_to")),
+      });
     else await updateProductImage(token, imageId, { is_primary: true });
     revalidateCatalog(Number(formData.get("product_id")), text(formData, "slug"));
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message };
     throw err;
   }
-  return { ok: remove ? "Image removed." : "Primary image updated." };
+  return {
+    ok: remove
+      ? "Image removed."
+      : intent === "applies"
+        ? "Image options updated."
+        : "Primary image updated.",
+  };
 }
 
 export async function updateInventoryAction(

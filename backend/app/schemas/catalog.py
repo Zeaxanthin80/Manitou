@@ -23,6 +23,9 @@ class ImageRead(BaseModel):
     url: str
     alt_text: str
     is_primary: bool
+    #: Which variants this image is for; {} means all. The storefront filters
+    #: the gallery on it as the customer picks options.
+    applies_to: dict
 
 
 class VariantRead(BaseModel):

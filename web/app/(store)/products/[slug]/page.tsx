@@ -1,8 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AddToCart } from "@/components/add-to-cart";
+import { ProductGallery } from "@/components/product-gallery";
+import { VariantSelectionProvider } from "@/components/variant-selection";
 import { ApiError, getProduct } from "@/lib/api";
 import { formatMoney, formatUnit } from "@/lib/format";
 import { storeConfig } from "@/lib/store-config";
@@ -36,8 +37,12 @@ export default async function ProductPage({
     throw error;
   }
 
-  const primary =
-    product.images.find((i) => i.is_primary) ?? product.images[0] ?? null;
+  // Primary first, then the rest in their existing order. The gallery opens on
+  // the same image the grid card showed, so arriving from the listing does not
+  // look like a different product.
+  const images = [...product.images].sort(
+    (a, b) => Number(b.is_primary) - Number(a.is_primary),
+  );
   const anyInStock = product.variants.some((v) => v.in_stock);
 
   return (
@@ -55,51 +60,43 @@ export default async function ProductPage({
         </Link>
       </nav>
 
-      <div className="mt-6 grid grid-cols-1 gap-12 md:grid-cols-2">
-        <div className="relative aspect-[4/5] overflow-hidden rounded-md border border-border bg-surface">
-          {primary ? (
-            <Image
-              src={primary.url}
-              alt={primary.alt_text}
-              fill
-              sizes="(max-width: 768px) 100vw, 50vw"
-              className="object-cover"
-              priority
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center font-body text-sm text-muted">
-              No image
-            </div>
-          )}
-        </div>
+      {/* The provider is a Client Component, but everything below is passed as
+          children -- so the name, price and description stay server-rendered and
+          only the gallery and the picker ship JavaScript. */}
+      <VariantSelectionProvider variants={product.variants}>
+        <div className="mt-6 grid grid-cols-1 gap-12 md:grid-cols-2">
+          <ProductGallery images={images} />
 
-        <div className="md:pt-2">
-          <h1 className="font-display text-2xl uppercase leading-none tracking-tight text-text">
-            {product.name}
-          </h1>
+          <div className="md:pt-2">
+            <h1 className="font-display text-2xl uppercase leading-none tracking-tight text-text">
+              {product.name}
+            </h1>
 
-          <p className="mt-4 font-body text-xl text-text">
-            {formatMoney(product.base_price)}
-            <span className="text-muted">{formatUnit(product.unit_of_measure)}</span>
-          </p>
-
-          {!anyInStock && (
-            <p className="mt-3 inline-block rounded-sm bg-accent px-2 py-1 font-body text-xs uppercase tracking-tight text-surface">
-              Sold out
+            <p className="mt-4 font-body text-xl text-text">
+              {formatMoney(product.base_price)}
+              <span className="text-muted">
+                {formatUnit(product.unit_of_measure)}
+              </span>
             </p>
-          )}
 
-          {product.description && (
-            <p className="mt-6 max-w-prose font-body text-base text-muted">
-              {product.description}
-            </p>
-          )}
+            {!anyInStock && (
+              <p className="mt-3 inline-block rounded-sm bg-accent px-2 py-1 font-body text-xs uppercase tracking-tight text-surface">
+                Sold out
+              </p>
+            )}
 
-          {storeConfig.features.variants_enabled && (
-            <AddToCart variants={product.variants} />
-          )}
+            {product.description && (
+              <p className="mt-6 max-w-prose font-body text-base text-muted">
+                {product.description}
+              </p>
+            )}
+
+            {storeConfig.features.variants_enabled && (
+              <AddToCart variants={product.variants} />
+            )}
+          </div>
         </div>
-      </div>
+      </VariantSelectionProvider>
     </main>
   );
 }

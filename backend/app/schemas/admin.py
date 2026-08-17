@@ -145,6 +145,8 @@ class AdminImageRead(BaseModel):
     url: str
     alt_text: str
     is_primary: bool
+    #: {} means "shows for every variant". See services/image_match.py.
+    applies_to: dict
 
 
 # One sentence, reused by every branch below. The person reading it is the store
@@ -170,6 +172,10 @@ class AdminImageCreate(BaseModel):
     url: str = Field(min_length=1)
     alt_text: str = Field(min_length=1)
     is_primary: bool = False
+    #: Which variants this photo is of. Empty shows it for all of them. The KEYS
+    #: are checked against the product's own variants in the endpoint -- a key
+    #: no variant uses can never match, so the image would silently vanish.
+    applies_to: dict = Field(default_factory=dict)
 
     @field_validator("url")
     @classmethod
@@ -213,8 +219,17 @@ class AdminImageCreate(BaseModel):
 
 
 class AdminImageUpdate(BaseModel):
+    """Editable in place -- deliberately including applies_to.
+
+    This used to carry alt_text and is_primary only, with no way to change a
+    url or a tag. Re-pointing four images at renamed files therefore meant
+    deleting and re-adding every row, which churns ids and risks leaving a
+    product with no primary between the two calls. Tagging must not repeat that.
+    """
+
     alt_text: str | None = Field(default=None, min_length=1)
     is_primary: bool | None = None
+    applies_to: dict | None = None
 
 
 class AdminVariantUpdate(BaseModel):
