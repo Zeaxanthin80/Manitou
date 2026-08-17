@@ -709,7 +709,50 @@ is safe only when every action taken inside it is attributable, which is impossi
    straight to Stripe and never touches your server.
 4. **[You + Claude Code]** Add a Stripe webhook endpoint that confirms payment and marks the order paid.
 5. **[You + Claude Code]** Record payment references in the `payments` table (Section 6.3).
-6. **[You]** Run the full checkout using Stripe's test cards and confirm the order is marked paid.
+6. **[You + Claude Code]** Reserve stock instead of decrementing it, and show the vendor the
+   difference.
+
+   Today `checkout.py` does `quantity_available -= line.quantity` at order creation — *before* any
+   money moves. That was correct while `pending → paid` was a human decision, and stops being
+   correct the moment payment is a separate step that can simply never happen: an abandoned
+   checkout holds its stock forever. Ten items and ten abandoned carts leaves a product reading
+   sold out having earned nothing, and nothing in the system explains why.
+
+   `inventory.quantity_reserved` already exists for this, with its `>= 0` CHECK, described in
+   Section 6.3 as "held during checkout", and is currently written by nothing.
+
+   - Placing an order adds to `quantity_reserved` and leaves `quantity_available` alone.
+   - **Sellable becomes `quantity_available - quantity_reserved`.** Every place that asks "is there
+     stock?" has to change together: the oversell guard in `checkout.py`, the storefront's
+     `in_stock` boolean, and the Sold out badge. Missing one reintroduces overselling in exactly
+     the window this is meant to close.
+   - Payment confirmed (the task 4 webhook) decrements `quantity_available` and releases the
+     reservation **in the same transaction as the status change**, so the two can never disagree.
+   - Cancelling or expiring releases the reservation without touching `quantity_available`.
+   - `needs_reorder` keeps comparing against `quantity_available`, not the sellable figure:
+     reordering is about physical stock on a shelf, not about what is currently spoken for.
+   - The concurrency guard moves with it. `checkout.py` already takes `SELECT ... FOR UPDATE` row
+     locks; the comparison inside them becomes `available - reserved >= requested`.
+
+   **Vendor visibility.** `/admin/inventory` gains a **Reserved** column and an **Available to
+   sell** figure beside the physical count, so "why is this sold out when I have twelve on the
+   shelf?" is answerable from the screen rather than from the database. Sortable like the rest.
+
+   Two decisions to settle when building it, not now:
+
+   - **Counter or derived?** A maintained `quantity_reserved` counter is cheap to read and can
+     drift if any release is ever missed — and a drifted reservation is invisible stock loss
+     nobody can trace. Deriving it from unpaid orders (`sum(quantity)` over `order_items` joined to
+     `pending` orders) cannot drift and is self-healing, at the cost of a query. Recommendation:
+     derive it, and keep the column as a materialised copy only if measurement says the query is
+     too slow.
+   - **What expires a reservation?** Stripe emits `payment_intent.canceled`, but a customer who
+     closes the tab emits nothing. Needs an explicit rule — a `reserved_until` on the order plus a
+     sweep, or treating reservations older than N minutes as void on read. The lazy read-time
+     version needs no scheduler, which suits a single container.
+
+7. **[You]** Run the full checkout using Stripe's test cards and confirm the order is marked paid.
+   Then abandon one at the payment step and confirm the stock comes back rather than staying held.
 
 ### Phase 5.5 — Fulfilment, Tracking & Delivery Confirmation
 

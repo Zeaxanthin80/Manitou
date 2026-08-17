@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from decimal import Decimal
 
@@ -8,6 +9,53 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.schemas.address import AddressRead
 from app.schemas.order import OrderItemRead
 from app.store import store_config
+
+
+# Case normalisation for the two business keys.
+#
+# Both `products.slug` and `product_variants.sku` are UNIQUE, but Postgres compares
+# text case-SENSITIVELY and there is no lower() index or citext on either. So the
+# database will happily hold `marianao` AND `Marianao` as two products with two
+# URLs, or `tee-001` and `TEE-001` as two SKUs for one physical shirt. That is not
+# a uniqueness constraint anyone means to have written.
+#
+# Normalising at the API boundary is what makes the constraint mean what it looks
+# like: the second one now collides with the first and gets the existing 409.
+#
+# The two use OPPOSITE cases on purpose, because they are different things:
+#
+#   slug  -> lower. It is a URL. /products/Marianao is a URL nobody types twice
+#            the same way, and search engines treat differing cases as different
+#            pages.
+#   sku   -> upper. It is a code humans read off a shelf label and a picking slip,
+#            and every SKU already in this store is uppercase. Lowercasing would
+#            silently rewrite TEE-CLS-M-BLK the next time anyone edited it.
+#
+# Format is enforced for the slug only. A slug has one job and one legal shape.
+# SKUs legitimately carry dots, slashes and underscores in real businesses, so
+# imposing a shape here would be inventing a rule the vendor never agreed to --
+# case and whitespace are all that need fixing.
+
+SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+_SLUG_ERROR = (
+    "Slug must be lowercase letters, numbers and single hyphens, like "
+    "'classic-cotton-tee'. It becomes the product's web address."
+)
+
+
+def _normalise_slug(value: str) -> str:
+    slug = value.strip().lower()
+    if not SLUG_PATTERN.match(slug):
+        raise ValueError(_SLUG_ERROR)
+    return slug
+
+
+def _normalise_sku(value: str) -> str:
+    sku = value.strip().upper()
+    if not sku:
+        raise ValueError("SKU cannot be blank.")
+    return sku
 
 
 class AdminVariantCreate(BaseModel):
@@ -26,6 +74,8 @@ class AdminVariantCreate(BaseModel):
     quantity_available: int = Field(default=0, ge=0)
     reorder_level: int = Field(default=0, ge=0)
 
+    _sku = field_validator("sku")(classmethod(lambda cls, v: _normalise_sku(v)))
+
 
 class AdminProductCreate(BaseModel):
     name: str = Field(min_length=1)
@@ -37,6 +87,8 @@ class AdminProductCreate(BaseModel):
     unit_of_measure: str = store_config.catalog.default_unit_of_measure
     is_active: bool = True
     variants: list[AdminVariantCreate] = Field(min_length=1)
+
+    _slug = field_validator("slug")(classmethod(lambda cls, v: _normalise_slug(v)))
 
 
 class AdminProductUpdate(BaseModel):
@@ -54,6 +106,11 @@ class AdminProductUpdate(BaseModel):
     base_price: Decimal | None = Field(default=None, gt=0)
     unit_of_measure: str | None = None
     is_active: bool | None = None
+
+    # None means "not sent"; only normalise a value that was actually supplied.
+    _slug = field_validator("slug")(
+        classmethod(lambda cls, v: v if v is None else _normalise_slug(v))
+    )
 
 
 class AdminInventoryUpdate(BaseModel):
@@ -173,6 +230,10 @@ class AdminVariantUpdate(BaseModel):
     variant_name: str | None = Field(default=None, min_length=1)
     attributes: dict | None = None
     price_override: Decimal | None = None
+
+    _sku = field_validator("sku")(
+        classmethod(lambda cls, v: v if v is None else _normalise_sku(v))
+    )
 
 
 class AdminProductRead(BaseModel):

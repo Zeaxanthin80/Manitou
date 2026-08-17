@@ -467,3 +467,117 @@ def test_get_unknown_product_is_404(client, make_user, auth_headers):
     r = client.get("/admin/products/999999", headers=auth_headers(admin))
     assert r.status_code == 404
     assert r.json()["detail"] == "Product not found"
+
+
+# ------------------------------------------------ slug and SKU normalisation --
+#
+# Both columns are UNIQUE, but Postgres compares text case-sensitively and there
+# is no lower() index on either -- so `marianao` and `Marianao` were two products
+# with two URLs, and `tee-001` and `TEE-001` two SKUs for one shirt. Normalising
+# at the boundary is what makes those constraints mean what they look like.
+
+
+@pytest.mark.parametrize("sent,stored", [
+    ("Marianao", "marianao"),
+    ("  classic-cotton-tee  ", "classic-cotton-tee"),
+    ("MIA-TEE", "mia-tee"),
+])
+def test_slug_is_lowercased_and_trimmed(
+    client, make_user, make_product, auth_headers, sent, stored
+):
+    admin = make_user(email="admin@manitou.example", role="admin")
+    existing = make_product()
+    r = client.post("/admin/products", headers=auth_headers(admin), json={
+        "name": "X", "slug": sent, "category_id": existing.category_id,
+        "base_price": "10.00",
+        "variants": [{"sku": f"SKU-{sent.strip()}", "variant_name": "v"}]})
+    assert r.status_code == 201
+    assert r.json()["slug"] == stored
+
+
+@pytest.mark.parametrize("bad", ["Miami Tee", "tee--x", "-lead", "trail-", "tee_1", "tée"])
+def test_malformed_slugs_are_refused(
+    client, make_user, make_product, auth_headers, bad
+):
+    """A slug becomes a URL, so it has exactly one legal shape."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    existing = make_product()
+    r = client.post("/admin/products", headers=auth_headers(admin), json={
+        "name": "X", "slug": bad, "category_id": existing.category_id,
+        "base_price": "10.00",
+        "variants": [{"sku": "SKU-BAD", "variant_name": "v"}]})
+    assert r.status_code == 422, f"{bad!r} was accepted as a slug"
+    assert "lowercase" in str(r.json()["detail"])
+
+
+def test_slug_differing_only_by_case_now_collides(
+    client, make_user, make_product, auth_headers
+):
+    """The whole point: before normalisation both inserts succeeded and the store
+    ended up with two products and two URLs for one thing."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    existing = make_product()
+    h = auth_headers(admin)
+    body = lambda slug, sku: {
+        "name": "X", "slug": slug, "category_id": existing.category_id,
+        "base_price": "10.00", "variants": [{"sku": sku, "variant_name": "v"}]}
+
+    assert client.post("/admin/products", headers=h,
+                       json=body("marianao", "SKU-A")).status_code == 201
+    assert client.post("/admin/products", headers=h,
+                       json=body("Marianao", "SKU-B")).status_code == 409
+
+
+def test_sku_is_uppercased_and_collides_across_case(
+    client, make_user, make_product, auth_headers
+):
+    """SKUs go UP, not down: every SKU in this store is uppercase, and it is a
+    code read off a shelf label. Lowercasing would rewrite them on next edit."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    existing = make_product()
+    h = auth_headers(admin)
+    body = lambda slug, sku: {
+        "name": "X", "slug": slug, "category_id": existing.category_id,
+        "base_price": "10.00", "variants": [{"sku": sku, "variant_name": "v"}]}
+
+    r = client.post("/admin/products", headers=h, json=body("prod-a", "  tee-001 "))
+    assert r.status_code == 201
+    assert r.json()["variants"][0]["sku"] == "TEE-001"
+
+    assert client.post("/admin/products", headers=h,
+                       json=body("prod-b", "TEE-001")).status_code == 409
+
+
+def test_sku_format_is_not_policed(
+    client, make_user, make_product, auth_headers
+):
+    """Real SKUs carry dots, slashes and underscores. Only case and whitespace
+    are normalised -- imposing a shape would invent a rule the vendor never
+    agreed to."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    existing = make_product()
+    r = client.post("/admin/products", headers=auth_headers(admin), json={
+        "name": "X", "slug": "odd-sku", "category_id": existing.category_id,
+        "base_price": "10.00",
+        "variants": [{"sku": "TEE.CLS/01_A", "variant_name": "v"}]})
+    assert r.status_code == 201
+    assert r.json()["variants"][0]["sku"] == "TEE.CLS/01_A"
+
+
+def test_partial_update_normalises_only_what_was_sent(
+    client, make_user, make_product, auth_headers
+):
+    admin = make_user(email="admin@manitou.example", role="admin")
+    product = make_product()
+    h = auth_headers(admin)
+
+    r = client.patch(f"/admin/products/{product.id}", headers=h,
+                     json={"slug": "Renamed-Product"})
+    assert r.status_code == 200
+    assert r.json()["slug"] == "renamed-product"
+
+    # slug omitted entirely -- must be left alone, not blanked or re-normalised
+    r = client.patch(f"/admin/products/{product.id}", headers=h,
+                     json={"name": "New Name"})
+    assert r.status_code == 200
+    assert r.json()["slug"] == "renamed-product"
