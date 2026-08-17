@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SKUs &amp; Barcodes — Manitou Reference</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ground: #0e141b;
+        --surface: #161f29;
+        --surface-2: #1d2833;
+        --line: #2a3947;
+        --ink: #e6edf4;
+        --muted: #8496a6;
+        --client: #4db6e2;
+        --server: #d4a32c;
+        --safe: #8fa98b;
+        --risk: #d9775b;
+        --display: "Barlow Condensed", system-ui, sans-serif;
+        --body: "IBM Plex Sans", system-ui, sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        * { animation: none !important; transition: none !important; }
+      }
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+        font-family: var(--body);
+        font-size: 16px;
+        line-height: 1.65;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px 96px; }
+
+      .masthead { padding: 72px 0 40px; border-bottom: 1px solid var(--line); }
+      .eyebrow {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em;
+        text-transform: uppercase; color: var(--muted); margin: 0 0 18px;
+      }
+      h1 {
+        font-family: var(--display); font-weight: 700;
+        font-size: clamp(44px, 8vw, 86px); line-height: 0.92;
+        letter-spacing: -0.01em; margin: 0 0 20px; text-transform: uppercase;
+      }
+      .standfirst { max-width: 64ch; color: var(--muted); font-size: 17px; margin: 0; }
+      .standfirst strong { color: var(--ink); font-weight: 500; }
+
+      .toc {
+        position: sticky; top: 0; z-index: 10;
+        background: rgba(14, 20, 27, 0.92);
+        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--line); margin-bottom: -1px;
+      }
+      .toc-inner {
+        max-width: 1080px; margin: 0 auto; padding: 10px 24px;
+        display: flex; gap: 2px; overflow-x: auto;
+        scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+      }
+      .toc-inner::-webkit-scrollbar, pre::-webkit-scrollbar,
+      .table-wrap::-webkit-scrollbar { height: 6px; }
+      .toc-inner::-webkit-scrollbar-track, pre::-webkit-scrollbar-track,
+      .table-wrap::-webkit-scrollbar-track { background: transparent; }
+      .toc-inner::-webkit-scrollbar-thumb, pre::-webkit-scrollbar-thumb,
+      .table-wrap::-webkit-scrollbar-thumb {
+        background: var(--line); border-radius: 3px;
+      }
+      .toc a {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+        text-transform: uppercase; color: var(--muted); text-decoration: none;
+        padding: 6px 10px; border-radius: 2px; white-space: nowrap;
+      }
+      .toc a:hover, .toc a:focus-visible { color: var(--ink); background: var(--surface-2); }
+
+      section { padding: 64px 0 0; scroll-margin-top: 72px; }
+      .sec-head {
+        display: flex; align-items: baseline; gap: 16px;
+        margin: 0 0 8px; flex-wrap: wrap;
+      }
+      .sec-num {
+        font-family: var(--mono); font-size: 12px; color: var(--muted);
+        border: 1px solid var(--line); padding: 3px 8px; border-radius: 2px; flex: none;
+      }
+      h2 {
+        font-family: var(--display); font-weight: 600; text-transform: uppercase;
+        font-size: clamp(26px, 4vw, 38px); line-height: 1; margin: 0;
+      }
+      h3 {
+        font-family: var(--display); font-weight: 600; text-transform: uppercase;
+        letter-spacing: 0.02em; font-size: 20px; margin: 40px 0 4px;
+      }
+      .lede { color: var(--muted); max-width: 72ch; margin: 12px 0 28px; }
+      p { max-width: 76ch; }
+      ul, ol { max-width: 76ch; }
+      li { margin-bottom: 8px; }
+
+      code {
+        font-family: var(--mono); font-size: 0.88em; background: var(--surface-2);
+        border: 1px solid var(--line); border-radius: 2px; padding: 1px 5px;
+      }
+      pre {
+        font-family: var(--mono); font-size: 12.5px; line-height: 1.6;
+        background: var(--surface); border: 1px solid var(--line);
+        border-left: 2px solid var(--server); border-radius: 3px;
+        padding: 12px 14px; overflow-x: auto; margin: 16px 0;
+      }
+      pre code { background: none; border: 0; padding: 0; font-size: inherit; display: block; }
+      .out { color: var(--safe); }
+      .note {
+        background: var(--surface); border: 1px solid var(--line);
+        border-left: 2px solid var(--client); border-radius: 3px;
+        padding: 14px 16px; margin: 20px 0; color: var(--muted); font-size: 15px;
+      }
+      .note strong { color: var(--ink); font-weight: 600; }
+      .note.warn { border-left-color: var(--risk); }
+      .note.good { border-left-color: var(--safe); }
+
+      .table-wrap {
+        overflow-x: auto; scrollbar-width: thin;
+        scrollbar-color: var(--line) transparent;
+      }
+      table {
+        width: 100%; min-width: 520px; border-collapse: collapse;
+        margin: 16px 0; font-size: 14.5px;
+      }
+      th, td {
+        text-align: left; padding: 10px 12px;
+        border-bottom: 1px solid var(--line); vertical-align: top;
+      }
+      th {
+        font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em;
+        text-transform: uppercase; color: var(--muted); font-weight: 400;
+      }
+      td strong { color: var(--ink); }
+
+      .anatomy {
+        font-family: var(--mono); font-size: 13px; line-height: 1.9;
+        background: var(--surface); border: 1px solid var(--line);
+        border-radius: 3px; padding: 18px; overflow-x: auto; margin: 16px 0;
+      }
+      .seg { color: var(--client); }
+      .seg2 { color: var(--server); }
+      .seg3 { color: var(--safe); }
+      .seg4 { color: var(--risk); }
+
+      .yes::before { content: "✓ "; color: var(--safe); }
+      .no::before { content: "✗ "; color: var(--risk); }
+
+      footer {
+        margin-top: 72px; padding-top: 28px; border-top: 1px solid var(--line);
+        color: var(--muted); font-size: 14px;
+      }
+      @media print {
+        .toc { display: none; }
+        body { background: #fff; color: #000; }
+        pre, .note, code, .anatomy { background: #f4f4f4; color: #000; }
+        a { color: #000; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="masthead">
+        <p class="eyebrow">Manitou · Reference · Inventory identifiers</p>
+        <h1>SKUs &amp;<br />Barcodes</h1>
+        <p class="standfirst">
+          What a SKU is actually for, where it shows up in a working day, why it
+          looks the way it does, and how it differs from the
+          <strong>GTIN</strong> that a supermarket scanner expects. Written
+          because Manitou has a <code>sku</code> column and a
+          <code>product_variants.id</code>, and the reason for having both is not
+          obvious until you watch someone pick an order.
+        </p>
+      </header>
+    </div>
+
+    <nav class="toc" aria-label="Sections">
+      <div class="toc-inner">
+        <a href="#what">0 · What it is</a>
+        <a href="#where">1 · Where it appears</a>
+        <a href="#scanning">2 · Barcodes &amp; POS</a>
+        <a href="#naming">3 · Naming</a>
+        <a href="#spreadsheet">4 · The spreadsheet</a>
+        <a href="#gtin">5 · GTIN / UPC / EAN</a>
+        <a href="#compare">6 · Which is which</a>
+        <a href="#manitou">7 · In Manitou</a>
+      </div>
+    </nav>
+
+    <div class="wrap">
+      <!-- ============================================================ 0 -->
+      <section id="what">
+        <div class="sec-head"><span class="sec-num">00</span><h2>What a SKU is</h2></div>
+        <p class="lede">
+          Stock Keeping Unit. The identifier for one distinct sellable thing —
+          specifically, the level at which you count stock.
+        </p>
+
+        <p>
+          If a shirt comes in three sizes and two colours, that is
+          <strong>one product</strong> and <strong>six SKUs</strong>, because six
+          separate piles exist on the shelf and each can run out independently.
+          "How many Classic Cotton Tees do I have?" is not an answerable question
+          in a warehouse. "How many <code>TEE-CLS-M-BLK</code>?" is.
+        </p>
+
+        <p>
+          Manitou already has a unique identifier for a variant —
+          <code>product_variants.id</code>, a bigint primary key. So why carry a
+          second one? Because they have different audiences:
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Identifier</th><th>Audience</th><th>Lives</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong><code>id</code></strong><br />technical key</td>
+                <td>The database, and code that joins on it</td>
+                <td>Inside the system only. An implementation detail nothing outside should depend on</td>
+              </tr>
+              <tr>
+                <td><strong><code>sku</code></strong><br />business key</td>
+                <td>People, and other companies' systems</td>
+                <td>On labels, paper, screens, phone calls, spreadsheets, and other firms' databases</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          A picker reading <code>TEE-CLS-M-BLK</code> knows to fetch a classic
+          tee, medium, black, without looking anything up. Reading
+          <code>76</code> tells them nothing, is easy to transpose, and means
+          something different in every other system it touches.
+        </p>
+
+        <div class="note">
+          <strong>A SKU is internal.</strong> There is no registry, no authority
+          and no format anyone can enforce on you. Your
+          <code>TEE-CLS-M-BLK</code> and another shop's are unrelated strings
+          that happen to match. Uniqueness is a promise you make to yourself,
+          inside your own database — which is exactly what
+          <code>uq_product_variants_sku</code> enforces in Manitou.
+        </div>
+      </section>
+
+      <!-- ============================================================ 1 -->
+      <section id="where">
+        <div class="sec-head"><span class="sec-num">01</span><h2>Where it actually appears</h2></div>
+        <p class="lede">
+          The SKU earns its existence outside the database. Each of these is a
+          place where a bigint primary key would be useless or dangerous.
+        </p>
+
+        <h3>Shelf and bin labels</h3>
+        <p>
+          Printed and stuck to the location where the stock physically lives.
+          Usually SKU + short description + a barcode. The label is how a human
+          confirms they are standing in front of the right box. This is the one
+          case where a <em>structured</em> SKU pays off most: shelves are usually
+          arranged so related SKUs sit together, and a code that sorts sensibly
+          makes the rack walkable.
+        </p>
+
+        <h3>Pick lists</h3>
+        <p>
+          When an order comes in, someone gets a list of what to collect. It is
+          the SKU, the quantity, and the location — <em>not</em> the product name,
+          because "Miami Tee" and "Miami T-Shirt" are indistinguishable at a
+          glance and the whole job is not mixing them up. The pick list is
+          usually the first place a bad SKU causes real money to be lost, because
+          the wrong item goes in the box and comes back as a return.
+        </p>
+
+        <h3>Barcodes</h3>
+        <p>
+          A barcode is a way of writing a string so a machine can read it
+          reliably. Which string? Whichever one you chose. On your own internal
+          labels, that is the SKU. Section 2 covers how this actually works.
+        </p>
+
+        <h3>Supplier purchase orders</h3>
+        <p>
+          When you reorder, you send the supplier a document listing what you
+          want. Here is the subtlety: <strong>your SKU means nothing to your
+          supplier.</strong> They have their own. A purchase order usually
+          carries both — their part number so they can fulfil it, and yours so
+          you can match the delivery back to your own stock when it arrives.
+          Mature systems store the supplier's code alongside your SKU for exactly
+          this translation.
+        </p>
+
+        <h3>Stocktake sheets</h3>
+        <p>
+          Counting what is physically present and comparing it to what the system
+          claims. Someone walks the shelves with a scanner or a clipboard and
+          records a number against each SKU. Hand-written stocktakes are why
+          ambiguous characters matter: a <code>0</code> recorded as
+          <code>O</code>, or <code>1</code> as <code>I</code>, produces a count
+          against a SKU that does not exist, and the real one silently stays
+          wrong.
+        </p>
+
+        <h3>Courier manifests and packing slips</h3>
+        <p>
+          The paperwork that travels with the parcel. The packing slip lists
+          SKUs and quantities so the customer — and anyone processing a return —
+          can verify the contents against what was ordered. For customs, some
+          carriers also want a description and commodity code, which is separate
+          from the SKU and not something a SKU can substitute for.
+        </p>
+
+        <h3>The spreadsheet the vendor actually uses</h3>
+        <p>
+          This is the one nobody designs for and everybody has. Reorder planning,
+          margin calculations, supplier price comparisons, "what sold last
+          month" — all of it happens in a spreadsheet, keyed by SKU, because the
+          SKU is the only identifier that survives being exported from one system
+          and pasted into another. Section 4 covers the ways a spreadsheet will
+          quietly corrupt it.
+        </p>
+      </section>
+
+      <!-- ============================================================ 2 -->
+      <section id="scanning">
+        <div class="sec-head"><span class="sec-num">02</span><h2>Barcodes and POS scanners</h2></div>
+        <p class="lede">
+          The mental model people usually start with is wrong in a way that
+          matters, so it is worth being precise.
+        </p>
+
+        <div class="note warn">
+          <strong>A barcode scanner does not know what a SKU is.</strong> It does
+          not know what a product is, or a price. It is an optical device that
+          decodes a printed pattern into a string of characters and hands that
+          string to whatever software is listening. All the meaning is added
+          afterwards, by a database lookup.
+        </div>
+
+        <h3>What physically happens at a till</h3>
+        <pre><code>1.  Scanner reads the bars, decodes them to characters   "0712345678912"
+2.  Scanner emits that text, usually as keystrokes,
+    exactly as though someone had typed it very fast,
+    followed by an Enter                                  (keyboard-wedge mode)
+3.  The POS software has a search box focused. The text
+    lands in it and the Enter submits.
+4.  POS queries ITS OWN database:  WHERE gtin = '0712345678912'
+5.  Row found -> name, price, tax rate, stock decrement.
+    Row not found -> "unknown item".</code></pre>
+
+        <p>
+          Step 5 is where everything you care about lives, and it is ordinary
+          database work — the same shape as
+          <code>SELECT ... WHERE sku = $1</code>. The scanner replaced typing,
+          nothing more. Many scanners can also run over USB serial or Bluetooth
+          rather than pretending to be a keyboard, but the principle is
+          unchanged: symbol in, string out, lookup follows.
+        </p>
+
+        <h3>Two different strings can be in that barcode</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th></th><th>Retail barcode</th><th>Internal barcode</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Encodes</strong></td>
+                <td>A GTIN — a globally unique number (Section 5)</td>
+                <td>Your SKU, or your own internal id</td>
+              </tr>
+              <tr>
+                <td><strong>Printed by</strong></td>
+                <td>The manufacturer, on the product or its packaging</td>
+                <td>You, on a label you stick on the shelf or the item</td>
+              </tr>
+              <tr>
+                <td><strong>Symbology</strong></td>
+                <td>UPC-A or EAN-13 — fixed length, digits only</td>
+                <td>Code 128 or Code 39 — variable length, letters allowed</td>
+              </tr>
+              <tr>
+                <td><strong>Understood by</strong></td>
+                <td>Any shop in the world that stocks the item</td>
+                <td>Only you</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note good">
+          <strong>This is why SKUs are conventionally uppercase.</strong> Not
+          aesthetics — encodability. <strong>Code 39</strong>, the simplest and
+          most widely supported alphanumeric symbology, can only represent
+          <code>A–Z</code>, <code>0–9</code>, space and
+          <code>- . $ / + %</code>. There are no lowercase letters in it at all.
+          A SKU of <code>tee-cls-m-blk</code> cannot be printed as a Code 39
+          barcode; <code>TEE-CLS-M-BLK</code> can. Code 128 handles full ASCII
+          and is the better default today, but the convention was set by the
+          older constraint and there is no reason to fight it. It is also why
+          Manitou normalises SKUs to uppercase on write.
+        </div>
+
+        <h3>Do you need any of this?</h3>
+        <p>
+          For an online-only store: <strong>no</strong>. Nothing scans anything.
+          The SKU is doing its work on pick lists and in the vendor's
+          spreadsheet, and a barcode adds nothing until there is a physical
+          counter or a stockroom big enough that walking it with a scanner beats
+          reading labels. It becomes worth it at roughly the point where
+          stocktakes stop fitting in an afternoon.
+        </p>
+      </section>
+
+      <!-- ============================================================ 3 -->
+      <section id="naming">
+        <div class="sec-head"><span class="sec-num">03</span><h2>Why <code>TYPE-STYLE-SIZE-COLOUR</code></h2></div>
+        <p class="lede">
+          There is no standard. There are strong conventions, and they exist
+          because each one solves a problem someone hit the hard way.
+        </p>
+
+        <div class="note">
+          <strong>Worth being clear about this.</strong> GS1 governs GTINs.
+          Nobody governs SKUs. There is no ISO standard, no registry, and no
+          validator that can tell you your SKU scheme is wrong. What follows is
+          accumulated practice, not a specification — but ignoring it has
+          predictable consequences.
+        </div>
+
+        <div class="anatomy">
+          <span class="seg">TEE</span>-<span class="seg2">CLS</span>-<span class="seg3">M</span>-<span class="seg4">BLK</span><br />
+          <span class="seg">&nbsp;│&nbsp;</span>&nbsp;&nbsp;<span class="seg2">&nbsp;│&nbsp;</span>&nbsp;&nbsp;<span class="seg3">│</span>&nbsp;&nbsp;<span class="seg4">&nbsp;│</span><br />
+          <span class="seg">&nbsp;└─ type</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;what kind of thing (TEE / CAP / BAG)<br />
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="seg2">└─ style</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;which design (CLS / GRA / GRV / ABS)<br />
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="seg3">└─ size</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;S / M / L / XXL / OS<br />
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="seg4">└─ colour</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BLK / WHT / NVY / KHK
+        </div>
+
+        <h3>Why segments run general → specific</h3>
+        <p>
+          Because sorting alphabetically then groups things the way a human
+          wants them grouped. Every <code>TEE-CLS-*</code> lands together, then
+          splits by size, then by colour. A stocktake sheet sorted by SKU walks
+          the rack in the order the rack is arranged. Put colour first and the
+          same list scatters every product across the sheet.
+        </p>
+
+        <h3>Why mnemonic and not sequential</h3>
+        <p>
+          <code>TEE-CLS-M-BLK</code> can be decoded by a person with no lookup.
+          <code>000247</code> cannot. The moment a SKU needs a lookup to be
+          understood, you have reinvented the primary key and gained nothing for
+          the extra column.
+        </p>
+
+        <h3>Why fixed, short segments</h3>
+        <p>
+          The eye parses by position. Once you know segment three is the size,
+          you stop reading the rest. Segments of wildly varying length break
+          that, and long SKUs get truncated on labels and in narrow spreadsheet
+          columns.
+        </p>
+
+        <h3>Things that go wrong</h3>
+        <ul>
+          <li>
+            <span class="no"></span><strong>Encoding anything that changes.</strong>
+            Price, cost, supplier, season, current promotion. When it changes,
+            the SKU is either a lie or must be changed — and a SKU must never
+            change, because every historical order, pick list and spreadsheet
+            already recorded the old one.
+          </li>
+          <li>
+            <span class="no"></span><strong>Reusing a retired SKU.</strong> Same
+            problem pointing backwards: last year's sales report silently starts
+            describing a different product. In Manitou this is prevented by
+            accident — every FK into <code>product_variants</code> is
+            <code>NO ACTION</code>, so a variant that has ever sold cannot be
+            deleted and its SKU stays taken forever.
+          </li>
+          <li>
+            <span class="no"></span><strong>Ambiguous characters.</strong>
+            <code>O</code>/<code>0</code>, <code>I</code>/<code>1</code>/<code>l</code>,
+            <code>S</code>/<code>5</code>, <code>B</code>/<code>8</code>. Fine on
+            screen, a coin-flip when read aloud across a stockroom or written on
+            a clipboard. Some schemes ban vowels outright, which also
+            conveniently prevents a SKU accidentally spelling something.
+          </li>
+          <li>
+            <span class="no"></span><strong>A SKU that contradicts the item.</strong>
+            Worse than an opaque one, because people trust the structure and stop
+            checking. Manitou had <code>TEE-CLS-LG-BLK-3</code> on a
+            Large/<em>White</em> variant of a product that was not Classic.
+          </li>
+          <li>
+            <span class="yes"></span><strong>Uppercase, digits, hyphens.</strong>
+            Encodable in Code 39, safe in URLs, safe in filenames, unambiguous in
+            CSV.
+          </li>
+        </ul>
+      </section>
+
+      <!-- ============================================================ 4 -->
+      <section id="spreadsheet">
+        <div class="sec-head"><span class="sec-num">04</span><h2>The spreadsheet will corrupt it</h2></div>
+        <p class="lede">
+          The vendor's spreadsheet is where SKUs go to die, and the failures are
+          silent. This is a real, well-known class of data loss, not a
+          hypothetical.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>SKU</th><th>What Excel / Sheets does</th><th>Why</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>00123</code></td>
+                <td>becomes <code>123</code></td>
+                <td>Read as a number; leading zeros are not significant</td>
+              </tr>
+              <tr>
+                <td><code>1-5</code></td>
+                <td>becomes <code>05-Jan</code></td>
+                <td>Read as a date</td>
+              </tr>
+              <tr>
+                <td><code>TEE-1E5</code></td>
+                <td>survives</td>
+                <td>Has letters, so it stays text</td>
+              </tr>
+              <tr>
+                <td><code>1E5</code></td>
+                <td>becomes <code>100000</code></td>
+                <td>Read as scientific notation</td>
+              </tr>
+              <tr>
+                <td><code>SEP1</code></td>
+                <td>may become <code>01-Sep</code></td>
+                <td>Recognised as a month abbreviation</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          The damage happens on <em>import</em>, before anyone looks. Then the
+          file gets sent back, pasted into a form, and the wrong SKU enters a
+          real system. A prefix of letters — which
+          <code>TYPE-STYLE-SIZE-COLOUR</code> gives you for free — makes every
+          one of these impossible, because a value starting with letters is
+          unambiguously text.
+        </p>
+
+        <div class="note">
+          This is the same problem that made the genetics community rename human
+          genes: <code>SEPT1</code> and <code>MARCH1</code> kept turning into
+          dates in published data sets. If it can happen to peer-reviewed
+          science, it will happen to a stocktake.
+        </div>
+      </section>
+
+      <!-- ============================================================ 5 -->
+      <section id="gtin">
+        <div class="sec-head"><span class="sec-num">05</span><h2>GTIN, UPC, EAN and GS1</h2></div>
+        <p class="lede">
+          The layer above SKUs: an identifier that means the same thing in every
+          company in the world, because somebody issues them centrally.
+        </p>
+
+        <h3>The names, which overlap confusingly</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Term</th><th>What it is</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>GS1</strong></td>
+                <td>The not-for-profit standards body that issues company prefixes and defines the formats. National member organisations (GS1 US, GS1 UK, …) handle licensing</td>
+              </tr>
+              <tr>
+                <td><strong>GTIN</strong></td>
+                <td>Global Trade Item Number — the umbrella term for the <em>number itself</em>, regardless of length</td>
+              </tr>
+              <tr>
+                <td><strong>GTIN-12 / UPC-A</strong></td>
+                <td>12 digits. The barcode on retail packaging in North America</td>
+              </tr>
+              <tr>
+                <td><strong>GTIN-13 / EAN-13</strong></td>
+                <td>13 digits. The international equivalent, used nearly everywhere else</td>
+              </tr>
+              <tr>
+                <td><strong>GTIN-8 / EAN-8</strong></td>
+                <td>8 digits. For packaging too small for a full barcode</td>
+              </tr>
+              <tr>
+                <td><strong>GTIN-14</strong></td>
+                <td>14 digits. Identifies a <em>case</em> or carton rather than a single unit</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          "UPC" and "EAN" name the <em>barcode symbologies</em>; "GTIN" names the
+          number they carry. In practice people use them interchangeably and
+          usually mean the number.
+        </p>
+
+        <h3>How the number is built</h3>
+        <div class="anatomy">
+          <span class="seg">0 7 1 2 3 4 5</span> <span class="seg2">6 7 8 9 1</span> <span class="seg3">2</span><br />
+          <span class="seg">└─── company prefix ───┘</span> <span class="seg2">└─ item ─┘</span> <span class="seg3">└ check</span><br />
+          <br />
+          <span class="seg">licensed to you by GS1 — identifies your company</span><br />
+          <span class="seg2">you assign, one per distinct product</span><br />
+          <span class="seg3">calculated, not chosen (mod-10)</span>
+        </div>
+
+        <p>
+          The <strong>check digit</strong> is arithmetic over the preceding
+          digits. A scanner recalculates it and rejects the read if it does not
+          match, which is how a smudged or partially-read barcode fails loudly
+          instead of ringing up the wrong item. Note the consequence: you cannot
+          invent a GTIN, because a made-up number will usually fail its own check
+          digit — and if it happens to pass, it belongs to somebody else.
+        </p>
+
+        <p>
+          Your prefix length determines how many items you can number. A shorter
+          prefix leaves more digits for items and costs more. That is the whole
+          pricing model: you license a prefix from your national GS1
+          organisation, typically an initial fee plus an annual renewal, sized by
+          how many products you need to identify. GS1 US also sells single GTINs
+          for sellers who need only a handful.
+        </p>
+
+        <div class="note warn">
+          <strong>Avoid cheap resold barcodes.</strong> A market exists in
+          reselling numbers from prefixes issued before GS1 required licences to
+          be renewed. They are legal to buy and frequently useless: Amazon and
+          the large retailers now verify a GTIN against GS1's registry and check
+          that the brand matches the prefix holder. A number registered to a
+          company that is not you gets the listing rejected, and you find out
+          after doing the work.
+        </div>
+
+        <h3>When you actually need one</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Channel</th><th>GTIN needed?</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Your own web store</td><td><strong>No.</strong> Nothing outside your system needs to name the item</td></tr>
+              <tr><td>Amazon</td><td>Yes for most categories, with a brand-registry exemption route for own-brand goods</td></tr>
+              <tr><td>Google Shopping</td><td>Required if the product <em>has</em> one; listings without are penalised or rejected</td></tr>
+              <tr><td>Physical retail / wholesale</td><td>Yes — the buyer's till and warehouse are built around scanning it</td></tr>
+              <tr><td>eBay, Etsy and similar</td><td>Varies by category; often optional for handmade or vintage</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          If you <em>resell</em> someone else's product it already has a GTIN,
+          printed by its manufacturer — you record theirs and assign your own SKU
+          alongside it. If you make and brand your own goods, you assign both:
+          the SKU because you need one internally, the GTIN because your sales
+          channels demand it.
+        </p>
+      </section>
+
+      <!-- ============================================================ 6 -->
+      <section id="compare">
+        <div class="sec-head"><span class="sec-num">06</span><h2>Which identifier is which</h2></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th></th><th>Who assigns it</th><th>Scope</th><th>Format</th><th>Changeable</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>SKU</strong></td>
+                <td>You</td>
+                <td>Your company only</td>
+                <td>Anything; conventionally uppercase alphanumeric with hyphens</td>
+                <td>Never, once used</td>
+              </tr>
+              <tr>
+                <td><strong>GTIN</strong><br />UPC / EAN</td>
+                <td>You, under a GS1 prefix</td>
+                <td>Global</td>
+                <td>8, 12, 13 or 14 digits with a check digit</td>
+                <td>Never. A materially different product needs a new one</td>
+              </tr>
+              <tr>
+                <td><strong>MPN</strong></td>
+                <td>The manufacturer</td>
+                <td>That manufacturer's catalogue</td>
+                <td>Free-form</td>
+                <td>Theirs to decide</td>
+              </tr>
+              <tr>
+                <td><strong>ASIN</strong></td>
+                <td>Amazon</td>
+                <td>Amazon only</td>
+                <td>10 characters</td>
+                <td>Amazon's to decide</td>
+              </tr>
+              <tr>
+                <td><strong><code>variants.id</code></strong></td>
+                <td>Postgres</td>
+                <td>One database</td>
+                <td>bigint</td>
+                <td>Never, and never exposed</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          These coexist rather than compete. A single black medium tee can
+          simultaneously be <code>TEE-CLS-M-BLK</code> to you,
+          <code>0712345678912</code> to the world, <code>B0XXXXXXXX</code> on
+          Amazon, and row <code>76</code> in your database.
+        </p>
+      </section>
+
+      <!-- ============================================================ 7 -->
+      <section id="manitou">
+        <div class="sec-head"><span class="sec-num">07</span><h2>How Manitou handles it today</h2></div>
+
+        <ul>
+          <li>
+            <code>product_variants.sku</code> is <code>UNIQUE</code> across the
+            whole store, not per product — the point of a SKU is that it means
+            one thing wherever it appears.
+          </li>
+          <li>
+            SKUs are normalised to <strong>uppercase</strong> and trimmed at the
+            API boundary, so <code>tee-001</code> and <code>TEE-001</code>
+            collide and the second is refused with a 409 instead of quietly
+            becoming a second SKU for one shirt.
+          </li>
+          <li>
+            <strong>Format is not enforced.</strong> Real SKUs carry dots,
+            slashes and underscores, so imposing a shape would invent a rule the
+            vendor never agreed to. Case and whitespace are the only things
+            normalised. Compare <code>products.slug</code>, which
+            <em>is</em> format-checked, because a slug becomes a URL and has
+            exactly one legal shape.
+          </li>
+          <li>
+            Size and colour live in <code>product_variants.attributes</code>
+            (JSONB) as well as being encoded in the SKU. The SKU is for humans;
+            <code>attributes</code> is what filtering and logic read. A variant
+            with a correct SKU and an empty <code>attributes</code> is invisible
+            to every size and colour filter.
+          </li>
+          <li>
+            <strong>No GTIN column exists</strong>, deliberately. Manitou sells
+            through its own storefront, where nothing outside the system needs to
+            name the item. If the store ever lists on Amazon or Google Shopping,
+            that is a nullable <code>gtin</code> column beside the SKU — an
+            addition, never a replacement.
+          </li>
+        </ul>
+
+        <div class="note good">
+          <strong>The rule worth remembering.</strong> A SKU answers "which of my
+          things is this?". A GTIN answers "which of the world's things is
+          this?". A primary key answers "which row is this?". Three questions,
+          three identifiers, and confusing them is how a warehouse ends up
+          shipping the wrong shirt.
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          Manitou · reference · companion to <code>PROJECT_PLAN.md</code> Section
+          6.3 (<code>product_variants</code>) and Section 1.1 (the
+          <code>attributes</code> reusability seam).
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>
