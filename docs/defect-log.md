@@ -295,3 +295,22 @@ than no check: it produces confidence without evidence.
 - **A wildcard that swept up more than intended.** `git add web/public/*.jpeg` committed an image
   that then had to be removed from history and the repository recreated. Add by explicit path, and
   read `git status` before committing.
+- **Assuming a string replacement applied.** Twice. A scripted edit to `test_admin.py` left
+  `("get", "/admin/products/1", None)` in the route list one commit *before* that endpoint existed
+  — the pattern was missing a trailing comma, so it matched nothing and reported nothing. Caught
+  only by inspecting the staged file. Then again on `cart/page.tsx`, where the whole "No longer
+  available" label silently failed to apply and was discovered at `git add` time, because the file
+  was simply absent from the modified list.
+
+  The instructive part: the *same* edit also put a field on the wrong TypeScript type, and `tsc`
+  caught that within seconds. The change with a machine checking it was found immediately; the
+  change relying on my own assertion was not — because I had not written one. Any scripted edit
+  now asserts the text actually changed.
+- **Verifying the data instead of the page.** The cart label above was "confirmed" by observing
+  `is_for_sale: false` in the API response and concluding the cart was done. The API and the
+  rendered page are two different things, and only the easier one was checked — while the label
+  did not exist at all. Re-verified afterwards by reading the DOM in both states:
+  `["NO LONGER AVAILABLE · REMOVE TO CHECK OUT"]` when hidden, `[]` when visible.
+
+  This is the same shape as *concluding from a 404 without a control*: a result that was true but
+  did not mean what it was taken to mean.
