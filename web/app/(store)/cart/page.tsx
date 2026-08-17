@@ -69,10 +69,21 @@ export default async function CartPage() {
                   <p className="mt-1 font-body text-sm text-muted">
                     {item.variant.variant_name} &middot; {formatMoney(item.variant.price)}
                   </p>
-                  {!item.variant.in_stock && (
+                  {/* Discontinued wins when both are true. A product that is
+                      withdrawn AND out of stock should say the thing the
+                      customer can act on: "Out of stock" means check back later,
+                      which would send them away to wait for something that is
+                      never coming back. */}
+                  {!item.variant.is_for_sale ? (
                     <p className="mt-1 font-body text-xs uppercase tracking-tight text-accent">
-                      Out of stock
+                      No longer available &middot; remove to check out
                     </p>
+                  ) : (
+                    !item.variant.in_stock && (
+                      <p className="mt-1 font-body text-xs uppercase tracking-tight text-accent">
+                        Out of stock
+                      </p>
+                    )
                   )}
                 </div>
 

@@ -237,3 +237,123 @@ def test_concurrent_checkouts_cannot_oversell(
     assert orders == STOCK, f"{orders} orders created for {STOCK} units"
     assert remaining == 0
     assert STOCK - remaining == sold, "units deducted must equal units sold"
+
+
+# ------------------------------------------- discontinued products in carts --
+#
+# Adding a hidden product to a cart was already refused. Nothing re-checked it at
+# checkout, so a product hidden AFTER it was in someone's cart could still be
+# bought -- measured at 201 before this guard existed. The vendor's "stop selling
+# this" was honoured everywhere a new customer looked and ignored for anyone
+# holding an old cart.
+
+
+def _cart_with(client, buyer, product, auth_headers, quantity=1):
+    r = client.post("/cart/items", headers=auth_headers(buyer),
+                    json={"variant_id": product.variants[0].id, "quantity": quantity})
+    assert r.status_code == 201
+    return r
+
+
+def test_hidden_product_cannot_be_checked_out_from_an_old_cart(
+    client, make_user, make_product, make_address, auth_headers
+):
+    buyer = make_user(email="buyer@manitou.example")
+    admin = make_user(email="admin@manitou.example", role="admin")
+    product = make_product(stock=5)
+    address = make_address(buyer)
+    h = auth_headers(buyer)
+
+    _cart_with(client, buyer, product, auth_headers)
+    assert client.delete(f"/admin/products/{product.id}",
+                         headers=auth_headers(admin)).status_code == 204
+
+    r = client.post("/orders", headers=h, json={
+        "shipping_address_id": address.id, "billing_address_id": address.id})
+    assert r.status_code == 409, "a withdrawn product was sold"
+    # Names the PRODUCT, not the SKU: the customer's only move is to remove the
+    # line, and they recognise a product name.
+    assert product.name in r.json()["detail"]
+
+
+def test_the_cart_says_why_before_checkout_does(
+    client, make_user, make_product, auth_headers
+):
+    """The combination that made this invisible: stock on the shelf is untouched,
+    so in_stock stays true and the line looked entirely normal."""
+    buyer = make_user(email="buyer@manitou.example")
+    admin = make_user(email="admin@manitou.example", role="admin")
+    product = make_product(stock=5)
+    _cart_with(client, buyer, product, auth_headers)
+    client.delete(f"/admin/products/{product.id}", headers=auth_headers(admin))
+
+    line = client.get("/cart", headers=auth_headers(buyer)).json()["items"][0]
+    assert line["variant"]["is_for_sale"] is False
+    assert line["variant"]["in_stock"] is True, (
+        "shelf stock is untouched -- this is exactly why in_stock could not "
+        "carry this signal"
+    )
+
+
+def test_one_bad_line_refuses_the_whole_checkout_and_names_it(
+    client, make_user, make_product, make_address, auth_headers
+):
+    """Matches how InsufficientStock already behaves. The message has to name the
+    culprit or the customer cannot tell which of several lines to remove."""
+    buyer = make_user(email="buyer@manitou.example")
+    admin = make_user(email="admin@manitou.example", role="admin")
+    good = make_product(stock=5)
+    doomed = make_product(stock=5)
+    address = make_address(buyer)
+    h = auth_headers(buyer)
+
+    _cart_with(client, buyer, good, auth_headers)
+    _cart_with(client, buyer, doomed, auth_headers)
+    client.delete(f"/admin/products/{doomed.id}", headers=auth_headers(admin))
+
+    r = client.post("/orders", headers=h, json={
+        "shipping_address_id": address.id, "billing_address_id": address.id})
+    assert r.status_code == 409
+    assert doomed.name in r.json()["detail"]
+    assert good.name not in r.json()["detail"]
+
+
+def test_unhiding_makes_it_buyable_again(
+    client, make_user, make_product, make_address, auth_headers
+):
+    """The block is on the flag, not a side effect of hiding."""
+    buyer = make_user(email="buyer@manitou.example")
+    admin = make_user(email="admin@manitou.example", role="admin")
+    product = make_product(stock=5)
+    address = make_address(buyer)
+    ah, h = auth_headers(admin), auth_headers(buyer)
+
+    _cart_with(client, buyer, product, auth_headers)
+    client.delete(f"/admin/products/{product.id}", headers=ah)
+    body = {"shipping_address_id": address.id, "billing_address_id": address.id}
+    assert client.post("/orders", headers=h, json=body).status_code == 409
+
+    client.patch(f"/admin/products/{product.id}", headers=ah, json={"is_active": True})
+    assert client.post("/orders", headers=h, json=body).status_code == 201
+
+
+def test_out_of_stock_behaviour_is_unchanged(
+    client, make_user, make_product, make_address, auth_headers
+):
+    """The new guard runs first in the same loop -- it must not swallow or
+    reword the stock failure."""
+    buyer = make_user(email="buyer@manitou.example")
+    product = make_product(stock=1)
+    address = make_address(buyer)
+    h = auth_headers(buyer)
+
+    _cart_with(client, buyer, product, auth_headers, quantity=1)
+    client.patch(f"/admin/variants/{product.variants[0].id}/inventory",
+                 headers=auth_headers(make_user(email="a@manitou.example", role="admin")),
+                 json={"quantity_available": 0})
+
+    r = client.post("/orders", headers=h, json={
+        "shipping_address_id": address.id, "billing_address_id": address.id})
+    assert r.status_code == 409
+    assert "only 0 in stock" in r.json()["detail"]
+    assert product.variants[0].sku in r.json()["detail"]

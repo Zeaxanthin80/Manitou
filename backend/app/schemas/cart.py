@@ -30,7 +30,13 @@ class CartLineVariant(BaseModel):
     product_name: str
     product_slug: str
     price: Decimal
+    #: Two booleans on two different axes, and they are not interchangeable.
+    #: in_stock  -- is there inventory? "check back later"
+    #: is_for_sale -- is the product still listed? "this is not coming back"
+    #: Telling a customer the first when you mean the second sends them away to
+    #: wait for something that will never return.
     in_stock: bool
+    is_for_sale: bool
 
 
 class CartItemRead(BaseModel):

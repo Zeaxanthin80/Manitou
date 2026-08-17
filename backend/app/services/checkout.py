@@ -47,6 +47,26 @@ class InsufficientStock(CheckoutError):
         super().__init__(f"{sku}: only {available} in stock")
 
 
+class ProductUnavailable(CheckoutError):
+    """A line points at a product the vendor has withdrawn from sale.
+
+    Adding a hidden product to a cart is already refused (cart router), but a
+    product can be hidden AFTER it is in someone's cart -- and nothing re-checked
+    it here. Measured before this existed: hide a product and the customer
+    holding it in an old cart could still complete the order. The vendor's "stop
+    selling this" was honoured everywhere a new customer looked and ignored for
+    anyone with an old cart.
+
+    Names the product, not the SKU. Unlike a stock shortfall, the customer's only
+    move is to remove the line, and they recognise a product name -- the SKU is
+    on the shelf label, not in their head.
+    """
+
+    def __init__(self, product_name: str) -> None:
+        self.product_name = product_name
+        super().__init__(f"{product_name} is no longer available. Remove it to continue.")
+
+
 def _owned_address(db: Session, address_id: int, user_id: int) -> Address:
     address = db.scalar(
         select(Address).where(Address.id == address_id, Address.user_id == user_id)
@@ -112,6 +132,17 @@ def create_order_from_cart(
     # Re-check AFTER acquiring the lock. Checking before it is precisely the
     # race: the value could change between the check and the write.
     for line in cart.items:
+        # Still for sale? Checked HERE rather than trusted from whatever the cart
+        # page rendered, because a product can be hidden between that render and
+        # this request. It deliberately does NOT need the row lock the stock
+        # check needs: stock is a read-modify-write under contention, is_active
+        # is a flag nothing writes back during checkout. A stale read costs an
+        # order slipping through microseconds after the vendor hid something;
+        # locking the products table to close that would be a real cost for an
+        # imaginary gain.
+        if not line.variant.product.is_active:
+            raise ProductUnavailable(line.variant.product.name)
+
         inv = stock.get(line.variant_id)
         available = inv.quantity_available if inv else 0
         if line.quantity > available:

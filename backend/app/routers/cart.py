@@ -93,6 +93,7 @@ def _to_line(item: CartItem) -> CartItemRead:
             product_slug=item.variant.product.slug,
             price=price,
             in_stock=inv is not None and inv.quantity_available > 0,
+            is_for_sale=item.variant.product.is_active,
         ),
         line_total=price * item.quantity,
     )

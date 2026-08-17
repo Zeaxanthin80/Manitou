@@ -124,7 +124,12 @@ export type CartLineVariant = {
   /** Live price, not a snapshot -- a cart shows today's price. Only order_items
    *  freeze it (see PROJECT_PLAN Section 6.4). */
   price: string;
+  /** Is there inventory? "check back later" */
   in_stock: boolean;
+  /** Is the product still listed? "this is not coming back". A separate axis
+   *  from in_stock on purpose -- a withdrawn product can be fully stocked, and
+   *  that combination is exactly what hid the discontinued-cart defect. */
+  is_for_sale: boolean;
 };
 
 export type CartItem = {

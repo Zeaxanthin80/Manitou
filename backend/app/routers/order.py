@@ -17,6 +17,7 @@ from app.services.checkout import (
     AddressNotFound,
     CartEmpty,
     InsufficientStock,
+    ProductUnavailable,
     create_order_from_cart,
 )
 
@@ -59,6 +60,12 @@ def create_order(
         # disclosure, same reasoning as the address router. from None for the
         # same reason as CartEmpty above.
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Address not found") from None
+    except ProductUnavailable as exc:
+        # 409 like InsufficientStock, and for the same reason: the request is
+        # well-formed, the world changed underneath it. The exception's message
+        # is the response body, so `from exc` -- it is the source of what the
+        # caller is told.
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except InsufficientStock as exc:
         # from exc here, unlike the two above: this exception's message IS the
         # response body, so it is the source of what the caller is told.
