@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [12](#12-storing-a-config-value-is-not-the-same-as-the-app-reading-it) | 2026-08-19 | Storing a config value is not the same as the app reading it | Fixed `92f6182` |
 | [11](#11-cancelling-an-order-never-returns-its-stock) | 2026-08-17 | Cancelling an order never returns its stock | **Open** — Phase 5 task 6 |
 | [10](#10-partial-stock-is-invisible-in-the-cart) | 2026-08-17 | Partial stock is invisible in the cart | **Open** — Phase 5 task 6 |
 | [9](#9-a-discontinued-product-could-still-be-bought-from-an-old-cart) | 2026-08-17 | A discontinued product could still be bought from an old cart | Fixed `db9dbc0` |
@@ -27,6 +28,37 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 12. Storing a config value is not the same as the app reading it
+
+**Status:** Fixed in `92f6182`.
+
+**Seen.** Phase 5 task 1 put the Stripe test keys in `backend/.env` — correct keys, correct file,
+correctly git-ignored, never committed. The backend then would not start, `alembic upgrade head`
+would not run, and `pytest` collected **zero** tests.
+
+**Cause.** `app/config.py` runs `settings = Settings()` at import time, pydantic-settings defaults to
+`extra="forbid"`, and `Settings` declared no Stripe fields. So two correctly-stored keys raised
+`ValidationError: Extra inputs are not permitted` before a single line of application code ran.
+
+**Why it took down three things at once.** The API, `alembic/env.py` and `tests/conftest.py` all
+import `app.config`. A single unreachable module sits underneath the app, the migrations and the
+entire test suite, so one config mismatch removed the ability to run the app, change the schema,
+*and* detect either problem. The tool that would normally catch a regression was itself a casualty.
+
+**Fixed.** The three fields declared. `stripe_secret_key` as `SecretStr`, because the
+`extra_forbidden` error printed the live key into the traceback — harmless on a laptop, but from
+Phase 6 that is a boot failure writing `sk_...` into CloudWatch. Adopted while there were zero call
+sites; after task 2 it would have been a refactor. `stripe_webhook_secret` is declared now with an
+empty default, so task 4 adding it to `.env` cannot reproduce this.
+
+**Prevented by.** `tests/test_config.py` asserts `.env.example` and `Settings` hold the same keys
+**in both directions** — a documented key with no field breaks the boot, and a field with no
+placeholder leaves a fresh clone unable to start. Verified by mutation: dropping a field reproduces
+the original crash, undocumenting one fails cleanly, and adding an undeclared key fails naming it.
+That last case is the task 4 rehearsal, since `STRIPE_WEBHOOK_SECRET` lands in `.env` then.
 
 ---
 
@@ -258,8 +290,10 @@ always to derive the offer from the same source as the guard, rather than keepin
 by hand.
 
 **A rule written more than once.** Defect 4 outright; defect 2 is its cousin, where the message and
-the transport were written by different people at different times. Every duplicated rule eventually
-disagrees with itself.
+the transport were written by different people at different times. Defect 12 is the same shape in
+configuration: `.env.example` and the `Settings` class are one list of variables maintained by hand
+in two places, and they drifted the first time a variable was added. Every duplicated rule
+eventually disagrees with itself.
 
 **Correct today, wrong at scale.** Defects 6 and 7 were both invisible at 7 products and inevitable
 at 51. Neither would have been caught by using the app; both were found by reading the code and
@@ -314,3 +348,9 @@ than no check: it produces confidence without evidence.
 
   This is the same shape as *concluding from a 404 without a control*: a result that was true but
   did not mean what it was taken to mean.
+- **Treating a value as stored without starting what reads it.** Defect 12. The Stripe keys were put
+  in `.env` correctly and the task looked complete — the keys were right, the file was right, and
+  nothing was committed that shouldn't have been. Every one of those checks passed while the
+  backend could not start at all, because none of them ran the application. "The config is in place"
+  and "the app can read the config" are two separate facts, and only the first was established.
+  A config task is not finished until something imports it.
