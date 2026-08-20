@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,6 +22,26 @@ class Settings(BaseSettings):
     # and production, which is exactly what makes it a .env value rather than a
     # store-config.json one (Section 4.2).
     app_base_url: str = "http://localhost:3000"
+
+    # --- Stripe (Phase 5) ---------------------------------------------------
+    # Required, like database_url and jwt_secret: a store with no Stripe keys is
+    # misconfigured, and should say so at boot naming the missing field rather
+    # than surface as a confusing Stripe error halfway through a checkout.
+    #
+    # The SECRET key never leaves the server -- it can create charges, issue
+    # refunds and read every customer. SecretStr so a traceback or a stray log
+    # of settings prints '**********' instead of the key itself; read the real
+    # value with .get_secret_value() at the one place that talks to Stripe.
+    stripe_secret_key: SecretStr
+
+    # Designed to be public and shipped to the browser, so no SecretStr. It can
+    # only start a payment the secret key already authorised.
+    stripe_publishable_key: str
+
+    # Filled in at task 4, when the webhook endpoint exists -- until then it is
+    # absent from .env, so it needs a default. Declared now anyway: every key in
+    # .env.example must be a field here, and test_config.py enforces that.
+    stripe_webhook_secret: SecretStr = SecretStr("")
 
     model_config = SettingsConfigDict(env_file=".env")
 
