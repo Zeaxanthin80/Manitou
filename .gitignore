@@ -17,3 +17,7 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
+
+# Claude Code worktrees -- isolated checkouts of this repo, never part of a commit.
+# Note .claude/agents/ IS tracked, so this must not be a blanket .claude/ ignore.
+.claude/worktrees/
