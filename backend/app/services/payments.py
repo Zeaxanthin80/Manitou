@@ -29,6 +29,7 @@ from decimal import Decimal, DefaultContext, Inexact
 from typing import Protocol
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -420,5 +421,26 @@ def ensure_payment_intent(
         status=intent.status,
     )
     db.add(payment)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # uq_payments_order_id fired: a concurrent request opened the payment
+        # between our SELECT above and this INSERT. That is the check-then-act
+        # race the constraint exists to catch, and losing it is not an error --
+        # both requests wanted the same payment and one of them made it.
+        #
+        # Not a failure for the customer either: the idempotency key is
+        # `order-{id}`, so the winner's intent IS the intent we just asked for.
+        # We re-read and re-retrieve rather than assuming that, because assuming
+        # would hand back a client secret belonging to a different row if it ever
+        # stopped being true.
+        db.rollback()
+        winner = db.scalar(select(Payment).where(Payment.order_id == order.id))
+        if winner is None:
+            # The constraint that fired was not this one -- a failed check or
+            # foreign key, say. Nothing to recover from, so let it surface.
+            raise
+        intent = gateway.retrieve_payment_intent(winner.stripe_payment_intent_id)
+        return winner, intent.client_secret
+
     return payment, intent.client_secret

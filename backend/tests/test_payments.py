@@ -18,6 +18,7 @@ from app.services.payments import (
     FractionalMinorUnit,
     PaymentError,
     UnsupportedCurrency,
+    ensure_payment_intent,
     to_minor_units,
 )
 
@@ -379,6 +380,107 @@ def test_an_order_stranded_by_an_outage_can_be_recovered(
 # ---------------------------------------------------------------------------
 # The seam itself
 # ---------------------------------------------------------------------------
+
+
+def test_the_database_refuses_a_second_payment_for_one_order(
+    client, db, make_user, make_product, make_address, auth_headers
+):
+    """uq_payments_order_id, asserted against the real constraint.
+
+    ensure_payment_intent also refuses this in Python, but that refusal is a
+    SELECT followed by an INSERT -- two concurrent requests can both pass it.
+    This asserts the rule where it cannot be raced.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    from app.models import Payment
+
+    user = make_user()
+    product = make_product(stock=5, base_price="10.00")
+    address = make_address(user)
+    h = auth_headers(user)
+
+    _add_to_cart(client, h, product.variants[0].id, 1)
+    order = _place_order(client, h, address).json()
+
+    db.add(
+        Payment(
+            order_id=order["id"],
+            stripe_payment_intent_id="pi_a_second_one",
+            amount=Decimal("10.00"),
+            currency="usd",
+            status="requires_payment_method",
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db.commit()
+    db.rollback()
+
+
+def test_losing_the_insert_race_returns_the_winners_payment(
+    db, session_factory, make_user, make_product, make_address, payment_gateway
+):
+    """The constraint alone would turn a duplicate row into a 500.
+
+    Catching IntegrityError is what makes it an improvement rather than a louder
+    failure. Simulated by a gateway that plants a competing row -- committed on a
+    SEPARATE session, so it is really visible to the constraint -- in the window
+    between ensure_payment_intent's SELECT and its INSERT.
+    """
+    from app.models import Payment
+    from app.services.checkout import create_order_from_cart
+    from app.models import CartItem, Cart
+
+    user = make_user()
+    product = make_product(stock=5, base_price="10.00")
+    address = make_address(user)
+
+    cart = Cart(user_id=user.id)
+    db.add(cart)
+    db.flush()
+    db.add(CartItem(cart_id=cart.id, variant_id=product.variants[0].id, quantity=1))
+    db.commit()
+
+    order = create_order_from_cart(
+        db, user=user, shipping_address_id=address.id,
+        billing_address_id=address.id,
+    )
+
+    class RacingGateway:
+        """Delegates, but commits a rival payment row first."""
+
+        def __init__(self, inner):
+            self.inner = inner
+
+        def create_payment_intent(self, **kwargs):
+            result = self.inner.create_payment_intent(**kwargs)
+            other = session_factory()
+            try:
+                other.add(
+                    Payment(
+                        order_id=order.id,
+                        stripe_payment_intent_id=result.id,
+                        amount=order.total,
+                        currency="usd",
+                        status="requires_payment_method",
+                    )
+                )
+                other.commit()
+            finally:
+                other.close()
+            return result
+
+        def retrieve_payment_intent(self, intent_id):
+            return self.inner.retrieve_payment_intent(intent_id)
+
+    payment, client_secret = ensure_payment_intent(
+        db, order, RacingGateway(payment_gateway)
+    )
+
+    # It returned the row that actually exists, not the one it tried to insert.
+    assert client_secret
+    assert db.query(Payment).filter(Payment.order_id == order.id).count() == 1
+    assert payment.stripe_payment_intent_id.startswith("pi_")
 
 
 def test_build_gateway_refuses_an_unknown_name():

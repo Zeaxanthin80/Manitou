@@ -77,7 +77,15 @@ class Payment(Base):
     __table_args__ = (CheckConstraint("amount > 0", name="amount_positive"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
+    # UNIQUE, not merely indexed. "One payment per order" was enforced only by a
+    # SELECT-then-INSERT in ensure_payment_intent, which is a check-then-act race:
+    # two concurrent requests both find nothing and both insert. Stripe's
+    # idempotency key means they would agree on the intent, so the damage was a
+    # duplicate ROW rather than a duplicate charge -- but a rule the database can
+    # enforce should not be left to application timing. unique=True rather than
+    # unique+index: the constraint's backing index already serves the lookups the
+    # old ix_payments_order_id was there for.
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), unique=True)
     stripe_payment_intent_id: Mapped[str] = mapped_column(Text, index=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     currency: Mapped[str] = mapped_column(Text)
