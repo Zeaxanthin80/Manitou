@@ -2,7 +2,10 @@
 
 import { useActionState } from "react";
 
-import { updateOrderStatusAction } from "@/app/actions/admin";
+import {
+  recheckPaymentAction,
+  updateOrderStatusAction,
+} from "@/app/actions/admin";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -17,6 +20,46 @@ import { Button } from "@/components/ui/button";
  * everything else is a normal forward step.
  */
 const DESTRUCTIVE = new Set(["cancelled", "refunded"]);
+
+/**
+ * Ask Stripe again.
+ *
+ * Rendered whatever the status, including terminal ones. A cancelled order can
+ * still have money attached -- that is exactly the conflict case -- so hiding
+ * this on anything but `pending` would hide it precisely when a vendor most
+ * needs to know what Stripe thinks.
+ *
+ * Its own form and its own action state, so a re-check result never overwrites
+ * the message from a status change or vice versa.
+ */
+function RecheckPayment({ orderId }: { orderId: number }) {
+  const [state, formAction, pending] = useActionState(recheckPaymentAction, {});
+
+  return (
+    <div className="mt-6 border-t border-border pt-4">
+      <form action={formAction}>
+        <input type="hidden" name="order_id" value={orderId} />
+        <Button type="submit" variant="ghost" size="sm" disabled={pending}>
+          {pending ? "Checking Stripe..." : "Re-check payment"}
+        </Button>
+      </form>
+      <p className="mt-2 max-w-prose font-body text-xs text-muted">
+        Use this if an order looks unpaid but the customer says they paid. Stripe
+        stops retrying a missed notification after a few days.
+      </p>
+      {state.ok && (
+        <p role="status" className="mt-2 font-body text-sm text-text">
+          {state.ok}
+        </p>
+      )}
+      {state.error && (
+        <p role="alert" className="mt-2 font-body text-sm text-error">
+          {state.error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function OrderStatusActions({
   orderId,
@@ -47,6 +90,7 @@ export function OrderStatusActions({
             {state.error}
           </p>
         )}
+        <RecheckPayment orderId={orderId} />
       </div>
     );
   }
@@ -85,6 +129,8 @@ export function OrderStatusActions({
           {state.error}
         </p>
       )}
+
+      <RecheckPayment orderId={orderId} />
     </div>
   );
 }

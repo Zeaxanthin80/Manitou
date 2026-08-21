@@ -356,6 +356,19 @@ class AdminOrderDetail(AdminOrderSummary):
     allowed_transitions: list[str]
 
 
+class AdminPaymentRecheck(BaseModel):
+    """The result of asking Stripe what it thinks about one order's payment.
+
+    Carries the OUTCOME as well as the refreshed order, because the two are not
+    the same information. An order that comes back still `pending` might mean the
+    customer never paid, or that the order has no payment at all -- and the
+    vendor's next move differs. The order alone cannot say which.
+    """
+
+    outcome: str
+    order: AdminOrderDetail
+
+
 class AdminOrderStatusUpdate(BaseModel):
     """A status change request.
 

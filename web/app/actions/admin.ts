@@ -12,6 +12,7 @@ import {
   createProduct,
   deactivateProduct,
   deleteProductImage,
+  recheckOrderPayment,
   sendAdminPasswordReset,
   updateAdminUser,
   updateOrderStatus,
@@ -75,6 +76,53 @@ export async function updateOrderStatusAction(
   revalidatePath(`/admin/orders/${id}`);
   revalidatePath("/admin/orders");
   return { ok: `Order #${id} is now ${status}.` };
+}
+
+/**
+ * What each outcome means to a vendor, in their words rather than the API's.
+ *
+ * Kept here rather than in the component so the sentence lives beside the action
+ * that produces it. "mirrored" deliberately does NOT say "not paid": a payment
+ * can be mid-authentication, and telling a vendor an order is unpaid when the
+ * customer is halfway through 3-D Secure invites them to cancel it.
+ */
+const RECHECK_MESSAGE: Record<string, string> = {
+  confirmed: "Payment confirmed — the order is now paid.",
+  already_paid: "Already paid. Nothing to change.",
+  conflict:
+    "Payment succeeded, but this order is not pending — it has been left as it is. " +
+    "Refund or re-place it deliberately.",
+  mirrored: "Stripe has no completed payment for this order yet.",
+  unknown: "Stripe has no record of this payment.",
+};
+
+export async function recheckPaymentAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+
+  const id = Number(formData.get("order_id"));
+  if (!id) return { error: "Nothing to check." };
+
+  let outcome: string;
+  try {
+    ({ outcome } = await recheckOrderPayment(token, id));
+  } catch (err) {
+    if (err instanceof ApiError) {
+      // 409 (no payment on this order) and 502 (Stripe unreachable) both carry a
+      // message written for the vendor, so it is shown as written.
+      return { error: err.message };
+    }
+    throw err;
+  }
+
+  // Revalidate whatever the outcome: even "nothing changed" may be news to a
+  // page that has been open since before someone else advanced this order.
+  revalidatePath(`/admin/orders/${id}`);
+  revalidatePath("/admin/orders");
+  return { ok: RECHECK_MESSAGE[outcome] ?? `Checked. Stripe says: ${outcome}.` };
 }
 
 /* ------------------------------------------------------------- catalog -- */

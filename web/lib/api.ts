@@ -548,6 +548,28 @@ export const updateOrderStatus = (token: string, id: number, status: string) =>
     body: { status },
   });
 
+/**
+ * Ask Stripe what it thinks about this order's payment, and apply the result.
+ *
+ * The pull half of the webhook. Stripe retries a failed delivery for about three
+ * days and then stops forever, so an order whose event was missed during a
+ * deploy has no other way back.
+ *
+ * `outcome` is carried alongside the order because the order alone cannot say
+ * why nothing changed -- "the customer never paid" and "this order has no
+ * payment at all" look identical from the status.
+ */
+export type PaymentRecheck = {
+  outcome: string;
+  order: AdminOrderDetail;
+};
+
+export const recheckOrderPayment = (token: string, id: number) =>
+  request<PaymentRecheck>(`/admin/orders/${id}/recheck-payment`, {
+    token,
+    method: "POST",
+  });
+
 /* ------------------------------------------------------- admin: catalog -- */
 
 export type ProductSort =

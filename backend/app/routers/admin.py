@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
-from app.dependencies import require_admin
+from app.dependencies import get_payment_gateway, require_admin
 from app.models import (
     Address,
     AuditEvent,
@@ -24,39 +24,46 @@ from app.models import (
     Inventory,
     Order,
     OrderItem,
+    Payment,
     Product,
     ProductImage,
     ProductVariant,
     User,
 )
+from app.services.payments import (
+    PaymentError,
+    PaymentGateway,
+    apply_payment_event,
+)
 from app.schemas.admin import (
-    AdminInventoryPage,
-    AdminInventoryRow,
+    AdminAnonymiseRequest,
+    AdminAuditEvent,
+    AdminAuditPage,
     AdminImageCreate,
     AdminImageRead,
     AdminImageUpdate,
+    AdminInventoryPage,
+    AdminInventoryRow,
     AdminInventoryUpdate,
     AdminLowStock,
     AdminOrderDetail,
     AdminOrderPage,
     AdminOrderStatusUpdate,
     AdminOrderSummary,
+    AdminPaymentRecheck,
     AdminProductCreate,
     AdminProductPage,
     AdminProductRead,
-    AdminAnonymiseRequest,
-    AdminAuditEvent,
-    AdminAuditPage,
     AdminProductUpdate,
     AdminStatusCount,
     AdminSummary,
     AdminTopProduct,
-    AdminVariantCreate,
-    AdminVariantRead,
     AdminUserDetail,
     AdminUserPage,
     AdminUserSummary,
     AdminUserUpdate,
+    AdminVariantCreate,
+    AdminVariantRead,
     AdminVariantUpdate,
 )
 from app.schemas.catalog import MAX_PAGE_SIZE
@@ -912,6 +919,57 @@ def update_order_status(
     )
     db.commit()
     return _to_order_detail(_admin_order(db, order_id))
+
+
+@router.post("/orders/{order_id}/recheck-payment", response_model=AdminPaymentRecheck)
+def recheck_order_payment(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+    gateway: PaymentGateway = Depends(get_payment_gateway),
+) -> AdminPaymentRecheck:
+    """Ask Stripe what it thinks, and apply the same rules the webhook applies.
+
+    **The pull half of a push integration.** Normally Stripe tells us, and
+    /webhooks/stripe acts on it. That fails silently in one direction: if the
+    endpoint is unreachable when an event fires -- a deploy window, a network
+    blip, or an endpoint that did not exist yet -- Stripe retries for about three
+    days and then stops forever. Nothing in a push-only design ever discovers
+    that money arrived, and the order stays pending with no way back.
+
+    Calls apply_payment_event rather than repeating its rules. Two
+    implementations of "what does succeeded mean" would eventually disagree, and
+    the way you would find out is an order this button marks paid and the webhook
+    does not.
+
+    POST rather than GET: it is not safe to repeat blindly in the sense a GET
+    promises -- it reaches a third party and can change order state.
+    """
+    order = _admin_order(db, order_id)
+    payment = db.scalar(select(Payment).where(Payment.order_id == order_id))
+    if payment is None:
+        # No payment was ever opened. Not a provider problem and not something a
+        # retry fixes -- 409, like the other "the store's state makes this
+        # impossible" answers in this router.
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This order has no payment to check. It was never taken to checkout.",
+        )
+
+    try:
+        intent = gateway.retrieve_payment_intent(payment.stripe_payment_intent_id)
+    except PaymentError as exc:
+        # 502: the request was fine, the provider was not. Same mapping as
+        # routers/order.py uses, for the same reason.
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            "Could not reach Stripe to check this payment. Nothing has changed.",
+        ) from exc
+
+    outcome = apply_payment_event(db, intent.id, intent.status, actor=user)
+    return AdminPaymentRecheck(
+        outcome=outcome, order=_to_order_detail(_admin_order(db, order_id))
+    )
 
 
 # Money actually collected. Deliberately excludes pending (not paid yet),
