@@ -53,6 +53,15 @@ def _owned_order(db: Session, order_id: int, user_id: int) -> Order:
             selectinload(Order.items),
             selectinload(Order.shipping_address),
             selectinload(Order.billing_address),
+            # Order.payment_status reads this. MEASURED: for this endpoint it
+            # is exactly neutral -- one order means selectinload costs one extra
+            # SELECT and a lazy load costs one extra SELECT, 6 queries either
+            # way. Kept anyway because it states the requirement rather than
+            # leaving it to the session still being open at serialisation time,
+            # and because the day a list shape wants payment_status the lazy
+            # version becomes an N+1 silently. Not a fix for a problem that
+            # exists today; insurance against one that would not announce itself.
+            selectinload(Order.payments),
         )
     )
     if order is None:

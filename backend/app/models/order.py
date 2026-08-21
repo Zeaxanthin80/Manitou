@@ -56,6 +56,26 @@ class Order(Base):
     items: Mapped[list["OrderItem"]] = relationship(back_populates="order")
     payments: Mapped[list["Payment"]] = relationship(back_populates="order")
 
+    @property
+    def payment_status(self) -> str | None:
+        """The provider's word for how payment is going, or None if none started.
+
+        A list with at most one element, since uq_payments_order_id -- so "the
+        payment" is well defined rather than "whichever row came back first".
+        Before that constraint this property could not have been written honestly.
+
+        **This is NOT whether the order is paid.** orders.status is, and only the
+        task 4 webhook writes it. This mirrors Stripe so the receipt can tell a
+        customer who has just entered a card that we have seen it, during the gap
+        before the webhook arrives -- without which the page would have to either
+        stay silent or claim something it cannot know.
+
+        A plain property rather than a hybrid_property: nothing sorts or filters
+        on this in SQL, and a hybrid would need a correlated subquery to earn a
+        capability no caller wants.
+        """
+        return self.payments[0].status if self.payments else None
+
 
 class OrderItem(Base):
     __tablename__ = "order_items"

@@ -51,9 +51,21 @@ class OrderSummary(BaseModel):
 
 
 class OrderDetail(OrderSummary):
+    """One order in full.
+
+    payment_status is on DETAIL only, never on OrderSummary. GET /orders returns
+    every order a customer has ever placed, and none of them needs this -- the
+    same restraint that keeps the client secret out of order reads, applied to a
+    field that is merely unnecessary rather than dangerous.
+
+    It is the provider's status string and nothing more. Never the client secret,
+    which stays exclusive to PaymentIntentRead.
+    """
+
     items: list[OrderItemRead]
     shipping_address: AddressRead
     billing_address: AddressRead
+    payment_status: str | None = None
 
 
 class OrderPage(BaseModel):

@@ -237,10 +237,68 @@ def test_the_client_secret_never_appears_in_order_reads(
 
     assert "client_secret" not in order.text
     assert "client_secret" not in client.get("/orders", headers=h).text
-    assert (
-        "client_secret"
-        not in client.get(f"/orders/{order.json()['id']}", headers=h).text
+    detail = client.get(f"/orders/{order.json()['id']}", headers=h)
+    assert "client_secret" not in detail.text
+
+    # payment_status arrived on OrderDetail for the receipt page. It carries the
+    # provider's status word and must not become a second route for the secret.
+    assert detail.json()["payment_status"] == "requires_payment_method"
+    assert "secret" not in detail.json()["payment_status"]
+
+
+def test_payment_status_is_on_the_detail_but_not_the_listing(
+    client, make_user, make_product, make_address, auth_headers
+):
+    """GET /orders returns every order ever placed; none of them needs this.
+
+    The same restraint that keeps the client secret out of order reads, applied
+    to a field that is merely unnecessary rather than dangerous. A listing shape
+    that grows a field per feature ends up shipping everything to everyone.
+    """
+    user = make_user()
+    product = make_product(stock=5, base_price="10.00")
+    address = make_address(user)
+    h = auth_headers(user)
+
+    _add_to_cart(client, h, product.variants[0].id, 1)
+    order = _place_order(client, h, address).json()
+
+    listing = client.get("/orders", headers=h).json()
+    assert listing["items"], "expected the order to be listed"
+    assert "payment_status" not in listing["items"][0]
+
+    detail = client.get(f"/orders/{order['id']}", headers=h).json()
+    assert "payment_status" in detail
+
+
+def test_payment_status_is_none_before_a_payment_exists(
+    db, make_user, make_product, make_address
+):
+    """The third state the receipt has to tell apart.
+
+    pending + None means payment never started; pending + succeeded means the
+    money arrived and the task 4 webhook has not caught up yet. Without this
+    distinction the receipt can only stay silent or guess.
+    """
+    from app.models import Cart, CartItem
+    from app.services.checkout import create_order_from_cart
+
+    user = make_user()
+    product = make_product(stock=5, base_price="10.00")
+    address = make_address(user)
+
+    cart = Cart(user_id=user.id)
+    db.add(cart)
+    db.flush()
+    db.add(CartItem(cart_id=cart.id, variant_id=product.variants[0].id, quantity=1))
+    db.commit()
+
+    # Straight through the service, so no payment intent is ever opened.
+    order = create_order_from_cart(
+        db, user=user, shipping_address_id=address.id,
+        billing_address_id=address.id,
     )
+    assert order.payment_status is None
 
 
 def test_another_users_order_is_not_payable(
@@ -481,6 +539,57 @@ def test_losing_the_insert_race_returns_the_winners_payment(
     assert client_secret
     assert db.query(Payment).filter(Payment.order_id == order.id).count() == 1
     assert payment.stripe_payment_intent_id.startswith("pi_")
+
+
+def test_a_succeeded_payment_still_returns_a_secret_not_a_409(
+    client, db, make_user, make_product, make_address, auth_headers, payment_gateway
+):
+    """Pins the contract /orders/[id]/pay branches on.
+
+    The page cannot rely on the 409 guard to tell it "already paid": that guard
+    fires on orders.status, and until the task 4 webhook exists the order stays
+    `pending` even after Stripe has taken the money. So the endpoint answers 201
+    with a live secret and a status of "succeeded", and the PAGE is what has to
+    notice -- otherwise a customer who reloads after paying is shown a card form
+    for something they already bought.
+
+    That is correct behaviour here, not a gap to close: create-or-retrieve has to
+    keep working, and the task 4 webhook will retrieve exactly this state. This
+    test exists so that if the endpoint ever starts refusing instead, whoever
+    changes it learns that a page depends on the current answer.
+    """
+    from app.models import Payment
+    from app.services.payments import PaymentIntentResult
+
+    user = make_user()
+    product = make_product(stock=5, base_price="10.00")
+    address = make_address(user)
+    h = auth_headers(user)
+
+    _add_to_cart(client, h, product.variants[0].id, 1)
+    order = _place_order(client, h, address).json()
+
+    # What the customer's reload races: Stripe accepted the card, no webhook yet.
+    pi_id = (
+        db.query(Payment).filter(Payment.order_id == order["id"]).one()
+        .stripe_payment_intent_id
+    )
+    payment_gateway.intents[pi_id] = PaymentIntentResult(
+        id=pi_id,
+        client_secret=f"{pi_id}_secret_test",
+        status="succeeded",
+        amount_minor=1000,
+        currency="usd",
+    )
+
+    r = client.post(f"/orders/{order['id']}/payment-intent", headers=h)
+    assert r.status_code == 201, r.text
+    assert r.json()["status"] == "succeeded"
+    assert r.json()["client_secret"]
+
+    # And the order is still pending -- the exact combination that makes the
+    # 409 guard unreachable and puts the decision on the page.
+    assert client.get(f"/orders/{order['id']}", headers=h).json()["status"] == "pending"
 
 
 def test_build_gateway_refuses_an_unknown_name():
