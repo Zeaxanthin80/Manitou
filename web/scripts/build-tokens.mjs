@@ -2,7 +2,15 @@
  * Bridges the repo-root config files into the web app.
  *
  *   ../design-tokens.json  ->  app/tokens.css        (Tailwind @theme)
+ *   ../design-tokens.json  ->  lib/design-tokens.ts  (typed constant)
  *   ../store-config.json   ->  lib/store-config.ts   (typed constant)
+ *
+ * The tokens are emitted TWICE, in two shapes, on purpose. Almost everything
+ * styles itself with Tailwind utilities and needs only the CSS. Stripe Elements
+ * cannot: it renders in an iframe served by stripe.com, so our stylesheet never
+ * reaches it and its appearance API takes literal JS values instead. Rather than
+ * let those literals be typed into a component -- the exact thing Section 4.3
+ * forbids -- the same JSON is also emitted as a typed constant.
  *
  * Why a generator rather than importing the JSON directly: both files live at the
  * repo root, outside the Next.js project, and bundlers do not import cleanly
@@ -119,6 +127,18 @@ writeFileSync(resolve(webRoot, "app/tokens.css"), css);
 
 /* ------------------------------------------------------------------- TS -- */
 
+// `meta` is prose for humans -- rationale, contrast measurements, the note about
+// Archivo Black having one weight. Useful in the JSON, dead weight in a bundle.
+delete tokens.meta;
+
+const tokensTs =
+  BANNER("design-tokens.json") +
+  `export const designTokens = ${JSON.stringify(tokens, null, 2)} as const;\n\n` +
+  `export type DesignTokens = typeof designTokens;\n`;
+
+mkdirSync(resolve(webRoot, "lib"), { recursive: true });
+writeFileSync(resolve(webRoot, "lib/design-tokens.ts"), tokensTs);
+
 delete store._meta; // documentation, not configuration
 
 const ts =
@@ -133,5 +153,8 @@ console.log(
   `tokens: ${Object.keys(tokens.color).length} colours, ` +
     `${Object.keys(tokens.typography.fontSize).length} type steps, ` +
     `${Object.keys(tokens.spacing).length} spacing steps -> app/tokens.css`,
+);
+console.log(
+  `        ${Object.keys(tokens.color).length} colours -> lib/design-tokens.ts (for Stripe Elements)`,
 );
 console.log(`store:  ${store.store.name} (${store.currency.code}) -> lib/store-config.ts`);

@@ -46,4 +46,5 @@ next-env.d.ts
 # Generated from the repo-root config files by scripts/build-tokens.mjs.
 # Edit design-tokens.json / store-config.json instead.
 /app/tokens.css
+/lib/design-tokens.ts
 /lib/store-config.ts
