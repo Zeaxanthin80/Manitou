@@ -16,6 +16,8 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [16](#16-the-payment-form-rendered-in-a-different-typeface-from-the-rest-of-the-site) | 2026-08-21 | The payment form rendered in a different typeface from the rest of the site | Fixed — uncommitted |
+| [15](#15-the-payment-page-offered-a-card-form-for-an-order-already-paid) | 2026-08-21 | The payment page offered a card form for an order already paid | Fixed — uncommitted |
 | [14](#14-one-payment-per-order-was-enforced-only-by-application-timing) | 2026-08-21 | "One payment per order" was enforced only by application timing | Fixed — uncommitted |
 | [13](#13-the-money-conversion-promised-to-refuse-a-fraction-and-rounded-it-instead) | 2026-08-20 | The money conversion promised to refuse a fraction and rounded it instead | Fixed — uncommitted |
 | [12](#12-storing-a-config-value-is-not-the-same-as-the-app-reading-it) | 2026-08-19 | Storing a config value is not the same as the app reading it | Fixed `92f6182` |
@@ -30,6 +32,90 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 16. The payment form rendered in a different typeface from the rest of the site
+
+**Status:** Fixed, uncommitted (Phase 5 task 3). Owner spotted it; four attempts to fix it.
+
+**Seen.** The Stripe Payment Element rendered in the system font while every other page used Inter.
+`appearance.variables.fontFamily` was already set to `"Inter, system-ui, sans-serif"` and was doing
+nothing.
+
+**Cause.** `next/font` self-hosts Inter under a *generated* family name and declares its
+`@font-face` in our document. The Elements iframe is a different document, served by js.stripe.com,
+and cannot see that declaration. No font called "Inter" existed inside it, so it fell through to
+`system-ui`.
+
+**The same shape build-tokens.mjs already documents** for `@theme` vs `@theme inline`: a font name
+that resolves in one scope and not another, failing by quietly rendering a fallback rather than by
+erroring. That comment was read during this task and the trap walked into anyway.
+
+**Fixed** by passing `fonts: [{ cssSrc: "https://fonts.googleapis.com/css2?family=Inter..." }]` to
+`<Elements>`.
+
+**Self-hosting was tried first, twice, and measured to fail.** A `CustomFontSource` pointing at
+`/public/fonts/inter-latin.woff2`, then a `cssSrc` pointing at our own stylesheet with a matching
+CORS header. In both cases the browser fetched the stylesheet and **never requested the font** --
+not a 404, not a CORS rejection, no request at all.
+
+**That signature is the reusable lesson.** A font that fails with *zero* network activity has been
+refused before the request: mixed content, or a Content-Security-Policy font-src. A font that fails
+*with* a request is a 404, a CORS problem or a bad path. The two have completely different causes
+and the Network panel distinguishes them in one glance.
+
+**The cause here is still not settled, and Phase 6 must retest.** Two explanations fit equally:
+Stripe's iframe allowlisting font sources, or plain mixed content -- dev serves `http://localhost:3000`
+while the iframe is https, and browsers block http subresources in an https document silently. If it
+is the second, self-hosting will work once Phase 6 serves HTTPS and this should go back to our own
+origin, restoring layout.tsx's "the browser makes no request to Google". Untestable until an HTTPS
+origin exists.
+
+**Also learned: Stripe validates appearance rules and says so in the console.**
+`[Stripe.js] stripe.elements(): "fontFamily" is not a supported property for ".Block"` was printed
+for two rounds before anyone read it. Not the cause of this defect, but it was free information
+sitting in a panel nobody opened.
+
+---
+
+## 15. The payment page offered a card form for an order already paid
+
+**Status:** Fixed, uncommitted (Phase 5 task 3).
+
+**Seen.** The owner pressed "Pay", then reloaded shortly after. Navigating back to
+`/orders/{id}/pay` for an order whose payment had already succeeded rendered a live card form for
+something already bought. Orders 77, 78 and 80 were all sitting in that state.
+
+**Cause.** `/orders/[id]/pay` guarded on `409 OrderNotPayable`, which the API raises when
+`orders.status != "pending"`. But **only the task 4 webhook writes `orders.status`, and task 4 does
+not exist** — so for the entire duration of task 3 an order can be paid at Stripe and `pending`
+here simultaneously. The guard could not fire. Measured:
+
+```
+order.status         : pending
+POST payment-intent  : 201
+returned status      : succeeded
+hands back a secret? : True
+```
+
+**Not an API bug.** Create-or-retrieve has to keep working, and the task 4 webhook will retrieve
+exactly this state. The endpoint reporting `succeeded` is correct; the page ignoring the status it
+was handed is not.
+
+**Fixed.** The page redirects to the receipt when `intent.status` is `succeeded` or `processing`.
+Deliberately **not** `requires_action` — that is a 3-D Secure challenge in progress, and the form is
+where it must resume.
+
+**Why it was low-harm and still worth fixing.** Stripe refuses to confirm one intent twice, so no
+double charge was possible. The cost was a customer staring at a form that cannot work, right after
+handing over a card — the exact moment to avoid making someone doubt whether their money moved.
+
+**Prevented by.** `test_a_succeeded_payment_still_returns_a_secret_not_a_409` pins the API contract
+the page now branches on, so anyone who later makes that endpoint refuse instead learns a page
+depends on the current answer. Verified live in both directions: order 77 (paid) redirects, order 79
+(unpaid) still renders the form — the second being the control that proves the redirect is
+conditional rather than unconditional.
 
 ---
 
@@ -451,3 +537,33 @@ than no check: it produces confidence without evidence.
   that passed and should not have. This was a false *negative*, a mutation that looked survived and
   was never applied. It would have been reported as "this test proves nothing", removing a guard
   that was working. A mutation test needs its mutation verified as much as its result.
+- **Writing a guard without watching it fire.** Defect 15. `/orders/[id]/pay` was given a `409`
+  branch for "this order cannot be paid", and it was never exercised — because the condition it
+  tested (`orders.status != "pending"`) cannot occur while task 4 is unbuilt. The code read as
+  though the case were handled. The suite passed. The branch was dead on arrival. *A guard you have
+  never watched fail is not a guard* was already the rule here for mutation testing; it applies just
+  as hard to a branch that no test and no manual step ever reached.
+- **A verification instruction vague enough to be read two ways.** The step written for the owner
+  was "reload `/orders/{id}/pay` mid-payment". That covers two different tests — reloading *before*
+  touching the form (which only exercises create-or-retrieve, and was already working) and paying
+  *then* returning (which is what found defect 15). The owner picked the second and had to ask what
+  had been meant. A verification step should name the actual actions — which button, in which order,
+  and what to look for — not a state of affairs the reader has to interpret. The useful test was
+  found despite the instruction, not because of it.
+- **Not reading the console while chasing a rendering bug.** Defect 16. Three rounds of network
+  captures, doc fetches and headless probes went by with
+  `[Stripe.js] "fontFamily" is not a supported property for ".Block"` printed in the browser console
+  the whole time — visible in two screenshots before anyone looked at it. It was not the cause, but
+  it was free evidence that Stripe validates the appearance object and reports what it rejects,
+  which would have narrowed the search immediately. When a third-party widget renders wrongly, its
+  own console output is the cheapest thing to check, and it was checked last.
+- **Testing in an environment that cannot reproduce the target.** Defect 16 again. Two headless
+  Chrome probes were built to prove whether the font loaded; in both, the Payment Element never got
+  past its skeleton state, so no text was ever rendered, so no font was ever requested — a result
+  indistinguishable from the bug itself. Conclusions were nearly drawn from it anyway. A probe that
+  cannot reach the state under test produces the same output as a failure and is worth nothing.
+- **A silent success taken as evidence.** Cancelling order 75 was run with
+  `docker exec` and no `-i`, so the heredoc was discarded, psql read nothing and exited 0. No output,
+  no error, no transaction. It surfaced only because the verification query was a separate command
+  that looked at the actual rows. Exit status and empty output are not evidence that an action
+  happened — the same shape as the `|| echo "CLEAN"` entry above.
