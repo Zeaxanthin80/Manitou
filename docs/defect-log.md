@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [13](#13-the-money-conversion-promised-to-refuse-a-fraction-and-rounded-it-instead) | 2026-08-20 | The money conversion promised to refuse a fraction and rounded it instead | Fixed — uncommitted |
 | [12](#12-storing-a-config-value-is-not-the-same-as-the-app-reading-it) | 2026-08-19 | Storing a config value is not the same as the app reading it | Fixed `92f6182` |
 | [11](#11-cancelling-an-order-never-returns-its-stock) | 2026-08-17 | Cancelling an order never returns its stock | **Open** — Phase 5 task 6 |
 | [10](#10-partial-stock-is-invisible-in-the-cart) | 2026-08-17 | Partial stock is invisible in the cart | **Open** — Phase 5 task 6 |
@@ -28,6 +29,46 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 13. The money conversion promised to refuse a fraction and rounded it instead
+
+**Status:** Fixed, uncommitted (Phase 5 task 2 walkthrough).
+
+**Seen.** Not in production — found by reading `to_minor_units` in `app/services/payments.py`
+during the task 2 walkthrough, and confirmed by measuring rather than trusting the comment.
+
+**Cause.** The docstring said `quantize` *"raises if anything is left below the currency's smallest
+unit instead of silently dropping it."* `Decimal.quantize` does no such thing by default — it
+rounds, half-even, and returns. Measured:
+
+```
+JPY 500.50  ->  500     no exception, half a yen dropped
+USD 19.999  ->  2000    no exception, rounded UP
+```
+
+**Why it mattered more than it looks.** Latent for USD, because `numeric(10,2)` cannot hold a third
+decimal, so the input cannot occur. **Live for JPY**, because `numeric(10,2)` stores `500.50`
+happily, an admin can type it, and the yen has no minor unit at all. The currencies
+`CURRENCY_EXPONENT` exists to protect are precisely the ones a default `quantize()` gets wrong —
+the guard was absent exactly where it was needed.
+
+**Fixed.** A `_EXACT` context (`DefaultContext.copy()` with the `Inexact` trap set) and a new
+`FractionalMinorUnit(PaymentError)`, so a price the currency cannot express refuses the sale
+instead of quietly rounding it. A `PaymentError`, and so a 502, for the same reason
+`UnsupportedCurrency` is one: both mean the store is misconfigured, both leave the order saved and
+uncharged, both are fixed by an admin.
+
+**The trap inside the fix.** The obvious spelling — `Context(traps=[Inexact])` — is wrong. Passing
+`traps=` *replaces* the trap set rather than adding to it, so `InvalidOperation` stops being
+trapped and an overflow returns a silent `NaN`. Verified both ways before choosing.
+
+**Prevented by.** Three parametrized cases in `tests/test_payments.py` (JPY 500.50, JPY 500.01,
+USD 19.999) plus a subclass check. Mutation-verified: reverting to the plain `quantize` turns all
+three red while the nine pre-existing money tests stay green — which is also the proof that the
+original suite was blind to this. The pre-existing case `("500.00", "JPY", 500)` *looks* like it
+covers zero-decimal currencies and covers only the half that cannot go wrong.
 
 ---
 
@@ -287,7 +328,10 @@ Reading the list back, the same few mistakes keep arriving in different clothes.
 **The offer and the guard disagree.** A UI presents something the system then refuses — or accepts
 something it cannot render. Defects 1 and 3 are the same mistake at different layers. The fix is
 always to derive the offer from the same source as the guard, rather than keeping two lists in step
-by hand.
+by hand. Defect 13 is the same disagreement one layer further in, between a
+docstring and its own function body: the comment promised an exactness check the code never
+performed. A comment is an offer too, and it is the one a future reader will trust instead of
+re-deriving the behaviour.
 
 **A rule written more than once.** Defect 4 outright; defect 2 is its cousin, where the message and
 the transport were written by different people at different times. Defect 12 is the same shape in
