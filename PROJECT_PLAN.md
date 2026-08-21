@@ -79,11 +79,11 @@ a store that ships by carrier, while retrofitting a second delivery-confirmation
 with no shipment table is a migration plus a rewrite of every fulfilment code path. It is the same
 argument `unit_of_measure` already won, for the same clone.
 
-| Seam                               | What it is                                                                                                                              | Why now, not later                                                                                                       |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **Store configuration**            | One config source for store name, currency, locale, tax behavior, and feature flags (e.g. `variants_enabled`, `weight_pricing_enabled`) | If these values scatter across API code and React components, cloning means hunting through files instead of editing one |
-| **`unit_of_measure` on products**  | `each` (default), `lb`, `kg`, `oz`, `g`                                                                                                 | A grocery store sells by weight. Without this column, that store type is a rewrite rather than a clone                   |
-| **`attributes` JSONB on variants** | Free-form key/value per variant: `{"size":"L","color":"red"}` or `{"scent":"cedar","wax":"soy"}`                                        | Lets each store type define its own variant dimensions with no schema change                                             |
+| Seam                                                 | What it is                                                                                                                                           | Why now, not later                                                                                                                                                                                                          |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Store configuration**                              | One config source for store name, currency, locale, tax behavior, and feature flags (e.g. `variants_enabled`, `weight_pricing_enabled`)              | If these values scatter across API code and React components, cloning means hunting through files instead of editing one                                                                                                    |
+| **`unit_of_measure` on products**                    | `each` (default), `lb`, `kg`, `oz`, `g`                                                                                                              | A grocery store sells by weight. Without this column, that store type is a rewrite rather than a clone                                                                                                                      |
+| **`attributes` JSONB on variants**                   | Free-form key/value per variant: `{"size":"L","color":"red"}` or `{"scent":"cedar","wax":"soy"}`                                                     | Lets each store type define its own variant dimensions with no schema change                                                                                                                                                |
 | **`fulfilment.method` + event `source`** (Phase 5.5) | `carrier` (default), `courier`, `pickup` in store config; every delivery event records what confirmed it — `admin`, `carrier`, `courier`, `customer` | A store running its own delivery staff confirms from an app, not a carrier's API. Without these columns that store is a rewrite rather than a clone, and the evidence quality of a delivery is unrecoverable after the fact |
 
 Everything else — the catalog, cart, checkout, order, and payment model — is already store-type
@@ -245,10 +245,10 @@ or SQLAlchemy and you lose autocomplete and type checking.
 - Every new package gets recorded and committed, in **one of two files**. The venv folder itself is
   **never** committed.
 
-| File | Holds | Installed by |
-|---|---|---|
-| `requirements.txt` | Everything the app needs to **run** | The Docker image (Phase 6), and developers indirectly |
-| `requirements-dev.txt` | Test tooling only — `pytest`, the test client. Begins with `-r requirements.txt` | Developers: `pip install -r requirements-dev.txt` |
+| File                   | Holds                                                                            | Installed by                                          |
+| ---------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `requirements.txt`     | Everything the app needs to **run**                                              | The Docker image (Phase 6), and developers indirectly |
+| `requirements-dev.txt` | Test tooling only — `pytest`, the test client. Begins with `-r requirements.txt` | Developers: `pip install -r requirements-dev.txt`     |
 
 The split exists so the production container never ships test code. It also means `pip freeze >
 requirements.txt` is **no longer safe** — it would sweep the dev packages into the runtime file.
@@ -260,6 +260,7 @@ comm -23 <(pip freeze | cut -d= -f1 | sort) <(cat requirements*.txt | cut -d= -f
 
 Anything it prints is installed but undeclared — which is how `PyJWT` and `email-validator` went
 missing from `requirements.txt` for four tasks, leaving a fresh clone unable to start the app.
+
 - The Node/Next.js side needs no equivalent step — `node_modules/` is already per-project isolation.
   Just keep it out of Git.
 
@@ -403,11 +404,11 @@ every platform can read or mirror it:
 
 How each platform consumes it:
 
-| Platform         | How tokens are applied                                                                                 |
-| ---------------- | ------------------------------------------------------------------------------------------------------ |
+| Platform         | How tokens are applied                                                                                                                          |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | Web (Next.js)    | Generated into a Tailwind `@theme` block by `web/scripts/build-tokens.mjs`, so Tailwind's palette, type scale, and spacing come from the tokens |
-| Android (Kotlin) | Mirrored into a Compose `Theme.kt` — `MaterialTheme` colors, typography, and shapes                    |
-| iOS (Swift)      | Mirrored into a SwiftUI theme file — `Color` and `Font` extensions                                     |
+| Android (Kotlin) | Mirrored into a Compose `Theme.kt` — `MaterialTheme` colors, typography, and shapes                                                             |
+| iOS (Swift)      | Mirrored into a SwiftUI theme file — `Color` and `Font` extensions                                                                              |
 
 Mobile mirroring is manual — you copy the values into the native theme file. That's acceptable
 because tokens change rarely, and it keeps the tooling simple. The rule is that `design-tokens.json`
@@ -593,7 +594,7 @@ recovery path at all. Neither is acceptable before taking real money in Phase 5.
 rather than renumbering so every existing reference to Phases 5–8 stays correct.
 
 **One constraint shapes the whole phase.** `orders.user_id` is `NOT NULL` with `NO ACTION`, so a
-customer who has ever ordered **cannot be deleted**. Erasure is therefore *anonymisation in place*:
+customer who has ever ordered **cannot be deleted**. Erasure is therefore _anonymisation in place_:
 personal fields are scrubbed and the order rows keep their foreign key. That is also the normal
 answer to a legal erasure request, since tax rules require retaining invoices.
 
@@ -611,7 +612,7 @@ request. No token-revocation machinery is needed.
 records who did what — thirteen tables, not one of them an event log. That was tolerable while the
 admin could only edit products. This phase adds suspending a person, changing a role, and
 irreversibly scrubbing someone's identity, and "who did this, and when?" is the first question asked
-after any of them goes wrong. The audit trail is therefore built *before* the actions it records,
+after any of them goes wrong. The audit trail is therefore built _before_ the actions it records,
 not retrofitted afterwards. It is also the precondition for ever adding impersonation: that feature
 is safe only when every action taken inside it is attributable, which is impossible without this.
 
@@ -670,9 +671,10 @@ is safe only when every action taken inside it is attributable, which is impossi
    these two queries). There is deliberately no write, update or delete endpoint for
    `audit_events` at any point in this project: the table is append-only in the database, and
    giving the API a way to touch it would make that guarantee decorative.
+
 10. **[You + Claude Code]** Web — customer: expand `/account` with editable profile, change password,
-   two-factor setup and account deletion. Add `/forgot-password` and `/reset-password`, plus the
-   second step in the login flow when 2FA is enabled.
+    two-factor setup and account deletion. Add `/forgot-password` and `/reset-password`, plus the
+    second step in the login flow when 2FA is enabled.
 11. **[You + Claude Code]** Web — vendor: `/admin/users` list and detail with suspend, reactivate,
     send-reset, disable-2FA and anonymise actions, reusing the Phase 3 primitives. The detail page
     renders only the actions `allowed_actions` reports, so a button can never offer something the
@@ -689,7 +691,7 @@ is safe only when every action taken inside it is attributable, which is impossi
 
 - **Email verification on signup.** Real, but closes none of the gaps above.
 - **Admin impersonation** ("sign in as this customer"). Its safety depends entirely on the audit
-  trail this phase introduces, so it becomes *possible* to build responsibly after 4.5 — not
+  trail this phase introduces, so it becomes _possible_ to build responsibly after 4.5 — not
   before. It also needs a visible banner, a time limit, and a decision about whether an impersonated
   session may place orders or change credentials. That is its own discussion.
 - **Customer data portability** (a customer downloading their own data). A compliance feature,
@@ -715,7 +717,7 @@ showing nothing — the customer is looking at a photograph of the thing they di
    variant's `attributes`. A **subset** test — `{"color": "Black"}` matches
    `{"size": "L", "color": "Black"}`: a photo of a black shirt is a photo of every size of one.
    Keyed on the visual dimension rather than a `variant_id`, so one photo covers all sizes of a
-   colour instead of being duplicated per size. Images tagged *for* the selection lead the gallery;
+   colour instead of being duplicated per size. Images tagged _for_ the selection lead the gallery;
    untagged ones follow.
 3. **[You + Claude Code]** The API rejects `applies_to` keys no variant of that product uses. The
    database cannot check it (the keys live in JSONB on another table), and without it a misspelling
@@ -741,10 +743,32 @@ happens); a per-variant primary image; zoom or lightbox.
    straight to Stripe and never touches your server.
 4. **[You + Claude Code]** Add a Stripe webhook endpoint that confirms payment and marks the order paid.
 5. **[You + Claude Code]** Record payment references in the `payments` table (Section 6.3).
+
+   **Satisfied by tasks 2 and 4 — there is no separate code to write.** Task 2 cannot open a
+   PaymentIntent without somewhere to put the reference, so `ensure_payment_intent` writes the row
+   (`order_id`, `stripe_payment_intent_id`, `amount`, `currency`, opening `status`), and task 4's
+   `apply_payment_event` keeps `status` current. Every column in Section 6.3 is populated. It is
+   listed as its own step because _what to store about a payment_ is a decision worth taking
+   deliberately rather than by accident; the decision, not the work, is what lives here.
+
+   Two consequences worth knowing before reading the code:
+   - **`payments.status` carries Stripe's vocabulary verbatim**, which is why it reads `canceled`
+     (one L) where `orders.status` reads `cancelled`. Two columns, two owners, two spellings, on
+     purpose. A word we invented would have to be kept in step with theirs forever.
+   - **We store a reference, never an instrument.** No card number, no last4, no client secret —
+     the secret is returned to the browser and deliberately not written down, because anything
+     stored is something that can leak from a backup or a log.
+
+   **Known gap, deferred to Phase 6.** The mirror is only accurate at the moments something looks:
+   a webhook delivery, or an admin re-check. Nothing sweeps the table against Stripe, so a row
+   whose event was missed stays stale until someone checks that specific order. Acceptable at
+   launch scale with the re-check as the manual path; a scheduled reconciliation belongs with the
+   other Phase 6 operational concerns.
+
 6. **[You + Claude Code]** Reserve stock instead of decrementing it, and show the vendor the
    difference.
 
-   Today `checkout.py` does `quantity_available -= line.quantity` at order creation — *before* any
+   Today `checkout.py` does `quantity_available -= line.quantity` at order creation — _before_ any
    money moves. That was correct while `pending → paid` was a human decision, and stops being
    correct the moment payment is a separate step that can simply never happen: an abandoned
    checkout holds its stock forever. Ten items and ten abandoned carts leaves a product reading
@@ -752,7 +776,6 @@ happens); a per-variant primary image; zoom or lightbox.
 
    `inventory.quantity_reserved` already exists for this, with its `>= 0` CHECK, described in
    Section 6.3 as "held during checkout", and is currently written by nothing.
-
    - Placing an order adds to `quantity_reserved` and leaves `quantity_available` alone.
    - **Sellable becomes `quantity_available - quantity_reserved`.** Every place that asks "is there
      stock?" has to change together: the oversell guard in `checkout.py`, the storefront's
@@ -786,13 +809,12 @@ happens); a per-variant primary image; zoom or lightbox.
    task anyway. Today the cart labels a line only at zero stock: hold 3 of something and the vendor
    drops to 1, and the cart looks entirely fine until checkout fails with "only 1 in stock". The
    cart carries a boolean, not a count. Showing "only 1 left" means publishing an exact figure,
-   which `VariantRead`'s docstring deliberately avoids for the public catalogue — but a count *for
-   something already in a customer's own cart* is a much narrower disclosure than a catalogue-wide
+   which `VariantRead`'s docstring deliberately avoids for the public catalogue — but a count _for
+   something already in a customer's own cart_ is a much narrower disclosure than a catalogue-wide
    one, and it is the difference between fixing the problem in the cart and discovering it at the
    till. A decision to take, not a bug to fix silently.
 
    Two more decisions to settle when building it, not now:
-
    - **Counter or derived?** A maintained `quantity_reserved` counter is cheap to read and can
      drift if any release is ever missed — and a drifted reservation is invisible stock loss
      nobody can trace. Deriving it from unpaid orders (`sum(quantity)` over `order_items` joined to
@@ -809,8 +831,8 @@ happens); a per-variant primary image; zoom or lightbox.
 
 ### Phase 5.5 — Fulfilment, Tracking & Delivery Confirmation
 
-Until this phase, `delivered` means an admin clicked a button. The audit trail records *who claimed
-it and when they claimed it* — provenance, not evidence — and `orders` carries no carrier, no
+Until this phase, `delivered` means an admin clicked a button. The audit trail records _who claimed
+it and when they claimed it_ — provenance, not evidence — and `orders` carries no carrier, no
 tracking number and no dispatch or delivery timestamp. Three things need that fixed: a payment
 processor answering a "product not received" dispute wants `shipping_carrier`,
 `shipping_tracking_number` and `shipping_date` and will not accept a status word; a customer
@@ -884,7 +906,7 @@ because that is when it starts mattering.
 9. **[You + Claude Code]** Set up **S3 + CloudFront** for product images and switch uploads to use them.
    This is where the admin image field becomes a real upload. Until now it is a picker listing the
    files already in `web/public/` — deliberately not a free-text URL box, because an external
-   address is accepted by the form and then makes `next/image` throw at *render* time, taking down
+   address is accepted by the form and then makes `next/image` throw at _render_ time, taking down
    the storefront and the admin edit page together. The upload uses a **presigned PUT**: the browser
    asks the API for a URL, sends the file straight to S3, and posts back only the key, so the API
    never handles the bytes and there is no request-size ceiling. `accept="image/*"` on one file
@@ -895,7 +917,7 @@ because that is when it starts mattering.
 
    **Uploading is the primary path, not browsing.** The vendor's normal action is "I photographed
    this shirt, attach it to this product" — so the file input lives on the product create/edit
-   page and the upload happens there. Browsing an existing library is the *secondary* path, for
+   page and the upload happens there. Browsing an existing library is the _secondary_ path, for
    reusing a photo across products. Building it the other way round is what produces admin screens
    where adding an image means first going somewhere else to put it.
 
@@ -906,30 +928,30 @@ because that is when it starts mattering.
 
 9b. **[You + Claude Code]** Media library: a modal picker for reusing images already uploaded.
 
-   The Phase 5.5-era picker renders every file as a thumbnail inline on the product page. That is
-   right for the six files in `web/public/` and unusable at two hundred — the page becomes a wall
-   of images with no way to find anything. Replace it with a scrollable modal built on
-   `web/components/ui/modal.tsx`, which already gives a focus trap, Escape-to-close, an inert
-   background and focus return via the native `<dialog>` element. It exists and is currently used
-   only by `/preview`, so this is reuse rather than new UI.
+The Phase 5.5-era picker renders every file as a thumbnail inline on the product page. That is
+right for the six files in `web/public/` and unusable at two hundred — the page becomes a wall
+of images with no way to find anything. Replace it with a scrollable modal built on
+`web/components/ui/modal.tsx`, which already gives a focus trap, Escape-to-close, an inert
+background and focus return via the native `<dialog>` element. It exists and is currently used
+only by `/preview`, so this is reuse rather than new UI.
 
-   Inside: search by filename and alt text, sort by upload date (newest first, the default anyone
-   actually wants), name or size, and a grid/list toggle — a list is faster to scan when the names
-   are meaningful and the pictures all look alike.
+Inside: search by filename and alt text, sort by upload date (newest first, the default anyone
+actually wants), name or size, and a grid/list toggle — a list is faster to scan when the names
+are meaningful and the pictures all look alike.
 
-   **This needs a `media_assets` table, not just an S3 bucket**, and that is the part worth deciding
-   before writing code. `ListObjectsV2` paginates by continuation token rather than offset, so it
-   cannot drive `components/pagination.tsx`; it sorts only by key; it cannot search; and it carries
-   no alt text, dimensions or "which products use this". A table indexed on `uploaded_at` gives all
-   of it and matches how `/admin/orders`, `/admin/users` and `/admin/audit` already paginate. The
-   row is written by the confirm step above: key, original filename, content type, byte size,
-   width, height, `uploaded_at`, `uploaded_by`.
+**This needs a `media_assets` table, not just an S3 bucket**, and that is the part worth deciding
+before writing code. `ListObjectsV2` paginates by continuation token rather than offset, so it
+cannot drive `components/pagination.tsx`; it sorts only by key; it cannot search; and it carries
+no alt text, dimensions or "which products use this". A table indexed on `uploaded_at` gives all
+of it and matches how `/admin/orders`, `/admin/users` and `/admin/audit` already paginate. The
+row is written by the confirm step above: key, original filename, content type, byte size,
+width, height, `uploaded_at`, `uploaded_by`.
 
-   Then `product_images` references the asset (`asset_id` **FK** → `media_assets.id`) rather than
-   storing a loose URL string. That is what makes "where is this image used?" answerable, and it
-   lets the FK refuse to delete an asset a product still shows — the same `NO ACTION` reasoning
-   used everywhere else in this schema. Deleting an unused asset removes both the row and the S3
-   object; deleting a used one is refused with the list of products holding it.
+Then `product_images` references the asset (`asset_id` **FK** → `media_assets.id`) rather than
+storing a loose URL string. That is what makes "where is this image used?" answerable, and it
+lets the FK refuse to delete an asset a product still shows — the same `NO ACTION` reasoning
+used everywhere else in this schema. Deleting an unused asset removes both the row and the S3
+object; deleting a used one is refused with the list of products holding it.
 
 10. **[You]** Register a domain in **Route 53** and issue an **ACM** certificate for HTTPS.
 11. **[You + Claude Code]** Move secrets into **Secrets Manager** and set up **CloudWatch** logs and alarms.
@@ -1027,7 +1049,7 @@ reference to another table's PK).
 |---|---|---|
 | id | bigint | **PK** |
 | user_id | bigint | **FK** → users.id |
-| code_hash | text | Hashed with bcrypt, exactly like a password — a recovery code *is* a credential |
+| code_hash | text | Hashed with bcrypt, exactly like a password — a recovery code _is_ a credential |
 | used_at | timestamptz | nullable; each code works once |
 
 **audit_events** (Phase 4.5) — append-only
@@ -1221,16 +1243,16 @@ dimensions per store in the store configuration (Section 1.1). Use `variant_name
 
 **Unique constraints** — six in total:
 
-| Column | What it guarantees |
-|---|---|
-| `users.email` | One account per address |
-| `categories.slug` | URLs resolve to one category |
-| `products.slug` | URLs resolve to one product |
-| `product_variants.sku` | A SKU identifies exactly one sellable item |
+| Column                 | What it guarantees                                                                 |
+| ---------------------- | ---------------------------------------------------------------------------------- |
+| `users.email`          | One account per address                                                            |
+| `categories.slug`      | URLs resolve to one category                                                       |
+| `products.slug`        | URLs resolve to one product                                                        |
+| `product_variants.sku` | A SKU identifies exactly one sellable item                                         |
 | `inventory.variant_id` | At most one stock row per variant — this is what makes the relationship one-to-one |
-| `carts.user_id` | One cart per user |
+| `carts.user_id`        | One cart per user                                                                  |
 
-Note what `inventory.variant_id` does *not* do: it enforces **at most** one inventory row, never
+Note what `inventory.variant_id` does _not_ do: it enforces **at most** one inventory row, never
 **at least** one. A variant with no stock row is legal SQL. Keeping every variant supplied with one
 is an application invariant, upheld in the seed script and in product creation.
 
@@ -1239,22 +1261,22 @@ is an application invariant, upheld in the seed script and in product creation.
 Quantity guards. These are the database-level half of Section 6.7's requirement that stock can
 never go negative; the row lock in checkout is the other half:
 
-| Table | Rule |
-|---|---|
-| `inventory` | `quantity_available >= 0` |
-| `inventory` | `quantity_reserved >= 0` |
-| `cart_items` | `quantity > 0` |
-| `order_items` | `quantity > 0` |
-| `payments` | `amount > 0` |
+| Table         | Rule                      |
+| ------------- | ------------------------- |
+| `inventory`   | `quantity_available >= 0` |
+| `inventory`   | `quantity_reserved >= 0`  |
+| `cart_items`  | `quantity > 0`            |
+| `order_items` | `quantity > 0`            |
+| `payments`    | `amount > 0`              |
 
 Enum-like text columns. Section 6.3 specifies `text` rather than a PostgreSQL `ENUM` type, so the
 permitted values are enforced with a CHECK:
 
-| Column | Permitted values |
-|---|---|
-| `users.role` | `customer`, `admin` |
-| `addresses.type` | `shipping`, `billing` |
-| `orders.status` | `pending`, `paid`, `shipped`, `delivered`, `cancelled`, `refunded` |
+| Column           | Permitted values                                                   |
+| ---------------- | ------------------------------------------------------------------ |
+| `users.role`     | `customer`, `admin`                                                |
+| `addresses.type` | `shipping`, `billing`                                              |
+| `orders.status`  | `pending`, `paid`, `shipped`, `delivered`, `cancelled`, `refunded` |
 
 **`products.unit_of_measure` is deliberately left unconstrained.** It looks like an oversight beside
 the columns above and is not one: it is a Section 1.1 reusability seam. A CHECK restricting it to
@@ -1266,10 +1288,10 @@ list, which is exactly what the seam exists to prevent. It is validated at the A
 An index speeds up lookups at a small cost to writes. Add indexes on columns you filter or join by:
 
 **PostgreSQL does not automatically index foreign key columns.** This surprises most people. A
-foreign key requires an index on the *referenced* (parent) column — which the primary key already
-supplies — but creates nothing on the *referencing* (child) column. That is why nearly every entry
+foreign key requires an index on the _referenced_ (parent) column — which the primary key already
+supplies — but creates nothing on the _referencing_ (child) column. That is why nearly every entry
 below is an FK: without them, "find this order's items" is a sequential scan. Unique constraints
-*do* create an index, which is why `users.email` needs no separate one.
+_do_ create an index, which is why `users.email` needs no separate one.
 
 - `users.email` (unique — already indexed)
 - `products.category_id`, `products.slug`
@@ -1314,7 +1336,7 @@ type_='check')` calls in `downgrade()`, and verify against `pg_constraint` rathe
 **Constraint names come from a naming convention** set on `Base.metadata` in `app/db.py`, producing
 `pk_<table>`, `fk_<table>_<column>_<referred_table>`, `uq_<table>_<column>`, `ck_<table>_<name>`,
 and `ix_<table>_<column>`. Without it the database invents names that vary by engine and are hard
-to predict — and a constraint can only be altered or dropped *by name*. Set this before the first
+to predict — and a constraint can only be altered or dropped _by name_. Set this before the first
 migration; retrofitting it later means renaming every constraint in the database.
 
 ### 6.9 Seeding
@@ -1394,14 +1416,14 @@ same service, training wheels off. Do not add that complexity earlier.
   web and mobile.
 - Include the user's **role** in the token so the vendor portal can require `admin`.
 - **The role claim is for clients, not for server-side authorisation.** It lets the web app decide
-  whether to render `/admin` without an extra request. The API reads the role from the *database*
+  whether to render `/admin` without an extra request. The API reads the role from the _database_
   on every request, so a role changed there takes effect immediately rather than when the token
   expires. Never authorise from the token's claim alone.
 - **Registration always creates a `customer`.** The registration schema has no `role` field at all
   — omitted rather than validated — so a request body has no way to ask for an admin account.
   Admins are created deliberately (the seed script, or an admin-only endpoint).
 - **Authentication failures must be indistinguishable.** An unknown email and a wrong password
-  return the same 401 with the same body *and take the same time*. Identical bodies alone are not
+  return the same 401 with the same body _and take the same time_. Identical bodies alone are not
   enough: if a missing user short-circuits before the password check, the response is ~100ms faster
   and that gap enumerates which addresses have accounts. Run a real hash comparison against a dummy
   hash when no user matches.
@@ -1410,7 +1432,7 @@ same service, training wheels off. Do not add that complexity earlier.
   `HTTPBearer` returns 403 for a missing header by default — set `auto_error=False` and raise 401.
 - **Password reset tokens are stored hashed, never raw** (Phase 4.5). The raw token lives only in
   the emailed link. They are single-use and expire in ~30 minutes, and `POST /auth/forgot-password`
-  returns the *same* response whether or not the address exists — the same anti-enumeration rule as
+  returns the _same_ response whether or not the address exists — the same anti-enumeration rule as
   login, applied to the one other endpoint that takes an email address.
 - **Changing a password sets `password_changed_at`**, and tokens issued before that instant are
   rejected. Without refresh tokens this is the only way to end sessions on other devices after a
@@ -1426,7 +1448,7 @@ same service, training wheels off. Do not add that complexity earlier.
   deleting a customer who has ordered is impossible without destroying order history. Scrubbing the
   personal fields in place satisfies an erasure request while keeping the invoices tax rules
   require. Addresses follow the same rule for the same reason: those an order references survive
-  (the order holds no snapshot, so the row *is* the shipping record), and address-book entries no
+  (the order holds no snapshot, so the row _is_ the shipping record), and address-book entries no
   order used are deleted.
 - **Consequential actions are recorded, and the record is append-only** (Phase 4.5). Suspension,
   role changes, anonymisation, admin-triggered resets, and the customer's own credential changes all
@@ -1479,12 +1501,12 @@ same service, training wheels off. Do not add that complexity earlier.
   constraint tests: make the constraint reject something before trusting it.
 - **Account and credential paths get the same scrutiny as money paths** (Phase 4.5). Specifically:
   a reset token works exactly once; an expired token is refused; `forgot-password` is
-  indistinguishable for a known and an unknown address; a suspended user's *existing* session stops
+  indistinguishable for a known and an unknown address; a suspended user's _existing_ session stops
   on the next request, not at token expiry; a password change invalidates tokens issued earlier;
   and the last admin cannot suspend or demote themselves. Each of these is a guard, so each must be
   watched failing before it is trusted.
 - **The audit trail gets tested as a guard too.** Prove the event and the action share a
-  transaction by forcing the action to fail after the event is queued and confirming *neither*
+  transaction by forcing the action to fail after the event is queued and confirming _neither_
   lands. Prove append-only by attempting an `UPDATE` and a `DELETE` on `audit_events` from `psql`
   and watching the trigger refuse both. An audit log nobody has tried to tamper with is not known
   to be tamper-proof.
@@ -1595,7 +1617,7 @@ After v1 launches, add reviews, richer search, sales reporting, and the mobile a
   re-authenticate: change password, change email, close account, disable two-factor, and admin
   anonymise. A passwordless account needs a separate answer for each of those before the first
   provider is wired up. Linking a provider to an existing account by email address is also an
-  account-takeover route unless the provider's `email_verified` claim is required *and* the link is
+  account-takeover route unless the provider's `email_verified` claim is required _and_ the link is
   confirmed by the account holder: otherwise someone who registers `victim@gmail.com` with a
   password first inherits the victim's later Google sign-in. Each provider is additionally an
   external account, a consent screen, and — for Google in production — an app review. Revisit
