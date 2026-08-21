@@ -18,6 +18,7 @@ from app.models import User
 from app.security import decode_access_token
 from app.store import store_config
 from app.services.email import EmailSender, build_sender
+from app.services.payments import PaymentGateway, build_gateway
 
 # auto_error=False because the default returns 403 when the Authorization header
 # is missing. A missing credential is 401 -- 403 means "authenticated, but not
@@ -152,3 +153,18 @@ def get_email_sender() -> EmailSender:
     instead of monkeypatching a module global.
     """
     return build_sender(settings.email_sender)
+
+
+@lru_cache(maxsize=1)
+def get_payment_gateway() -> PaymentGateway:
+    """The configured payment gateway, built once.
+
+    Same shape and same reasons as get_email_sender above. Built once rather than
+    per request because StripePaymentGateway sets up an SDK client, and doing
+    that on every checkout would be waste.
+
+    The cache is also why tests override *this function* rather than setting
+    PAYMENT_GATEWAY: lru_cache would hand back whatever was built first, so an
+    env var read at import time cannot be changed by a test that runs later.
+    """
+    return build_gateway(settings.payment_gateway)

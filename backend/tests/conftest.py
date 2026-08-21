@@ -92,7 +92,25 @@ def db(session_factory) -> Session:
 
 
 @pytest.fixture
-def client(session_factory):
+def payment_gateway():
+    """The fake payment gateway every test runs against.
+
+    Requested by `client` below rather than by individual tests, so the override
+    is ALWAYS installed. That is deliberate: placing an order now opens a payment
+    intent, so without a blanket override any test that posts to /orders would
+    reach for the real Stripe gateway -- needing the SDK, a live key and a
+    network round trip to test something that has nothing to do with payments.
+
+    A test that wants to assert on payment behaviour just asks for this fixture
+    too and gets the same instance.
+    """
+    from app.services.payments import FakePaymentGateway
+
+    return FakePaymentGateway()
+
+
+@pytest.fixture
+def client(session_factory, payment_gateway):
     """TestClient wired to the test database.
 
     dependency_overrides is cleared afterwards; leaving it set would leak into
@@ -101,6 +119,7 @@ def client(session_factory):
     from fastapi.testclient import TestClient
 
     from app.db import get_db
+    from app.dependencies import get_payment_gateway
     from app.main import app
 
     def override_get_db():
@@ -111,6 +130,7 @@ def client(session_factory):
             s.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_payment_gateway] = lambda: payment_gateway
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

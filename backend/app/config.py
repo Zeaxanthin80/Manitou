@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     # .env.example must be a field here, and test_config.py enforces that.
     stripe_webhook_secret: SecretStr = SecretStr("")
 
+    # Which PaymentGateway implementation to build (app/services/payments.py).
+    # "stripe" talks to the real API in test mode; "fake" is in-memory, for
+    # working offline. Tests do not use this -- they override the dependency
+    # directly, so the suite never depends on how a laptop happens to be set up.
+    payment_gateway: str = "stripe"
+
     model_config = SettingsConfigDict(env_file=".env")
 
 

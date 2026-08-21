@@ -61,3 +61,23 @@ class OrderPage(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class PaymentIntentRead(BaseModel):
+    """The client secret for one order's payment, plus what to display beside it.
+
+    **Deliberately its own shape rather than a field on OrderDetail.** The client
+    secret is a bearer credential: whoever holds it can confirm that payment.
+    Hanging it off the order shape would ship one in `GET /orders` for every
+    order a customer has ever placed, forever, to satisfy a single checkout page.
+    It is returned only by the two endpoints that exist to hand it over.
+
+    `status` is Stripe's own word, not ours -- see PaymentIntentResult. Note that
+    a status of "succeeded" here still does not mean the ORDER is paid: only the
+    task 4 webhook writes that, because only Stripe can be trusted to say it.
+    """
+
+    client_secret: str
+    amount: Decimal
+    currency: str
+    status: str

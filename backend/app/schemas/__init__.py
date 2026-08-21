@@ -22,6 +22,7 @@ from app.schemas.order import (
     OrderItemRead,
     OrderPage,
     OrderSummary,
+    PaymentIntentRead,
 )
 from app.schemas.user import (
     AccountDelete,
@@ -62,6 +63,7 @@ __all__ = [
     "OrderItemRead",
     "OrderPage",
     "OrderSummary",
+    "PaymentIntentRead",
     "ProductDetail",
     "ProductListItem",
     "ProductPage",
