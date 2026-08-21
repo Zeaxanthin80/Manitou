@@ -188,6 +188,32 @@ export type OrderDetail = OrderSummary & {
   items: OrderItem[];
   shipping_address: Address;
   billing_address: Address;
+  /**
+   * Stripe's word for how payment is going, or null if none has started.
+   *
+   * NOT whether the order is paid -- `status` is that, and only the Phase 5
+   * task 4 webhook writes it. This exists so the receipt can acknowledge a card
+   * that has just been entered during the gap before the webhook arrives.
+   *
+   * Absent from OrderSummary on purpose: a listing does not need it.
+   */
+  payment_status: string | null;
+};
+
+/**
+ * The credential the browser needs to confirm one payment, plus what to show
+ * beside it.
+ *
+ * `client_secret` is a bearer credential scoped to a single PaymentIntent. It
+ * can pay this order and do nothing else -- not read a customer, not refund,
+ * not touch another order. That narrowness is why it may reach a browser at all
+ * while the secret key never may.
+ */
+export type PaymentIntentRead = {
+  client_secret: string;
+  amount: string;
+  currency: string;
+  status: string;
 };
 
 /* ------------------------------------------------------------------ admin -- */
@@ -485,6 +511,23 @@ export const listOrders = (token: string, limit = 20, offset = 0) =>
 
 export const getOrder = (token: string, id: number) =>
   request<OrderDetail>(`/orders/${id}`, { token });
+
+/**
+ * Open (or retrieve) the payment for an order.
+ *
+ * `method` is explicit because `request` infers POST only when there is a body,
+ * and this endpoint takes none. POST despite mostly reading: the first call
+ * creates a resource at Stripe, and a GET is expected to be safe to repeat,
+ * prefetch and cache -- none of which should be true of opening a payment.
+ *
+ * Create-or-retrieve on the server, so calling it twice for one order returns
+ * the same intent rather than opening a second.
+ */
+export const createPaymentIntent = (token: string, orderId: number) =>
+  request<PaymentIntentRead>(`/orders/${orderId}/payment-intent`, {
+    token,
+    method: "POST",
+  });
 
 export const listAdminOrders = (
   token: string,

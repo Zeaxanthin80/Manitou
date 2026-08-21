@@ -53,5 +53,9 @@ export async function placeOrderAction(
   revalidatePath("/", "layout");
 
   // Outside the try: redirect() signals by throwing.
-  redirect(`/orders/${orderId}`);
+  //
+  // To the PAYMENT page, not the receipt. Placing the order also opened a
+  // PaymentIntent (Phase 5 task 2), so the next thing the customer owes us is a
+  // card -- and /orders/{id}/pay is the URL that resumes it if they wander off.
+  redirect(`/orders/${orderId}/pay`);
 }

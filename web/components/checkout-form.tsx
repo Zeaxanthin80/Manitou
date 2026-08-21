@@ -130,11 +130,11 @@ export function CheckoutForm({ addresses }: { addresses: Address[] }) {
         size="lg"
         disabled={pending || shipping === null || effectiveBilling === null}
       >
-        {pending ? "Placing order..." : "Place order"}
+        {pending ? "Placing order..." : "Continue to payment"}
       </Button>
 
       <p className="font-body text-xs text-muted">
-        No payment is taken yet — card payment arrives in a later phase.
+        You will enter card details on the next step.
       </p>
     </form>
   );

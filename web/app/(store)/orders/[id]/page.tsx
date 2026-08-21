@@ -59,10 +59,11 @@ export default async function OrderPage({
       <h1 className="mt-2 font-display text-2xl uppercase leading-none tracking-tight text-text">
         Thank you
       </h1>
-      <p className="mt-3 max-w-prose font-body text-base text-muted">
-        Your order is {order.status}. A payment step will be added in a later
-        phase — nothing has been charged.
-      </p>
+      <PaymentState
+        orderId={order.id}
+        orderStatus={order.status}
+        paymentStatus={order.payment_status}
+      />
 
       <div className="mt-10 grid gap-12 md:grid-cols-[1fr_18rem]">
         <div>
@@ -137,5 +138,68 @@ function AddressBlock({ title, address }: { title: string; address: Address }) {
         {address.country}
       </address>
     </div>
+  );
+}
+
+/**
+ * What to tell the customer about money, from two signals rather than one.
+ *
+ * orders.status alone cannot express the state that matters most here: the gap
+ * between a card being accepted by Stripe and the Phase 5 task 4 webhook saying
+ * so. During that window the order is genuinely `pending` AND genuinely paid
+ * for, and a page reading only `status` would have to either stay silent or
+ * claim something it cannot know. Someone who has just typed a card number and
+ * sees no acknowledgement assumes it failed and pays twice.
+ *
+ * "succeeded" here is Stripe's word for the PAYMENT, never for the order. Only
+ * the webhook writes orders.status, because only Stripe can be trusted to say
+ * money moved -- the browser is the one party with a reason to lie about it.
+ */
+function PaymentState({
+  orderId,
+  orderStatus,
+  paymentStatus,
+}: {
+  orderId: number;
+  orderStatus: string;
+  paymentStatus: string | null;
+}) {
+  if (orderStatus === "cancelled" || orderStatus === "refunded") {
+    return (
+      <p className="mt-3 max-w-prose font-body text-base text-muted">
+        This order was {orderStatus}.
+      </p>
+    );
+  }
+
+  if (orderStatus !== "pending") {
+    return (
+      <p className="mt-3 max-w-prose font-body text-base text-muted">
+        Your order is {orderStatus}.
+      </p>
+    );
+  }
+
+  if (paymentStatus === "succeeded" || paymentStatus === "processing") {
+    return (
+      <p className="mt-3 max-w-prose font-body text-base text-muted">
+        Payment received — we are confirming your order now.
+      </p>
+    );
+  }
+
+  // Nothing paid yet, and the order can still be paid for. Offer the way back
+  // rather than leaving them to work out that a payment page exists.
+  return (
+    <p className="mt-3 max-w-prose font-body text-base text-muted">
+      Your order is saved and nothing has been charged.{" "}
+      <Link
+        href={`/orders/${orderId}/pay`}
+        className="text-text underline underline-offset-4"
+      >
+        Complete payment
+      </Link>
+      .
+    </p>
   );
 }
