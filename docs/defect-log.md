@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [14](#14-one-payment-per-order-was-enforced-only-by-application-timing) | 2026-08-21 | "One payment per order" was enforced only by application timing | Fixed — uncommitted |
 | [13](#13-the-money-conversion-promised-to-refuse-a-fraction-and-rounded-it-instead) | 2026-08-20 | The money conversion promised to refuse a fraction and rounded it instead | Fixed — uncommitted |
 | [12](#12-storing-a-config-value-is-not-the-same-as-the-app-reading-it) | 2026-08-19 | Storing a config value is not the same as the app reading it | Fixed `92f6182` |
 | [11](#11-cancelling-an-order-never-returns-its-stock) | 2026-08-17 | Cancelling an order never returns its stock | **Open** — Phase 5 task 6 |
@@ -29,6 +30,45 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 14. "One payment per order" was enforced only by application timing
+
+**Status:** Fixed, uncommitted (migration `4ff248d16b7f`).
+
+**Seen.** Found by reading the `payments` table during the task 2 walkthrough, not by a failure.
+`ensure_payment_intent` refuses to open a second payment for an order — but by `SELECT`ing first
+and `INSERT`ing after, with nothing between them. `payments.order_id` carried an index and no
+unique constraint, so the database had no opinion.
+
+**Cause.** Check-then-act. Two requests arriving together — a double-clicked "Place order", a
+retried checkout — both find no row and both insert one.
+
+**Why the damage was bounded.** The Stripe idempotency key is `order-{id}`, so both calls receive
+the *same* intent and the duplicate rows share a `stripe_payment_intent_id`. A row that should not
+exist, not a second charge. Bounded is not acceptable: a rule the database can state should not be
+left to request timing.
+
+**Fixed.** Migration `4ff248d16b7f` drops the non-unique `ix_payments_order_id` and adds
+`uq_payments_order_id`. Dropped rather than kept alongside — a unique constraint is a unique index
+in Postgres and serves the same lookups, so keeping both would mean two indexes on one column.
+
+**The constraint alone would have made this worse.** It converts a silent duplicate row into an
+unhandled `IntegrityError`, which the router turns into a 500 — a customer who did nothing wrong
+sees a crash where they previously saw success. So `ensure_payment_intent` now catches it, re-reads
+the winning row and retrieves its intent, and returns that. It re-retrieves rather than reusing the
+intent it already holds: the idempotency key makes those the same today, and assuming it would hand
+back a client secret belonging to a different row if it ever stopped being true. If no winning row
+is found the exception is re-raised — that means some *other* constraint fired and there is nothing
+to recover.
+
+**Prevented by.** Two tests. One inserts a rival row directly and asserts the database refuses it;
+one drives the race with a gateway that commits a competing row on a separate session inside the
+window, and asserts one row survives and a usable secret comes back. Mutation-verified both ways:
+without the constraint the first reports `DID NOT RAISE` and the second reports `assert 2 == 1`,
+which is the duplicate-row defect itself; without the `except IntegrityError`, the race test dies
+on an unhandled `UniqueViolation`.
 
 ---
 
@@ -398,3 +438,16 @@ than no check: it produces confidence without evidence.
   backend could not start at all, because none of them ran the application. "The config is in place"
   and "the app can read the config" are two separate facts, and only the first was established.
   A config task is not finished until something imports it.
+- **Mutating a database that the test run rebuilds.** Defect 14. To check that
+  `uq_payments_order_id` was really doing the work, the constraint was dropped from `manitou_test`
+  with `psql` and the test re-run. It passed — which looked like proof the test was worthless. It
+  was not: `conftest.py`'s `engine` fixture runs `DROP DATABASE ... CREATE DATABASE` and
+  `alembic upgrade head` at the start of every session, so the constraint was rebuilt before the
+  test executed and the mutation never reached the code under test. The mutation has to go in the
+  **migration**, since that is what the schema is actually built from. Done properly it failed
+  exactly as it should: `DID NOT RAISE IntegrityError`, and `assert 2 == 1` for the duplicate rows.
+
+  Worth noting the direction of this one. The others in this list are false *positives* — a check
+  that passed and should not have. This was a false *negative*, a mutation that looked survived and
+  was never applied. It would have been reported as "this test proves nothing", removing a guard
+  that was working. A mutation test needs its mutation verified as much as its result.
