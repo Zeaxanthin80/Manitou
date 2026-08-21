@@ -26,7 +26,7 @@ store ships goods it was never paid for.
 
 from dataclasses import dataclass, field
 from decimal import Decimal, DefaultContext, Inexact
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -34,7 +34,11 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Order, Payment
+from app.services import audit
 from app.store import store_config
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from app.models import User
 
 
 class PaymentError(Exception):
@@ -61,6 +65,16 @@ class OrderNotPayable(PaymentError):
 
 class UnsupportedCurrency(PaymentError):
     """The store is configured for a currency whose minor unit we do not know."""
+
+
+class WebhookVerificationError(PaymentError):
+    """The request did not come from Stripe, or we cannot tell that it did.
+
+    One exception for a bad signature, a malformed payload and an unconfigured
+    secret alike, because the caller's response is the same in every case:
+    refuse. Distinguishing them in the reply would tell an attacker which part of
+    their forgery to fix.
+    """
 
 
 class FractionalMinorUnit(PaymentError):
@@ -444,3 +458,179 @@ def ensure_payment_intent(
         return winner, intent.client_secret
 
     return payment, intent.client_secret
+
+
+# ---------------------------------------------------------------------------
+# Applying what the provider tells us
+# ---------------------------------------------------------------------------
+
+#: What apply_payment_event did, for the caller to report or log.
+#:
+#: Strings rather than an Enum because they go straight into an audit detail and
+#: an admin response, and a bare Enum member is not JSON-serialisable.
+CONFIRMED = "confirmed"          # order moved pending -> paid
+ALREADY_PAID = "already_paid"    # nothing to do; a retry or a second caller
+MIRRORED = "mirrored"            # payment status updated, order untouched
+CONFLICT = "conflict"            # money arrived for an order nobody can fulfil
+UNKNOWN = "unknown"              # no payment row for this intent
+
+
+def apply_payment_event(
+    db: Session, intent_id: str, intent_status: str, actor: "User | None" = None
+) -> str:
+    """Bring our records into line with what the provider says, idempotently.
+
+    **The single implementation of "what does this payment status mean".** Two
+    callers reach it: the Stripe webhook, and the admin's re-check for an event
+    that never arrived. Written once because two copies of a money rule
+    eventually disagree, and the way you find out is an order one path marks paid
+    and the other does not.
+
+    **Idempotent by construction, because webhooks are at-least-once.** Stripe
+    does not promise one delivery -- it promises at least one, and retries for
+    days until answered with a 2xx. The same succeeded event WILL arrive more
+    than once. Applying this five times must leave what applying it once leaves,
+    and must not write five audit rows.
+
+    Commits once: the order status, the mirrored payment status and the audit row
+    land together or not at all (CLAUDE.md). A crash between them would leave an
+    order marked paid with nothing recording why.
+
+    **Does not touch stock.** Phase 5 task 6 moves the decrement and the
+    reservation release into this same transaction; until then placing the order
+    already decremented, and doing it again here would double-count.
+
+    `actor` is None for the webhook -- nobody is in the room, and audit.record
+    snapshots that as "system". The admin re-check passes the admin who clicked,
+    because "Stripe told us" and "someone asked us to check" are different facts
+    about how an order came to be paid, and a trail that conflated them could not
+    answer why an order changed at a moment when no event was delivered.
+    """
+    payment = db.scalar(
+        select(Payment).where(Payment.stripe_payment_intent_id == intent_id)
+    )
+    if payment is None:
+        # An intent we have no record of -- another integration on the same
+        # Stripe account, or a test event fired by the CLI. Not an error, and
+        # emphatically not something to retry: there is nothing here to update.
+        return UNKNOWN
+
+    order = payment.order
+    previous_payment_status = payment.status
+    payment.status = intent_status
+
+    if intent_status != "succeeded":
+        # failed, canceled, processing, requires_action... all mirror and stop.
+        # None of them is a reason to move an ORDER: a failed payment leaves the
+        # order exactly where it was, still payable.
+        if previous_payment_status != intent_status:
+            db.commit()
+        return MIRRORED
+
+    if order.status == "paid":
+        # The common retry. Return success so Stripe stops redelivering, and
+        # write nothing -- a second audit row for the same event would make the
+        # trail describe an event that only happened once.
+        db.commit()
+        return ALREADY_PAID
+
+    if order.status != "pending":
+        # Money for an order nobody is going to fulfil. Cancelling released its
+        # stock and the customer may already have been told it is off, so
+        # reinstating it here would overrule a person and could commit the store
+        # to goods it no longer has. Flag it and let the vendor decide between
+        # refunding and re-placing.
+        audit.record(
+            db,
+            actor=actor,
+            action="payment.conflict",
+            target_type="order",
+            target_id=order.id,
+            order_status=order.status,
+            payment_intent=intent_id,
+            amount=str(payment.amount),
+            note=(
+                f"Payment succeeded for an order that is {order.status}. "
+                f"Order left unchanged; refund or re-place deliberately."
+            ),
+        )
+        db.commit()
+        return CONFLICT
+
+    order.status = "paid"
+    audit.record(
+        db,
+        actor=actor,
+        action="payment.confirmed",
+        target_type="order",
+        target_id=order.id,
+        payment_intent=intent_id,
+        amount=str(payment.amount),
+        currency=payment.currency,
+        **audit.changes({"status": "pending"}, {"status": "paid"}, "status"),
+    )
+    db.commit()
+    return CONFIRMED
+
+
+# ---------------------------------------------------------------------------
+# Webhooks
+# ---------------------------------------------------------------------------
+
+
+def verify_webhook(payload: bytes, signature_header: str) -> dict:
+    """Prove a webhook delivery came from Stripe, and return the parsed event.
+
+    The endpoint is necessarily public: Stripe has no account here, no token and
+    no session, so anyone on the internet can post to it. The signature IS the
+    authentication. Without this check, a stranger who guesses the URL can post
+    a payment_intent.succeeded and have goods shipped for free.
+
+    Stripe signs `{timestamp}.{raw_body}` with the endpoint secret and sends
+    `Stripe-Signature: t=...,v1=...`. Recomputing that HMAC proves the sender
+    held the secret. The timestamp is inside the signed string, so a captured
+    request cannot be replayed later -- construct_event enforces a tolerance
+    window on it.
+
+    **payload must be the RAW BYTES off the wire.** Not a re-serialised dict:
+    json.dumps produces different whitespace and key order, and the HMAC is over
+    the exact bytes Stripe sent, so a round trip through parsing guarantees a
+    mismatch. This is the single most common way this integration breaks.
+
+    **The empty-secret check is DIAGNOSTIC, not the security control.** Measured:
+    removing it does not open anything -- construct_event computes an HMAC with
+    an empty key, which cannot match, so an unconfigured store already refuses
+    every delivery. What the check adds is the reason. Without it the failure
+    reads "Bad webhook signature: No signatures found matching...", which sends
+    whoever is debugging to look for a tampered payload rather than an unset
+    variable. Same lesson as defect 12: the system was already right, the message
+    was not.
+
+    What must never be added is the opposite shortcut -- treating an empty secret
+    as "not configured yet, let it through" so local development works before
+    `stripe listen` has run. That is the one change here that would fail OPEN.
+
+    `import stripe` sits inside the function for the same reason it does in
+    StripePaymentGateway: the SDK stays optional for anything that never talks to
+    Stripe, and a missing dependency surfaces here rather than at import time.
+    """
+    secret = settings.stripe_webhook_secret.get_secret_value()
+    if not secret:
+        raise WebhookVerificationError(
+            "STRIPE_WEBHOOK_SECRET is not set, so webhook deliveries cannot be "
+            "verified and are all refused. Run `stripe listen` and put the "
+            "whsec_ value it prints into .env."
+        )
+
+    import stripe
+
+    try:
+        event = stripe.Webhook.construct_event(payload, signature_header, secret)
+    except ValueError as exc:
+        # Not JSON at all.
+        raise WebhookVerificationError(f"Unparseable webhook payload: {exc}") from exc
+    except stripe.SignatureVerificationError as exc:
+        # Wrong secret, tampered body, or a stale timestamp.
+        raise WebhookVerificationError(f"Bad webhook signature: {exc}") from exc
+
+    return event.to_dict() if hasattr(event, "to_dict") else dict(event)
