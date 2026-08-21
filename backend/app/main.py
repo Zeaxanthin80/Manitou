@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db import get_db
 from app.middleware import RequestContextMiddleware
-from app.routers import address, admin, auth, cart, catalog, order
+from app.routers import address, admin, auth, cart, catalog, order, webhooks
 from app.services.payments import validate_gateway_name
 
 # Fail here, at startup, on a payment gateway that does not exist -- rather than
@@ -27,6 +27,9 @@ app.include_router(cart.router)
 app.include_router(address.router)
 app.include_router(order.router)
 app.include_router(admin.router)
+# No auth dependency by design -- Stripe has no account here, so the request is
+# authenticated by its signature instead. See app/routers/webhooks.py.
+app.include_router(webhooks.router)
 
 
 @app.get("/health")
