@@ -16,13 +16,14 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [17](#17-an-abandoned-checkout-consumed-its-stock-permanently) | 2026-08-21 | An abandoned checkout consumed its stock permanently | Fixed — uncommitted |
 | [16](#16-the-payment-form-rendered-in-a-different-typeface-from-the-rest-of-the-site) | 2026-08-21 | The payment form rendered in a different typeface from the rest of the site | Fixed — uncommitted |
 | [15](#15-the-payment-page-offered-a-card-form-for-an-order-already-paid) | 2026-08-21 | The payment page offered a card form for an order already paid | Fixed — uncommitted |
 | [14](#14-one-payment-per-order-was-enforced-only-by-application-timing) | 2026-08-21 | "One payment per order" was enforced only by application timing | Fixed — uncommitted |
 | [13](#13-the-money-conversion-promised-to-refuse-a-fraction-and-rounded-it-instead) | 2026-08-20 | The money conversion promised to refuse a fraction and rounded it instead | Fixed — uncommitted |
 | [12](#12-storing-a-config-value-is-not-the-same-as-the-app-reading-it) | 2026-08-19 | Storing a config value is not the same as the app reading it | Fixed `92f6182` |
-| [11](#11-cancelling-an-order-never-returns-its-stock) | 2026-08-17 | Cancelling an order never returns its stock | **Open** — Phase 5 task 6 |
-| [10](#10-partial-stock-is-invisible-in-the-cart) | 2026-08-17 | Partial stock is invisible in the cart | **Open** — Phase 5 task 6 |
+| [11](#11-cancelling-an-order-never-returns-its-stock) | 2026-08-17 | Cancelling an order never returns its stock | Fixed — uncommitted |
+| [10](#10-partial-stock-is-invisible-in-the-cart) | 2026-08-17 | Partial stock is invisible in the cart | Fixed — uncommitted |
 | [9](#9-a-discontinued-product-could-still-be-bought-from-an-old-cart) | 2026-08-17 | A discontinued product could still be bought from an old cart | Fixed `db9dbc0` |
 | [8](#8-slug-and-sku-uniqueness-was-case-sensitive) | 2026-08-16 | Slug and SKU uniqueness was case-sensitive | Fixed `6d3f14b` |
 | [7](#7-the-product-edit-page-404d-for-any-product-past-the-first-page) | 2026-08-15 | The product edit page 404'd past the first page | Fixed `b083ec4` |
@@ -32,6 +33,49 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 17. An abandoned checkout consumed its stock permanently
+
+**Status:** Fixed, uncommitted (Phase 5 task 6).
+
+**Seen.** Eight orders sitting `pending` in the development database, none of them paid, every one
+still holding stock it had taken at placement. A product could read sold out having earned nothing,
+and nothing on any screen explained why.
+
+**Cause.** `checkout.py` did `quantity_available -= line.quantity` at order creation — before any
+money moved.
+
+**This code was CORRECT when it was written**, which is the part worth keeping. While `pending →
+paid` was a human decision, an order was as good as a sale and deducting immediately was right. It
+became wrong the moment Phase 5 made payment a separate step that can simply never happen. Nothing
+edited it into being a bug; the world around it changed.
+
+The same shape as *data outliving the assumption that made it valid*, one level up: it was the CODE
+outliving its assumption. Worth watching for whenever a manual step becomes an automated one — the
+question is not "is this still correct?" but "what was this relying on that is no longer true?"
+
+**Fixed.** `quantity_available` now means one thing only: what is physically on the shelf. What
+pending orders hold is DERIVED, never stored (`app/services/stock.py`), and the pending order *is*
+the reservation — its `order_items` rows are the hold. Placing an order writes nothing extra,
+releasing one is just the status changing, and a missed release cannot happen because there is no
+counter to drift. Expiry is one `WHERE` clause instead of a scheduled sweep.
+
+**The dangerous part was the five call sites.** "Is there stock?" is asked by the oversell guard,
+the storefront, the cart, add-to-cart and the admin inventory view. A site left comparing against
+`quantity_available` would not merely weaken the guard — it would REMOVE it, because that column no
+longer moves at placement. Measured: reverting the checkout guard alone let 8 concurrent buyers sell
+the same 3 units.
+
+**Prevented by.** 23 tests in `tests/test_stock.py`. Each of the five sites is pinned by its own
+test, verified by reverting each one individually and confirming exactly one test fails. The
+concurrency guard is mutation-tested both ways — removing the row lock, and reading the shelf count
+instead of sellable, each produce `sold 8, only 3 existed`.
+
+**Measured rather than assumed.** Deriving costs an aggregate per read, so it was benchmarked on
+1,500 variants and 40,000 order lines before deciding: customer-facing paths are ~1 ms, because the
+catalogue listing never asks. The numbers are in `stock.py`'s docstring.
 
 ---
 
@@ -231,7 +275,7 @@ That last case is the task 4 rehearsal, since `STRIPE_WEBHOOK_SECRET` lands in `
 
 ## 11. Cancelling an order never returns its stock
 
-**Status:** Open — recorded in `PROJECT_PLAN.md` Phase 5 task 6.
+**Status:** Fixed, uncommitted (Phase 5 task 6). Open for four days.
 
 **Seen.** After a probe order was cancelled, the stock count stayed decremented. Putting it back
 meant editing the number by hand in `/admin/inventory`.
@@ -248,11 +292,32 @@ so its stock is still on the shelf. A refunded one may have shipped, and what re
 damaged, opened, or never sent back. `→ cancelled` should restock automatically; `→ refunded`
 should not, and the vendor restocks deliberately if the goods actually arrive.
 
+**Fixed.** `restock_for_order` in `app/services/stock.py`, called from the admin status transition
+**in the same transaction as the status change** — split across two commits you could end up with an
+order marked cancelled and stock still missing, which nothing afterwards could distinguish from an
+order that legitimately shipped.
+
+The condition is `previous == "paid" and payload.status == "cancelled"`, and **both halves are
+load-bearing**:
+
+- Drop `previous == "paid"` and cancelling a *pending* order manufactures stock out of an abandoned
+  checkout — the mirror image of this defect, and just as wrong.
+- Widen it to include `refunded` and the store invents inventory that may be shipped, damaged, or
+  never coming back.
+
+Every restock writes an `inventory.restocked` audit row naming the lines and the reason, because
+"where did those twelve units come from?" has to be answerable.
+
+**Prevented by.** Four tests in `tests/test_stock.py`, mutation-verified individually: removing the
+restock, widening it to refunds, and dropping the `previous == "paid"` guard each fail exactly one
+test. Confirmed end to end against the running app — a paid order for 2 units cancelled, and the
+shelf went 0 → 2 with the audit row to match.
+
 ---
 
 ## 10. Partial stock is invisible in the cart
 
-**Status:** Open — recorded in `PROJECT_PLAN.md` Phase 5 task 6.
+**Status:** Fixed, uncommitted (Phase 5 task 6). Open for four days.
 
 **Seen.** A cart line is labelled only when stock hits **zero**. Hold 3 of something, let the vendor
 drop to 1, and the cart looks entirely fine until checkout fails with "only 1 in stock".
@@ -263,6 +328,29 @@ drop to 1, and the cart looks entirely fine until checkout fails with "only 1 in
 which `VariantRead`'s docstring deliberately avoids for the public catalogue. A count for something
 already in that customer's own cart is a much narrower disclosure — but it is still a policy change,
 not a silent correction.
+
+**Decided: publish the count.** `CartLineVariant` gained `quantity_sellable`, deliberately NOT
+`VariantRead` — the public catalogue keeps its no-exact-counts posture, and this is a number about a
+line the customer already holds.
+
+**Fixed.** The cart line now has three states rather than two, in strict precedence:
+
+| condition | label |
+|---|---|
+| product withdrawn | No longer available · remove to check out |
+| sellable is 0 | Out of stock |
+| sellable < line quantity | **Only N left · reduce to check out** |
+
+Discontinued wins over both, and the order of the branches is what enforces it: "Out of stock" means
+*check back later*, which is exactly the wrong advice for something that is never coming back.
+
+**Verified on the rendered page, not the API response.** The web app has no test tooling at all — no
+vitest, no testing-library, no test files — so the page was driven through Next.js and the labels
+read out of the DOM at each state: stock 19 → no label, stock 1 → "Only 1 left", stock 0 → "Out of
+stock", stock 1 + withdrawn → "No longer available". That last row is the precedence claim.
+
+Done that way deliberately: *verifying the data instead of the page* is already an entry in the
+verification failures below, from the discontinued-cart work on this same component.
 
 ---
 
@@ -474,6 +562,12 @@ order holding a fact that was true when it was written and is not true now. Anyt
 references live state needs re-checking at the moment it is used, not trusted from when it was
 created.
 
+**CODE outliving the assumption that made it correct.** Defect 17 is the same shape one level up.
+`quantity_available -= qty` at order placement was right while `pending → paid` was a human
+decision, and became wrong the moment payment turned into a step that can never happen. Nobody
+edited it into being a bug. The useful question when automating something a person used to do by
+hand is not "is this still correct?" but "what was this relying on that is no longer true?" 
+
 ---
 
 ## Verification failures
@@ -567,3 +661,21 @@ than no check: it produces confidence without evidence.
   no error, no transaction. It surfaced only because the verification query was a separate command
   that looked at the actual rows. Exit status and empty output are not evidence that an action
   happened — the same shape as the `|| echo "CLEAN"` entry above.
+- **Comparing two things that are both zero.** Task 6. The derived reservation was checked against an
+  independently hand-computed sum across the whole development database: zero mismatches, which
+  looked like proof. It was not — every pending order was hours past the 30-minute window, so both
+  sides were summing an empty set and agreeing that nothing is nothing. Widening the window until
+  six variants actually reserved is what turned it into evidence. A comparison only tests what it
+  can distinguish.
+- **A mutation applied to the wrong function.** Task 6, and the second time in two days. A guard was
+  mutated with `s.replace(old, new, 1)` where `old` — `if order.status != "pending":` — appears twice
+  in the file, so the FIRST occurrence was hit and the code under test was never touched. The test
+  passed and read as "this guard is untested". Retargeting by line number failed it correctly. The
+  entry about this already existed in this list and did not prevent the repeat: a written lesson is
+  not a habit, and the durable fix is to assert the match is unique before replacing, which the later
+  edits in this task did.
+- **Reading a response body before checking its status.** Task 6. Five tests failed with
+  `KeyError: 'items'`, which reads like a bug in the endpoint. It was `?limit=200` exceeding
+  `MAX_PAGE_SIZE = 100`, so the API answered 422 and the test was pulling `items` off an error body.
+  The error named the test's own shape and sent the search to the wrong place. Assert the status
+  first; a 4xx should say so, not surface three lines later as a missing key.
