@@ -14,6 +14,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.services import audit
 from app.services.stock import sellable_map
 from app.store import store_config
 from app.models import (
@@ -103,6 +104,39 @@ def create_order_from_cart(
 
     shipping = _owned_address(db, shipping_address_id, user.id)
     billing = _owned_address(db, billing_address_id, user.id)
+
+    # ------------------------------------------------------------------
+    # One pending order per customer.
+    #
+    # The cart now SURVIVES reaching the payment step (see the note where it
+    # used to be emptied), so a customer can abandon at the card form, add
+    # something, and check out again. Without this, that leaves two pending
+    # orders -- and since task 6 derives reservations from pending order_items,
+    # one person would be holding the same units twice.
+    #
+    # Superseding rather than refusing: the newer cart is what they actually
+    # want, and refusing would strand them behind an order they have already
+    # walked away from.
+    #
+    # Safe if the old order's payment lands anyway -- a card form left open in
+    # another tab. apply_payment_event refuses to revive a cancelled order and
+    # writes a payment.conflict row instead (Phase 5 task 4), so the money is
+    # recorded and flagged rather than silently applied.
+    # ------------------------------------------------------------------
+    superseded = db.scalars(
+        select(Order).where(Order.user_id == user.id, Order.status == "pending")
+    ).all()
+    for stale in superseded:
+        stale.status = "cancelled"
+        audit.record(
+            db,
+            actor=user,
+            action="order.superseded",
+            target_type="order",
+            target_id=stale.id,
+            reason="customer returned to checkout with a new cart",
+            **audit.changes({"status": "pending"}, {"status": "cancelled"}, "status"),
+        )
 
     # ------------------------------------------------------------------
     # The concurrency guard (Section 6.7).
@@ -219,8 +253,17 @@ def create_order_from_cart(
     # that can simply never happen, it meant an abandoned checkout consumed stock
     # for good.
 
-    for line in list(cart.items):
-        db.delete(line)
+    # The cart is deliberately NOT emptied here.
+    #
+    # It used to be, and that made "Continue to payment" behave like a clerk
+    # taking your goods before you had paid: abandon at the card form and the
+    # trolley was gone. Every major store keeps the cart until payment succeeds,
+    # and not only for kindness -- an abandoned cart that still holds its items
+    # is the entire basis of cart recovery, and abandonment runs around 70%.
+    #
+    # It is consumed by apply_payment_event instead, when money actually
+    # arrives. Keeping it here costs nothing in stock terms: reservations derive
+    # from pending ORDER items, and cart lines reserve nothing.
 
     # One commit releases the locks and makes everything visible at once.
     db.commit()

@@ -35,7 +35,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models import Order, Payment
 from app.services import audit
-from app.services.stock import consume_for_order
+from app.services.stock import consume_cart_lines, consume_for_order
 from app.store import store_config
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -565,6 +565,11 @@ def apply_payment_event(
     # with an order marked paid and stock untouched -- and nothing afterwards
     # could tell that apart from an order that legitimately shipped.
     shortfalls = consume_for_order(db, order)
+
+    # And out of the customer's cart. The cart survives reaching the payment
+    # step now, so this is where it is finally consumed -- when money arrives,
+    # not when a card form is merely opened.
+    consume_cart_lines(db, order)
 
     audit.record(
         db,

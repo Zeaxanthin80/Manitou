@@ -262,9 +262,20 @@ def test_adding_a_fully_reserved_variant_to_a_cart_is_refused(
 
 
 def _confirm(db, order, payment_intent_id="pi_stock_test"):
-    """Take an order through payment confirmation, as the webhook would."""
+    """Take an order through payment confirmation, as the webhook would.
+
+    Reuses the order's existing payment if it has one. An order placed through
+    POST /orders already opened a PaymentIntent (task 2), and adding a second
+    trips uq_payments_order_id -- correctly, since that constraint exists to keep
+    one payment per order. Only orders built by calling create_order_from_cart
+    directly arrive here without one.
+    """
     from app.models import Payment
     from app.services.payments import apply_payment_event
+
+    existing = db.scalar(select(Payment).where(Payment.order_id == order.id))
+    if existing is not None:
+        return apply_payment_event(db, existing.stripe_payment_intent_id, "succeeded")
 
     db.add(
         Payment(
@@ -540,3 +551,133 @@ def test_sellable_is_floored_for_display_but_not_in_the_data(
     assert row["quantity_sellable"] == 0, "the screen floors it"
     assert row["quantity_available"] == 3
     assert row["quantity_reserved"] == 5, "3 on the shelf, 5 promised -- visible"
+
+
+# ---------------------------------------------------------------------------
+# The cart survives an abandoned checkout
+#
+# Reaching the payment step used to empty the cart -- a clerk taking your goods
+# before you had paid. Every major store keeps the cart until payment succeeds,
+# and an abandoned cart that still holds its items is the whole basis of cart
+# recovery. These pin the three parts of that change.
+# ---------------------------------------------------------------------------
+
+
+def test_abandoning_at_the_payment_step_leaves_the_cart_intact(
+    client, db, make_user, make_product, make_address, auth_headers
+):
+    """The customer's complaint, as a test.
+
+    Click "Continue to payment", think better of it, and the trolley is still
+    there -- with the badge still counting.
+    """
+    user = make_user(email=f"shopper{next(_SEQ)}@manitou.example")
+    product = make_product(stock=10, base_price="10.00")
+    address = make_address(user)
+    h = auth_headers(user)
+
+    client.post("/cart/items", headers=h,
+                json={"variant_id": product.variants[0].id, "quantity": 2})
+    r = client.post("/orders", headers=h, json={
+        "shipping_address_id": address.id, "billing_address_id": address.id})
+    assert r.status_code == 201
+
+    cart = client.get("/cart", headers=h).json()
+    assert cart["item_count"] == 2, "abandoned at the card form, goods still theirs"
+
+
+def test_checking_out_again_supersedes_the_unpaid_order(
+    client, db, make_user, make_product, make_address, auth_headers
+):
+    """One pending order per customer, so stock is never held twice.
+
+    Without this, the surviving cart lets someone reach the payment step twice
+    and reserve the same units under two orders.
+    """
+    from app.models import Order
+
+    user = make_user(email=f"shopper{next(_SEQ)}@manitou.example")
+    product = make_product(stock=10, base_price="10.00")
+    address = make_address(user)
+    h = auth_headers(user)
+    vid = product.variants[0].id
+    body = {"shipping_address_id": address.id, "billing_address_id": address.id}
+
+    client.post("/cart/items", headers=h, json={"variant_id": vid, "quantity": 2})
+    first = client.post("/orders", headers=h, json=body).json()["id"]
+    assert stock.reserved_map(db, [vid])[vid] == 2
+
+    # Back to shopping: one more, then check out again.
+    client.post("/cart/items", headers=h, json={"variant_id": vid, "quantity": 1})
+    second = client.post("/orders", headers=h, json=body).json()["id"]
+
+    db.expire_all()
+    assert db.get(Order, first).status == "cancelled", "the abandoned one is superseded"
+    assert db.get(Order, second).status == "pending"
+    assert stock.reserved_map(db, [vid])[vid] == 3, (
+        "3 reserved -- the new order only. Held twice would read 5."
+    )
+
+
+def test_superseding_is_recorded(
+    client, db, make_user, make_product, make_address, auth_headers
+):
+    """An order cancelling itself is worth a line in the trail."""
+    from app.models import AuditEvent
+
+    user = make_user(email=f"shopper{next(_SEQ)}@manitou.example")
+    product = make_product(stock=10, base_price="10.00")
+    address = make_address(user)
+    h = auth_headers(user)
+    body = {"shipping_address_id": address.id, "billing_address_id": address.id}
+
+    client.post("/cart/items", headers=h,
+                json={"variant_id": product.variants[0].id, "quantity": 1})
+    first = client.post("/orders", headers=h, json=body).json()["id"]
+    client.post("/cart/items", headers=h,
+                json={"variant_id": product.variants[0].id, "quantity": 1})
+    client.post("/orders", headers=h, json=body)
+
+    events = (
+        db.query(AuditEvent)
+        .filter(AuditEvent.target_id == first, AuditEvent.action == "order.superseded")
+        .all()
+    )
+    assert len(events) == 1
+    assert events[0].actor_email == user.email
+
+
+def test_payment_takes_only_what_the_order_covered_out_of_the_cart(
+    client, db, make_user, make_product, make_address, auth_headers
+):
+    """The case superseding does not cover.
+
+    Check out, abandon, add something WITHOUT checking out again, then pay the
+    original order. Emptying the whole cart would silently bin the late addition.
+    """
+    user = make_user(email=f"shopper{next(_SEQ)}@manitou.example")
+    shirts = make_product(stock=10, base_price="10.00")
+    jumper = make_product(stock=10, base_price="30.00")
+    address = make_address(user)
+    h = auth_headers(user)
+
+    client.post("/cart/items", headers=h,
+                json={"variant_id": shirts.variants[0].id, "quantity": 2})
+    order_id = client.post("/orders", headers=h, json={
+        "shipping_address_id": address.id,
+        "billing_address_id": address.id}).json()["id"]
+
+    # Adds a jumper afterwards, and does NOT check out again.
+    client.post("/cart/items", headers=h,
+                json={"variant_id": jumper.variants[0].id, "quantity": 1})
+    assert client.get("/cart", headers=h).json()["item_count"] == 3
+
+    from app.models import Order
+
+    _confirm(db, db.get(Order, order_id), f"pi_partial_{order_id}")
+
+    cart = client.get("/cart", headers=h).json()
+    assert cart["item_count"] == 1, "the shirts are paid for and gone"
+    assert cart["items"][0]["variant"]["id"] == jumper.variants[0].id, (
+        "the jumper stays exactly where the customer put it"
+    )

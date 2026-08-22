@@ -260,3 +260,43 @@ def restock_for_order(db: Session, order) -> None:
         inv = stock_rows.get(variant_id)
         if inv is not None:
             inv.quantity_available += qty
+
+
+def consume_cart_lines(db: Session, order) -> None:
+    """Take this order's goods out of the customer's cart. Payment has confirmed.
+
+    The cart survives reaching the payment step now (see checkout.py), so
+    something has to clear it once the money actually arrives -- otherwise a paid
+    customer still sees the goods sitting in their trolley.
+
+    **Subtracts the ordered quantities rather than emptying the cart**, which
+    matters for a case superseding does not cover: check out, abandon at the card
+    form, add a jumper WITHOUT checking out again, then pay the original order.
+    That order covers the shirts and not the jumper, and emptying would silently
+    bin something the customer deliberately added. Subtracting leaves it exactly
+    where they put it.
+
+    Does not commit -- the caller owns the transaction, so the cart clearing
+    lands with the status change.
+    """
+    from app.models import Cart, CartItem
+
+    cart = db.scalar(select(Cart).where(Cart.user_id == order.user_id))
+    if cart is None:
+        return
+
+    ordered: dict[int, int] = {}
+    for item in order.items:
+        ordered[item.variant_id] = ordered.get(item.variant_id, 0) + item.quantity
+
+    lines = db.scalars(select(CartItem).where(CartItem.cart_id == cart.id)).all()
+    for line in lines:
+        taken = ordered.get(line.variant_id, 0)
+        if not taken:
+            continue
+        if taken >= line.quantity:
+            ordered[line.variant_id] = taken - line.quantity
+            db.delete(line)
+        else:
+            line.quantity -= taken
+            ordered[line.variant_id] = 0

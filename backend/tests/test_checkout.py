@@ -63,15 +63,21 @@ def test_price_override_is_used(
     assert order["total"] == "32.00"
 
 
-def test_checkout_empties_the_cart_and_reserves_without_decrementing(
+def test_checkout_reserves_and_leaves_both_the_shelf_and_the_cart_alone(
     client, db, make_user, make_product, make_address, auth_headers
 ):
-    """Placing an order RESERVES; it does not take anything off a shelf.
+    """Placing an order RESERVES. It takes nothing off a shelf and nothing out
+    of the trolley.
 
-    Renamed from ..._and_decrements_stock with task 6. The old assertion --
-    quantity_available drops from 10 to 7 -- was correct while pending -> paid
-    was a human decision, and became wrong once payment could simply never
-    happen: an abandoned checkout consumed stock for good.
+    Renamed twice, and both renames are the same lesson arriving in two places.
+    Originally ..._and_decrements_stock: quantity_available dropped 10 -> 7 at
+    placement, which was right while pending -> paid was a human decision and
+    wrong once payment became a step that can never happen.
+
+    Then ..._empties_the_cart, for the same reason one layer up: reaching the
+    card form emptied the cart, so abandoning there left the customer with
+    nothing -- a clerk taking your goods before you have paid. Both were the same
+    mistake, treating "started to check out" as "bought".
     """
     from app.models import Inventory
     from app.services import stock
@@ -87,7 +93,10 @@ def test_checkout_empties_the_cart_and_reserves_without_decrementing(
         "shipping_address_id": address.id,
         "billing_address_id": address.id}).status_code == 201
 
-    assert client.get("/cart", headers=h).json()["items"] == []
+    cart = client.get("/cart", headers=h).json()
+    assert len(cart["items"]) == 1, "the cart survives reaching the payment step"
+    assert cart["items"][0]["quantity"] == 3
+    assert cart["item_count"] == 3, "and the cart badge still shows them"
 
     inv = db.query(Inventory).filter(Inventory.variant_id == variant_id).one()
     db.refresh(inv)
