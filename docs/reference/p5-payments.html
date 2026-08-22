@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Payments &amp; Stock — Manitou Reference</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <!-- The shared house style. First reference document to use it; the eight
+         earlier ones inline their own copies and are deliberately left alone. -->
+    <link rel="stylesheet" href="reference.css" />
+    <style>
+      /* Only what this document needs beyond the house style. */
+      .flow {
+        font-family: var(--mono); font-size: 12px; line-height: 1.75;
+        background: var(--surface); border: 1px solid var(--line);
+        border-radius: 3px; padding: 18px 16px; overflow-x: auto; margin: 20px 0;
+        white-space: pre;
+      }
+      .flow .c { color: var(--client); }
+      .flow .s { color: var(--server); }
+      .flow .g { color: var(--safe); }
+      .flow .r { color: var(--risk); }
+      .flow .m { color: var(--muted); }
+
+      /* Task strip on the masthead. */
+      .tasks {
+        display: flex; flex-wrap: wrap; gap: 6px; margin: 24px 0 0;
+        padding: 0; list-style: none; max-width: none;
+      }
+      .tasks li {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em;
+        text-transform: uppercase; color: var(--muted);
+        border: 1px solid var(--line); border-radius: 2px; padding: 5px 9px;
+        margin: 0;
+      }
+      .tasks li b { color: var(--safe); font-weight: 500; }
+
+      /* Two-column compare, collapsing on narrow screens. */
+      .versus { display: grid; gap: 14px; margin: 20px 0; }
+      @media (min-width: 720px) { .versus { grid-template-columns: 1fr 1fr; } }
+      .versus > div {
+        background: var(--surface); border: 1px solid var(--line);
+        border-left: 2px solid var(--risk); border-radius: 3px; padding: 14px 16px;
+        min-width: 0;
+      }
+      .versus > div.right { border-left-color: var(--safe); }
+      .versus h4 {
+        font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em;
+        text-transform: uppercase; color: var(--muted); font-weight: 400;
+        margin: 0 0 8px;
+      }
+      .versus p { margin: 0; font-size: 14.5px; max-width: none; }
+
+      .key { color: var(--ink); font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <nav class="toc">
+      <div class="toc-inner">
+        <a href="#s0">00 · Overview</a>
+        <a href="#s1">01 · Money</a>
+        <a href="#s2">02 · Opening</a>
+        <a href="#s3">03 · The card</a>
+        <a href="#s4">04 · Confirming</a>
+        <a href="#s5">05 · Stock</a>
+        <a href="#s6">06 · The cart</a>
+        <a href="#s7">07 · Decisions</a>
+        <a href="#s8">08 · Phase 6</a>
+      </div>
+    </nav>
+
+    <div class="wrap">
+      <header class="masthead">
+        <p class="eyebrow">Manitou Reference · Phase 5</p>
+        <h1>Payments<br />&amp; Stock</h1>
+        <p class="standfirst">
+          Taking money is the point at which a store stops being a catalogue. This
+          is what Phase 5 built, and — more usefully — <strong>why each piece is
+          shaped the way it is</strong>. Six tasks, twenty defects found and fixed,
+          257 tests. Written to be readable in six months without the code open.
+        </p>
+        <ul class="tasks">
+          <li><b>1</b> Stripe account</li>
+          <li><b>2</b> Payment intent</li>
+          <li><b>3</b> Card collection</li>
+          <li><b>4</b> Webhook</li>
+          <li><b>5</b> payments table</li>
+          <li><b>6</b> Reserve stock</li>
+        </ul>
+      </header>
+
+      <!-- ============================================================ 00 -- -->
+      <section id="s0">
+        <div class="sec-head"><span class="sec-num">00</span><h2>What changed</h2></div>
+        <p class="lede">
+          Before Phase 5, an order was a row someone typed a status into. After it,
+          an order is a claim on money and on goods, and both have to be true at the
+          same time.
+        </p>
+
+        <p>
+          That single change is what made the phase larger than it looks. Adding
+          Stripe is a day's work. What took the rest was every assumption that
+          quietly depended on <em>“placing an order” and “being paid” happening in
+          the same instant</em> — because they no longer do.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Before</th><th>After</th><th>What broke</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>An admin set an order to <code>paid</code></td>
+                <td>Stripe says so, via a webhook</td>
+                <td>Nothing may trust the browser about money</td>
+              </tr>
+              <tr>
+                <td>Stock left the shelf at checkout</td>
+                <td>Stock leaves when payment confirms</td>
+                <td>Abandoned checkouts consumed stock forever</td>
+              </tr>
+              <tr>
+                <td>The cart emptied at checkout</td>
+                <td>The cart empties when paid</td>
+                <td>Abandoning lost the customer's basket</td>
+              </tr>
+              <tr>
+                <td>“In stock” meant one number</td>
+                <td>Physical, reserved and sellable are three</td>
+                <td>Five places asked the wrong one</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note">
+          <strong>The recurring shape.</strong> Most of the twenty defects were not
+          new mistakes. They were code that had been <em>correct</em> and stopped
+          being correct because the world around it changed. Worth remembering
+          whenever a step a human used to perform becomes automatic: the question
+          is not “is this still right?” but <span class="key">“what was this
+          relying on that is no longer true?”</span>
+        </div>
+      </section>
+
+      <!-- ============================================================ 01 -- -->
+      <section id="s1">
+        <div class="sec-head"><span class="sec-num">01</span><h2>Money is an integer</h2></div>
+        <p class="lede">
+          Stripe does not accept <code>19.99</code>. It accepts <code>1999</code>.
+        </p>
+
+        <p>
+          Payment APIs take a whole number of the currency's smallest unit — cents,
+          pence, öre. There is no decimal point anywhere in the request. This is not
+          Stripe being awkward; it is the industry avoiding the most expensive bug
+          class in financial software.
+        </p>
+
+        <pre><code>&gt;&gt;&gt; 19.99 * 100
+1998.9999999999998
+&gt;&gt;&gt; int(19.99 * 100)
+1998</code></pre>
+
+        <p>
+          A penny short on every order, forever, and nobody notices until
+          reconciliation. It is the same reason every money column in the schema is
+          <code>numeric(10,2)</code> and never a float.
+        </p>
+
+        <h3>Not every currency has cents</h3>
+        <p>
+          This is the half that catches people. <span class="key">Multiplying by 100
+          is not “the conversion”</span> — it is the conversion for currencies that
+          happen to have two decimal places. The yen has none. ¥500 is five hundred
+          yen. Send <code>50000</code> and you have charged your customer
+          <strong>one hundred times the price</strong>.
+        </p>
+
+        <pre><code>CURRENCY_EXPONENT = {
+    "USD": 2, "EUR": 2, "GBP": 2, "CAD": 2, "AUD": 2,
+    "JPY": 0, "KRW": 0,
+}</code></pre>
+
+        <div class="note warn">
+          <strong>A missing entry raises rather than defaulting to 2.</strong>
+          <code>.get(code, 2)</code> would have been shorter and would have worked
+          for every currency in the table. It would also have silently overcharged
+          100× the first time this store was cloned for a Japanese market. Failing
+          loudly costs a support ticket; guessing costs a chargeback and a customer.
+        </div>
+
+        <h3>The test that proved nothing</h3>
+        <p>
+          The first version of the test used <code>19.99 × 3 = 59.97</code>, assuming
+          an awkward price stays awkward once multiplied. It does not:
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Total</th><th>float × 100</th><th>int()</th><th>Correct?</th></tr></thead>
+            <tbody>
+              <tr><td><code>59.97</code></td><td><code>5997.0</code></td><td>5997</td><td class="yes">a float version passes</td></tr>
+              <tr><td><code>32.30</code></td><td><code>3229.9999999999995</code></td><td>3229</td><td class="no">a cent short</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          <code>16.15 × 2 = 32.30</code> distinguishes them. And note how ordinary
+          <code>32.30</code> looks — there is no surface cue about which totals are
+          dangerous, which is the entire argument for never letting money touch a
+          float.
+        </p>
+
+        <div class="note">
+          <strong>Curiosity worth keeping.</strong> Of <code>16.15 × 1…20</code>,
+          only ×1, ×2, ×4, ×8 and ×16 undercharge — the powers of two. Doubling is
+          exact in binary, so it preserves the original representation error, while
+          ×3 renormalises and washes it out.
+        </div>
+      </section>
+
+      <!-- ============================================================ 02 -- -->
+      <section id="s2">
+        <div class="sec-head"><span class="sec-num">02</span><h2>Opening a payment</h2></div>
+        <p class="lede">
+          A PaymentIntent is an <em>intention</em> to collect money. Creating one
+          charges nothing.
+        </p>
+
+        <h3>Why a seam, not a direct call</h3>
+        <p>
+          The app never says “call Stripe”. It says “create a payment intent”, and a
+          <code>Protocol</code> decides who hears that — the real gateway, or an
+          in-memory fake. Without it, every test that places an order would need a
+          network round trip and a live secret key: the suite would stop being
+          runnable offline and would leave money-shaped debris in a real account.
+        </p>
+
+        <div class="note">
+          <strong>A fake that does not imitate what you depend on is a fake that
+          lies.</strong> <code>FakePaymentGateway</code> replays on a repeated
+          idempotency key, exactly as Stripe does. A lazier fake would mint a new
+          intent every call — and a test asserting “asking twice reuses one payment”
+          would then pass for the wrong reason.
+        </div>
+
+        <h3>Idempotency is keyed to the order</h3>
+        <pre><code>idempotency_key = f"order-{order.id}"</code></pre>
+        <p>
+          Stripe remembers the key and replays its original response rather than
+          opening a second payment. A double-clicked “Place order”, or our own retry
+          after a timeout that actually succeeded, cannot produce two charges. Keyed
+          to the <em>request</em> instead — a fresh UUID per HTTP call — it would
+          have looked like idempotency and protected against nothing.
+        </p>
+
+        <h3>Never hold a lock across a network call</h3>
+        <p>
+          Checkout takes <code>SELECT … FOR UPDATE</code> row locks on inventory, and
+          holds them until commit. Opening the Stripe intent <em>inside</em> that
+          window would mean every concurrent buyer of the same item queues behind a
+          third party's latency — and a slow Stripe becomes a database stall, with
+          connections piling up on locks.
+        </p>
+
+        <div class="flow"><span class="m">wrong                                   right</span>
+<span class="r">┌ BEGIN                              </span>  <span class="g">┌ BEGIN</span>
+<span class="r">│ lock inventory rows                </span>  <span class="g">│ lock inventory rows</span>
+<span class="r">│ create order                       </span>  <span class="g">│ create order</span>
+<span class="r">│ ── call Stripe ── ⏳ 200ms          </span>  <span class="g">└ COMMIT        locks released</span>
+<span class="r">└ COMMIT                             </span>  <span class="g">  ── call Stripe ── ⏳ 200ms</span>
+<span class="m">  locks held for the round trip        </span>  <span class="m">  nobody is waiting on us</span></div>
+
+        <p>
+          The cost of that choice: the order and the payment are no longer one atomic
+          unit. There is a real window where the order exists and the payment does
+          not — which is why the failure message has to carry two facts at once.
+        </p>
+
+        <div class="note good">
+          <strong>“Your order was saved, but we could not start the payment. Nothing
+          has been charged.”</strong> Both halves earn their place. Without the
+          first, the customer rebuilds their cart and orders twice. Without the
+          second, they check their bank statement in a panic.
+        </div>
+      </section>
+
+      <!-- ============================================================ 03 -- -->
+      <section id="s3">
+        <div class="sec-head"><span class="sec-num">03</span><h2>Collecting a card</h2></div>
+        <p class="lede">
+          The card number never enters our page. That is a structural property, not
+          a promise.
+        </p>
+
+        <div class="flow"><span class="m">BROWSER              NEXT.js            FastAPI          STRIPE</span>
+   │  GET /orders/42/pay │                  │                │
+   │────────────────────&gt;│  POST payment-intent               │
+   │                     │─────────────────&gt;│   create/retrieve
+   │                     │                  │───────────────&gt;│
+   │  <span class="s">HTML + clientSecret</span>│&lt;─────────────────│&lt;───────────────│
+   │&lt;────────────────────│                  │                │
+   │                                                          │
+   │  <span class="c">┌── iframe from js.stripe.com ──┐</span>                     │
+   │  <span class="c">│  4242 4242 4242 4242          │</span>  card ──────────────&gt;│
+   │  <span class="c">└───────────────────────────────┘</span>  never in our DOM   │
+   │                                                          │
+   │  confirmPayment(clientSecret) ──────────────────────────&gt;│</div>
+
+        <p>
+          The input lives in an iframe served by <code>js.stripe.com</code>.
+          Same-origin policy means our JavaScript cannot read across that boundary —
+          not the value, not the keystrokes. <span class="key">A compromised npm
+          dependency running in our bundle still cannot see a card number.</span>
+          The moment those digits are in our DOM they are in our logs, our error
+          reports and our PCI scope.
+        </p>
+
+        <h3>Three keys, three different rules</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Key</th><th>Lives</th><th>Can</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><code>sk_test_…</code> secret</td>
+                <td>Server only, <code>SecretStr</code></td>
+                <td>Charge, refund, read every customer. Treat like the database password.</td>
+              </tr>
+              <tr>
+                <td><code>pk_test_…</code> publishable</td>
+                <td><code>NEXT_PUBLIC_</code>, inlined into the browser bundle</td>
+                <td>Only start a payment the secret key already authorised</td>
+              </tr>
+              <tr>
+                <td><code>client_secret</code></td>
+                <td>Returned to one browser, <strong>never stored</strong></td>
+                <td>Confirm <em>this one payment</em>. Nothing else.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note">
+          <strong>Why the client secret is safe to send and never written down.</strong>
+          It authorises exactly one payment — whoever holds it can pay <em>this</em>
+          order and cannot read a customer, refund anything, or touch another order.
+          That narrowness is why it may reach a browser at all. It is not stored
+          because anything written down can leak from a backup, a log or a stray
+          <code>SELECT *</code>, and it can always be re-fetched from Stripe.
+        </div>
+
+        <p>
+          The secret key is wrapped in <code>SecretStr</code> so a traceback prints
+          <code>**********</code> rather than the key. That was adopted after a boot
+          failure printed a live key into an error message — harmless on a laptop,
+          and from Phase 6 the same crash writes it to CloudWatch.
+        </p>
+      </section>
+
+      <!-- ============================================================ 04 -- -->
+      <section id="s4">
+        <div class="sec-head"><span class="sec-num">04</span><h2>Confirming payment</h2></div>
+        <p class="lede">
+          Only Stripe may say that money moved — and it says so to the server, not
+          to the browser.
+        </p>
+
+        <p>
+          The browser is the one party in this exchange with a reason to lie about
+          payment. So confirmation arrives by webhook: Stripe's servers POST to ours.
+          That endpoint is <strong>public and unauthenticated</strong> — Stripe has no
+          account here, no JWT, no cookie. Anyone on the internet can post to it.
+        </p>
+
+        <h3>What stops a stranger posting “paid”</h3>
+        <p>
+          A shared secret and an HMAC. Stripe signs each delivery and sends the
+          signature in a header:
+        </p>
+
+        <pre><code>Stripe-Signature: t=1724236800,v1=5257a869e7eceb…
+
+v1 = HMAC-SHA256(whsec_…, f"{t}.{raw_body}")</code></pre>
+
+        <p>
+          Recomputing that proves the sender held the secret. The timestamp is
+          <em>inside</em> the signed string, so a captured request cannot be replayed
+          days later.
+        </p>
+
+        <div class="note warn">
+          <strong>The single most common way this breaks:</strong> using the parsed
+          body. Take FastAPI's parsed JSON, re-serialise it to compute the HMAC, and
+          you get different bytes — different whitespace, different key order — so
+          the signature never matches. The endpoint must read
+          <code>await request.body()</code> and hand those exact bytes through.
+        </div>
+
+        <h3>At-least-once, not exactly-once</h3>
+        <p>
+          Stripe does not promise one delivery. It promises <em>at least</em> one, and
+          retries for days until answered with a 2xx. The same
+          <code>payment_intent.succeeded</code> will arrive more than once.
+        </p>
+
+        <p>
+          So the rule has to be idempotent by construction: applying it five times
+          must leave what applying it once leaves, and must not write five audit
+          rows. <span class="key">A trail claiming an event happened five times is
+          worse than no trail</span> — it describes something that did not occur.
+        </p>
+
+        <h3>Almost everything answers 200</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Situation</th><th>Answer</th><th>Why</th></tr></thead>
+            <tbody>
+              <tr><td>Valid, handled event</td><td><code>200</code></td><td>Applied</td></tr>
+              <tr><td>Event type we ignore</td><td><code>200</code></td><td>A 4xx has Stripe redelivering <code>account.updated</code> for three days</td></tr>
+              <tr><td>An intent we have no record of</td><td><code>200</code></td><td>Another integration, or a CLI test event. No retry will ever help.</td></tr>
+              <tr><td>Bad signature</td><td><code>400</code></td><td>The sender was not Stripe, so there is nobody to retry</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note">
+          <strong>The response body says nothing.</strong> Telling a forger
+          <em>which part</em> of their signature failed is telling them what to fix.
+          The real reason goes to the log instead.
+        </div>
+
+        <h3>Money for an order nobody will fulfil</h3>
+        <p>
+          A customer pays after the vendor cancelled. The order is
+          <strong>not</strong> revived: cancelling released the stock and the customer
+          may already have been told, so reinstating it would overrule a person and
+          could commit the store to goods it no longer has. The payment is mirrored,
+          a <code>payment.conflict</code> row names the clash, and a human decides.
+        </p>
+
+        <h3>The pull half: when the push is missed</h3>
+        <p>
+          Webhooks are missed — the endpoint is down during a deploy, or (as here) it
+          did not exist yet. Stripe retries for about three days and then stops
+          <em>forever</em>. A push-only integration has a failure mode with no
+          recovery.
+        </p>
+        <p>
+          Hence a <strong>Re-check payment</strong> action in the vendor portal, which
+          asks Stripe and applies the same rule. Not a second implementation — the
+          same function — because two copies of a money rule eventually disagree, and
+          you find out when one path marks an order paid and the other does not.
+        </p>
+      </section>
+
+      <!-- ============================================================ 05 -- -->
+      <section id="s5">
+        <div class="sec-head"><span class="sec-num">05</span><h2>Stock is a promise</h2></div>
+        <p class="lede">
+          “There are five on the shelf” and “you can buy five” stopped being the same
+          sentence.
+        </p>
+
+        <p>
+          Checkout used to do <code>quantity_available -= qty</code> at order
+          creation. That was <em>correct</em> while <code>pending → paid</code> was a
+          human decision — an order was as good as a sale. It became wrong the moment
+          payment turned into a step that can simply never happen: an abandoned
+          checkout consumed its stock permanently. Ten items and ten abandoned carts
+          leaves a product reading sold out having earned nothing.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Figure</th><th>Means</th><th>Stored?</th></tr></thead>
+            <tbody>
+              <tr><td><code>quantity_available</code></td><td>Physically on the shelf</td><td>Yes</td></tr>
+              <tr><td><code>reserved</code></td><td>Held by pending orders</td><td><strong>No — derived</strong></td></tr>
+              <tr><td><code>sellable</code></td><td>available − reserved</td><td>No — derived</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>The pending order <em>is</em> the reservation</h3>
+        <p>
+          Its <code>order_items</code> rows are the hold. Placing an order writes
+          nothing extra, releasing one is just the status changing, and
+          <span class="key">a “missed release” is not a bug that can exist</span> —
+          there is no counter to drift because there is no counter.
+        </p>
+
+        <div class="versus">
+          <div>
+            <h4>A maintained counter</h4>
+            <p>
+              Cheap to read. Drifts if any release is ever missed, and a drifted
+              reservation is invisible stock loss nobody can trace. Expiry needs a
+              scheduled sweep.
+            </p>
+          </div>
+          <div class="right">
+            <h4>Derived from pending orders</h4>
+            <p>
+              Cannot drift — the orders <em>are</em> the truth. Expiry is one
+              <code>WHERE</code> clause, no scheduler. Costs an aggregate per read.
+            </p>
+          </div>
+        </div>
+
+        <h3>Expiry without a scheduler</h3>
+        <pre><code>AND o.created_at &gt; now() - interval '30 minutes'</code></pre>
+        <p>
+          An abandoned order simply ages out of the query. No cron, no sweep job, no
+          background worker — which suits a single container. The window lives in
+          <code>store-config.json</code>, because a grocery clone picking stock the
+          same morning wants a much shorter one than a T-shirt store.
+        </p>
+
+        <h3>The dangerous part: five call sites</h3>
+        <p>
+          Five places ask “is there stock?” — the oversell guard, the storefront, the
+          cart, add-to-cart, and the vendor's inventory screen. Leaving one on
+          <code>quantity_available</code> does not merely weaken the guard:
+          <span class="key">it removes it</span>, because that column no longer moves
+          at placement.
+        </p>
+
+        <div class="note warn">
+          <strong>Measured, not assumed.</strong> Reverting the checkout guard alone
+          let <strong>8 concurrent buyers sell the same 3 units</strong>. Each of the
+          five sites now has its own test, verified by reverting each individually
+          and confirming exactly one test fails.
+        </div>
+
+        <h3>Where the shelf actually moves</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Transition</th><th>Shelf</th><th>Why</th></tr></thead>
+            <tbody>
+              <tr><td>→ <code>paid</code></td><td>−qty</td><td>Sold; they will be picked</td></tr>
+              <tr><td><code>pending</code> → <code>cancelled</code></td><td>unchanged</td><td>Nothing ever left the shelf</td></tr>
+              <tr><td><code>paid</code> → <code>cancelled</code></td><td><strong>+qty</strong></td><td>Never dispatched, so they are back</td></tr>
+              <tr><td><code>paid</code> → <code>refunded</code></td><td><strong>unchanged</strong></td><td>May be shipped, damaged, or never returned</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note">
+          <strong>Cancelled and refunded look alike in a status column and are
+          opposites in the warehouse.</strong> Both halves of the condition are
+          load-bearing: drop “was paid” and cancelling a pending order manufactures
+          stock out of an abandoned checkout; widen it to refunds and the store
+          invents inventory that may never come back.
+        </div>
+
+        <h3>Deriving costs something — so it was measured</h3>
+        <p>
+          A benchmark database of 1,500 variants and 40,000 order lines, because the
+          development database has 27 and Postgres will not use an index on a table
+          that small. Measuring there would have produced a number that looked like
+          evidence and was not.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Query</th><th>With index</th><th>Without</th></tr></thead>
+            <tbody>
+              <tr><td>Product page (3 variants)</td><td><strong>1.0 ms</strong></td><td>8.5 ms</td></tr>
+              <tr><td><code>/admin/inventory</code> (100 of 1,500)</td><td><strong>225 ms</strong></td><td>3,375 ms</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Customer-facing paths are ~1 ms, because the catalogue <em>listing</em> never
+          asks — it carries no variants. The 225 ms belongs to one internal screen,
+          and the cause is not the subquery: <code>ORDER BY</code> a derived column
+          forces computing it for all 1,500 rows before <code>LIMIT</code> applies
+          (9 ms vs 142 ms). So the counter stays underived, and if it ever matters the
+          fix is that sort — not a cache with drift to manage.
+        </p>
+      </section>
+
+      <!-- ============================================================ 06 -- -->
+      <section id="s6">
+        <div class="sec-head"><span class="sec-num">06</span><h2>A cart is not a purchase</h2></div>
+        <p class="lede">
+          Reaching the payment step used to empty the cart — before any money moved.
+        </p>
+
+        <p>
+          The clerk scans your goods out of the trolley. But if you say “hold on, do
+          not ring that up”, you do not walk away empty-handed. Ours did: abandon at
+          the card form and the basket was gone.
+        </p>
+
+        <p>
+          Every major platform keeps the cart until payment <em>succeeds</em>.
+          Abandonment runs around 70% industry-wide, and a cart that still holds its
+          items is the entire basis of cart recovery. Emptying at the payment step
+          throws that away and punishes a customer who merely wanted one more thing.
+        </p>
+
+        <div class="note">
+          <strong>The same root as the stock defect, one layer up.</strong> Both
+          treated <em>“started to check out”</em> as <em>“bought”</em>. The test
+          guarding it has now been renamed twice for exactly that reason.
+        </div>
+
+        <h3>One pending order per customer</h3>
+        <p>
+          A surviving cart means someone can reach the payment step twice — and since
+          reservations derive from pending orders, that would hold the same units
+          under two orders. So checking out again <strong>supersedes</strong> the
+          unpaid one. If the superseded order's payment lands anyway, from a card form
+          left open in another tab, the conflict rule from §04 catches it.
+        </p>
+
+        <h3>Payment takes only what the order covered</h3>
+        <p>
+          Not “empty the cart”. Check out, abandon, add a jumper <em>without</em>
+          checking out again, then pay the original order — emptying would silently
+          bin the jumper. Subtracting the ordered quantities leaves it where the
+          customer put it.
+        </p>
+      </section>
+
+      <!-- ============================================================ 07 -- -->
+      <section id="s7">
+        <div class="sec-head"><span class="sec-num">07</span><h2>Decisions, and what was rejected</h2></div>
+        <p class="lede">
+          The reasoning matters more than the outcome; an outcome without its reason
+          gets reversed by the next person who finds it inconvenient.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Decision</th><th>Rejected</th><th>Because</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Only the webhook marks an order paid</td>
+                <td>Trust the browser after <code>confirmPayment</code></td>
+                <td>The browser is the one party with a reason to lie about money</td>
+              </tr>
+              <tr>
+                <td>Currency exponent raises on a miss</td>
+                <td>Default to 2</td>
+                <td>Guessing is a 100× overcharge for a zero-decimal currency</td>
+              </tr>
+              <tr>
+                <td>Reserved is derived</td>
+                <td>A maintained counter</td>
+                <td>A missed release is invisible, permanent stock loss</td>
+              </tr>
+              <tr>
+                <td>Paid-after-cancel is flagged</td>
+                <td>Revive the order · auto-refund</td>
+                <td>Never silently overrule a person; an automatic outbound refund is too much trust in one event handler</td>
+              </tr>
+              <tr>
+                <td><code>→ cancelled</code> restocks, <code>→ refunded</code> does not</td>
+                <td>Treat them alike</td>
+                <td>A refund may be shipped, damaged, or never returned</td>
+              </tr>
+              <tr>
+                <td>Cart shows the exact remaining count</td>
+                <td>“Not enough stock”, no number</td>
+                <td>A count for a line they already hold is a far narrower disclosure than the catalogue's</td>
+              </tr>
+              <tr>
+                <td>Card-only checkout</td>
+                <td>Link · Klarna · bank</td>
+                <td>Suppressing Link's in-card prompt removes the rows it brokers; BNPL earns little on a $25 basket</td>
+              </tr>
+              <tr>
+                <td>Pay button always enabled</td>
+                <td>Disable until valid</td>
+                <td>A dead button removes the feedback loop — the customer cannot ask why</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>How the defects were actually found</h3>
+        <p>
+          Twenty entries in <code>docs/defect-log.md</code>. Almost none came from a
+          test failing — the suite was green throughout. They came from reading code
+          and asking what it depended on, from using the store, and from mutation
+          testing: <span class="key">breaking a guard on purpose to watch a test
+          fail.</span>
+        </p>
+
+        <div class="note good">
+          <strong>A guard you have never watched fail is not a guard.</strong> Twice
+          in this phase a mutation was applied to the wrong line and “passed”, reading
+          as <em>this guard is untested</em> when the guard had simply never been
+          touched. The durable fix was to assert the match is unique before replacing
+          it — a written lesson is not a habit.
+        </div>
+      </section>
+
+      <!-- ============================================================ 08 -- -->
+      <section id="s8">
+        <div class="sec-head"><span class="sec-num">08</span><h2>What Phase 6 inherits</h2></div>
+        <p class="lede">Four open threads, each recorded where the code is.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Thread</th><th>State</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>The Elements font</strong></td>
+                <td>Loaded from Google Fonts, against <code>layout.tsx</code>'s no-third-party rule. Self-hosting failed twice with <em>no font request at all</em> — which fits either a Stripe font-src policy or plain mixed content (http dev server, https iframe). If the second, HTTPS fixes it. <strong>Retest.</strong></td>
+              </tr>
+              <tr>
+                <td><strong>Webhook secret</strong></td>
+                <td>Per-environment. The CLI's <code>whsec_</code> never travels; the deployed endpoint gets its own from the Dashboard.</td>
+              </tr>
+              <tr>
+                <td><strong>No reconciliation sweep</strong></td>
+                <td><code>payments.status</code> is accurate only when something looks — a delivery or a re-check. Acceptable at launch scale; a scheduled sweep is an operational concern.</td>
+              </tr>
+              <tr>
+                <td><strong>225 ms on <code>/admin/inventory</code></strong></td>
+                <td>One vendor, occasionally, on an internal page. Caused by sorting on a derived column, not by the subquery.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note">
+          <strong>Where to look in the code.</strong>
+          <code>backend/app/services/payments.py</code> — the gateway seam, money
+          conversion, webhook verification, and the one rule both callers share.
+          <code>backend/app/services/stock.py</code> — sellable, and where the shelf
+          moves. <code>backend/app/routers/webhooks.py</code> — the only endpoint
+          with no auth dependency. All three carry the reasoning in their docstrings;
+          this document is the map, not the territory.
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          Manitou · Phase 5 reference · 20 defects logged and closed · 257 tests.
+          Companion documents in <code>docs/reference/</code>; defects in
+          <code>docs/defect-log.md</code>; roadmap in <code>PROJECT_PLAN.md</code>.
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>

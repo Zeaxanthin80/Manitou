@@ -1,0 +1,206 @@
+/* Manitou reference documents — shared house style.
+ *
+ * Extracted from p5-sku-and-barcodes.html and p4.5-12-acceptance-walkthrough.html,
+ * which were the current form of it. Measured before extracting: across the eight
+ * documents that existed at the time, the :root token block was byte-identical in
+ * every one and 23 selectors appeared in five or more — roughly 40% of each file's
+ * CSS. The other 60% is genuinely bespoke to a document's content and belongs in
+ * that document's own <style> block.
+ *
+ * THE EIGHT EARLIER DOCUMENTS DELIBERATELY DO NOT LINK THIS FILE. They inline
+ * their own copies, they work, and their bespoke rules extend and override this
+ * core. Rewriting finished documents to remove duplication is churn with a real
+ * chance of breaking rendering, for no reader benefit. New references link this;
+ * old ones are left alone.
+ *
+ * Link it relatively, and keep the Google Fonts <link> in the document:
+ *   <link rel="stylesheet" href="reference.css" />
+ *
+ * A document that needs more adds a <style> block AFTER this link, so its rules
+ * win on equal specificity.
+ */
+
+/* ---------------------------------------------------------------- tokens -- */
+/* Named by role, never by appearance, so a restyle changes values here rather
+   than every reference. --client and --server carry the same meaning they do in
+   the sequence diagrams: blue is the browser's side, amber is ours. */
+:root {
+  --ground: #0e141b;
+  --surface: #161f29;
+  --surface-2: #1d2833;
+  --line: #2a3947;
+  --ink: #e6edf4;
+  --muted: #8496a6;
+  --client: #4db6e2;
+  --server: #d4a32c;
+  --safe: #8fa98b;
+  --risk: #d9775b;
+  --display: "Barlow Condensed", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+/* Someone who has asked their system to reduce motion has usually done so for a
+   reason that matters more than a smooth jump to an anchor. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation: none !important; transition: none !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px 96px; }
+
+/* -------------------------------------------------------------- masthead -- */
+.masthead { padding: 72px 0 40px; border-bottom: 1px solid var(--line); }
+
+.eyebrow {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--muted); margin: 0 0 18px;
+}
+
+h1 {
+  font-family: var(--display); font-weight: 700;
+  font-size: clamp(44px, 8vw, 86px); line-height: 0.92;
+  letter-spacing: -0.01em; margin: 0 0 20px; text-transform: uppercase;
+}
+
+.standfirst { max-width: 64ch; color: var(--muted); font-size: 17px; margin: 0; }
+.standfirst strong { color: var(--ink); font-weight: 500; }
+
+/* ------------------------------------------------------------------ toc --- */
+.toc {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(14, 20, 27, 0.92);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line); margin-bottom: -1px;
+}
+
+.toc-inner {
+  max-width: 1080px; margin: 0 auto; padding: 10px 24px;
+  display: flex; gap: 2px; overflow-x: auto;
+  scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+}
+
+.toc-inner::-webkit-scrollbar, pre::-webkit-scrollbar,
+.table-wrap::-webkit-scrollbar { height: 6px; }
+.toc-inner::-webkit-scrollbar-track, pre::-webkit-scrollbar-track,
+.table-wrap::-webkit-scrollbar-track { background: transparent; }
+.toc-inner::-webkit-scrollbar-thumb, pre::-webkit-scrollbar-thumb,
+.table-wrap::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+
+.toc a {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted); text-decoration: none;
+  padding: 6px 10px; border-radius: 2px; white-space: nowrap;
+}
+.toc a:hover, .toc a:focus-visible { color: var(--ink); background: var(--surface-2); }
+
+/* -------------------------------------------------------------- sections -- */
+/* scroll-margin-top keeps a heading clear of the sticky TOC when jumped to. */
+section { padding: 64px 0 0; scroll-margin-top: 72px; }
+
+.sec-head {
+  display: flex; align-items: baseline; gap: 16px;
+  margin: 0 0 8px; flex-wrap: wrap;
+}
+
+.sec-num {
+  font-family: var(--mono); font-size: 12px; color: var(--muted);
+  border: 1px solid var(--line); padding: 3px 8px; border-radius: 2px; flex: none;
+}
+
+h2 {
+  font-family: var(--display); font-weight: 600; text-transform: uppercase;
+  font-size: clamp(26px, 4vw, 38px); line-height: 1; margin: 0;
+}
+
+h3 {
+  font-family: var(--display); font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.02em; font-size: 20px; margin: 40px 0 4px;
+}
+
+/* Measure caps: prose past about 75 characters a line is measurably harder to
+   track back to the next line. */
+.lede { color: var(--muted); max-width: 72ch; margin: 12px 0 28px; }
+p { max-width: 76ch; }
+ul, ol { max-width: 76ch; }
+li { margin-bottom: 8px; }
+
+/* ------------------------------------------------------------ code, notes -- */
+code {
+  font-family: var(--mono); font-size: 0.88em; background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 2px; padding: 1px 5px;
+}
+
+pre {
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.6;
+  background: var(--surface); border: 1px solid var(--line);
+  border-left: 2px solid var(--server); border-radius: 3px;
+  padding: 12px 14px; overflow-x: auto; margin: 16px 0;
+}
+pre code { background: none; border: 0; padding: 0; font-size: inherit; display: block; }
+
+.out { color: var(--safe); }
+
+.note {
+  background: var(--surface); border: 1px solid var(--line);
+  border-left: 2px solid var(--client); border-radius: 3px;
+  padding: 14px 16px; margin: 20px 0; color: var(--muted); font-size: 15px;
+}
+.note strong { color: var(--ink); font-weight: 600; }
+.note.warn { border-left-color: var(--risk); }
+.note.good { border-left-color: var(--safe); }
+
+/* ---------------------------------------------------------------- tables -- */
+/* Wide content scrolls inside its own box. The acceptance-walkthrough document
+   once overflowed the PAGE horizontally at 375px; .table-wrap is the fix, and
+   every table belongs inside one. */
+.table-wrap {
+  overflow-x: auto; scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+table {
+  width: 100%; min-width: 520px; border-collapse: collapse;
+  margin: 16px 0; font-size: 14.5px;
+}
+
+th, td {
+  text-align: left; padding: 10px 12px;
+  border-bottom: 1px solid var(--line); vertical-align: top;
+}
+
+th {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--muted); font-weight: 400;
+}
+
+td strong { color: var(--ink); }
+
+.yes::before { content: "✓ "; color: var(--safe); }
+.no::before { content: "✗ "; color: var(--risk); }
+
+footer {
+  margin-top: 72px; padding-top: 28px; border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 14px;
+}
+
+/* ----------------------------------------------------------------- print -- */
+@media print {
+  .toc { display: none; }
+  body { background: #fff; color: #000; }
+  pre, .note, code { background: #f4f4f4; color: #000; }
+  a { color: #000; }
+}
