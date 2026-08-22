@@ -63,26 +63,37 @@ def test_price_override_is_used(
     assert order["total"] == "32.00"
 
 
-def test_checkout_empties_the_cart_and_decrements_stock(
+def test_checkout_empties_the_cart_and_reserves_without_decrementing(
     client, db, make_user, make_product, make_address, auth_headers
 ):
+    """Placing an order RESERVES; it does not take anything off a shelf.
+
+    Renamed from ..._and_decrements_stock with task 6. The old assertion --
+    quantity_available drops from 10 to 7 -- was correct while pending -> paid
+    was a human decision, and became wrong once payment could simply never
+    happen: an abandoned checkout consumed stock for good.
+    """
     from app.models import Inventory
+    from app.services import stock
 
     user = make_user()
     product = make_product(stock=10)
     address = make_address(user)
     h = auth_headers(user)
+    variant_id = product.variants[0].id
 
-    _add_to_cart(client, h, product.variants[0].id, 3)
+    _add_to_cart(client, h, variant_id, 3)
     assert client.post("/orders", headers=h, json={
         "shipping_address_id": address.id,
         "billing_address_id": address.id}).status_code == 201
 
     assert client.get("/cart", headers=h).json()["items"] == []
-    inv = db.query(Inventory).filter(
-        Inventory.variant_id == product.variants[0].id).one()
+
+    inv = db.query(Inventory).filter(Inventory.variant_id == variant_id).one()
     db.refresh(inv)
-    assert inv.quantity_available == 7
+    assert inv.quantity_available == 10, "the shelf count must be untouched"
+    assert stock.reserved_map(db, [variant_id])[variant_id] == 3
+    assert stock.sellable_map(db, [variant_id])[variant_id] == 7
 
 
 def test_empty_cart_is_rejected(client, make_user, make_address, auth_headers):
@@ -229,14 +240,30 @@ def test_concurrent_checkouts_cannot_oversell(
     assert not errors, f"unexpected failures: {errors}"
 
     db.expire_all()
-    remaining = db.query(Inventory).filter(
+    from app.services import stock as stock_svc
+
+    on_shelf = db.query(Inventory).filter(
         Inventory.variant_id == variant_id).one().quantity_available
+    sellable = stock_svc.sellable_map(db, [variant_id])[variant_id]
+    reserved = stock_svc.reserved_map(db, [variant_id])[variant_id]
     orders = db.query(Order).count()
 
     assert sold == STOCK, f"sold {sold}, only {STOCK} existed"
     assert orders == STOCK, f"{orders} orders created for {STOCK} units"
-    assert remaining == 0
-    assert STOCK - remaining == sold, "units deducted must equal units sold"
+
+    # Task 6 changed WHICH number goes to zero. Nothing has been paid for, so
+    # nothing has left the shelf -- what is exhausted is the sellable figure.
+    assert on_shelf == STOCK, "nothing is paid for, so nothing left the shelf"
+    assert reserved == STOCK, "every unit is spoken for"
+    assert sellable == 0, "and none is left to sell"
+
+    # The property this test exists for, restated for a derived reservation:
+    # a reservation computed by a subquery is still safe because it is read
+    # INSIDE the FOR UPDATE. Each thread that wins the lock recomputes after the
+    # previous one committed its order, so it sees that order's hold. Remove the
+    # lock and every thread sums the same (empty) set of pending orders and all
+    # eight sell the same three units.
+    assert sellable >= 0, "sellable must never go negative through overselling"
 
 
 # ------------------------------------------- discontinued products in carts --

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
 from app.models import Category, Product, ProductVariant
+from app.services.stock import sellable_map
 from app.schemas import (
     CategoryRead,
     ImageRead,
@@ -168,6 +169,11 @@ def get_product(slug: str, db: Session = Depends(get_db)) -> ProductDetail:
         # direct URL, not merely absent from the listing.
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
 
+    # SELLABLE, not the shelf count -- a unit held by someone else's pending
+    # order is not available to this shopper. One query for the whole product
+    # rather than one per variant.
+    sellable = sellable_map(db, [v.id for v in product.variants])
+
     variants = [
         VariantRead(
             id=v.id,
@@ -175,7 +181,7 @@ def get_product(slug: str, db: Session = Depends(get_db)) -> ProductDetail:
             variant_name=v.variant_name,
             attributes=v.attributes,
             price=v.price_override if v.price_override is not None else product.base_price,
-            in_stock=v.inventory is not None and v.inventory.quantity_available > 0,
+            in_stock=sellable.get(v.id, 0) > 0,
         )
         for v in product.variants
     ]

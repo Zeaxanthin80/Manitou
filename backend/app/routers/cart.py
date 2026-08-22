@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.db import get_db
 from app.dependencies import get_current_user
 from app.models import Cart, CartItem, Product, ProductVariant, User
+from app.services.stock import sellable_map
 from app.schemas import (
     CartItemCreate,
     CartItemRead,
@@ -78,7 +79,7 @@ def _effective_price(variant: ProductVariant) -> Decimal:
     return variant.product.base_price
 
 
-def _to_line(item: CartItem) -> CartItemRead:
+def _to_line(item: CartItem, sellable: int) -> CartItemRead:
     price = _effective_price(item.variant)
     inv = item.variant.inventory
     return CartItemRead(
@@ -92,15 +93,27 @@ def _to_line(item: CartItem) -> CartItemRead:
             product_name=item.variant.product.name,
             product_slug=item.variant.product.slug,
             price=price,
-            in_stock=inv is not None and inv.quantity_available > 0,
+            in_stock=sellable > 0,
+            # The exact count, for a line the customer already holds. NOT on
+            # VariantRead: the public catalogue keeps its no-exact-counts
+            # posture, but "only 1 left" for something in your own basket is a
+            # far narrower disclosure -- and the difference between fixing the
+            # problem here and discovering it at the till (defect 10).
+            quantity_sellable=max(0, sellable),
             is_for_sale=item.variant.product.is_active,
         ),
         line_total=price * item.quantity,
     )
 
 
-def _to_cart(cart: Cart | None) -> CartRead:
-    lines = [_to_line(i) for i in cart.items] if cart else []
+def _to_cart(db: Session, cart: Cart | None) -> CartRead:
+    # One round trip for the whole cart rather than a query per line.
+    sellable = sellable_map(db, [i.variant_id for i in cart.items]) if cart else {}
+    lines = (
+        [_to_line(i, sellable.get(i.variant_id, 0)) for i in cart.items]
+        if cart
+        else []
+    )
     subtotal = sum((line.line_total for line in lines), Decimal("0.00"))
 
     # Tax and shipping come from the SAME functions checkout uses to build the
@@ -147,7 +160,9 @@ def _check_stock(db: Session, variant_id: int, wanted: int) -> ProductVariant:
         # hidden product should not be purchasable via a variant id.
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Variant not found")
 
-    available = variant.inventory.quantity_available if variant.inventory else 0
+    # Sellable, so a customer cannot add units another pending order is holding.
+    available = sellable_map(db, [variant_id]).get(variant_id, 0)
+    available = max(0, available)
     if wanted > available:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -166,7 +181,7 @@ def view_cart(
     Creates nothing. A GET that inserts a row is not a read -- it would no longer
     be safe to repeat or retry. The cart row is created on first write instead.
     """
-    return _to_cart(_load_cart(db, user.id))
+    return _to_cart(db, _load_cart(db, user.id))
 
 
 @router.post("/items", response_model=CartRead, status_code=status.HTTP_201_CREATED)
@@ -219,7 +234,7 @@ def add_item(
         winner.quantity += payload.quantity
         db.commit()
 
-    return _to_cart(_load_cart(db, user.id))
+    return _to_cart(db, _load_cart(db, user.id))
 
 
 @router.patch("/items/{item_id}", response_model=CartRead)
@@ -233,7 +248,7 @@ def update_item(
     _check_stock(db, item.variant_id, payload.quantity)
     item.quantity = payload.quantity
     db.commit()
-    return _to_cart(_load_cart(db, user.id))
+    return _to_cart(db, _load_cart(db, user.id))
 
 
 @router.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)

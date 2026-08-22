@@ -36,6 +36,13 @@ class CartLineVariant(BaseModel):
     #: Telling a customer the first when you mean the second sends them away to
     #: wait for something that will never return.
     in_stock: bool
+    #: How many the customer could actually buy right now.
+    #:
+    #: On the CART line only, never on VariantRead. The public catalogue
+    #: deliberately withholds exact counts; a count for something already in this
+    #: customer's own basket is a far narrower disclosure, and it is what turns
+    #: "checkout failed" into "reduce this line to 1" (defect 10).
+    quantity_sellable: int
     is_for_sale: bool
 
 

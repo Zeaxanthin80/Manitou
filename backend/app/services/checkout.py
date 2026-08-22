@@ -14,6 +14,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.services.stock import sellable_map
 from app.store import store_config
 from app.models import (
     Address,
@@ -129,6 +130,10 @@ def create_order_from_cart(
     ).all()
     stock = {inv.variant_id: inv for inv in inventories}
 
+    # Computed once, after the lock and before any check, so every line in a
+    # multi-line order is judged against the same snapshot.
+    sellable_now = sellable_map(db, variant_ids)
+
     # Re-check AFTER acquiring the lock. Checking before it is precisely the
     # race: the value could change between the check and the write.
     for line in cart.items:
@@ -143,10 +148,20 @@ def create_order_from_cart(
         if not line.variant.product.is_active:
             raise ProductUnavailable(line.variant.product.name)
 
-        inv = stock.get(line.variant_id)
-        available = inv.quantity_available if inv else 0
-        if line.quantity > available:
-            raise InsufficientStock(line.variant.sku, available)
+        # SELLABLE, not the shelf count. quantity_available is what is
+        # physically here; what this customer may buy is that minus whatever
+        # other pending orders are already holding (services/stock.py).
+        #
+        # Read INSIDE the lock, and that is what makes it safe despite being a
+        # derived figure: the FOR UPDATE above serialises two checkouts for the
+        # same variant, so the second one recomputes its reservation after the
+        # first has committed its order and can see it.
+        sellable = sellable_now.get(line.variant_id, 0)
+        if line.quantity > sellable:
+            # max(0, ...) only in the MESSAGE. An oversold position is a real
+            # state worth keeping in the data, but "only -2 in stock" is not a
+            # sentence to show a shopper.
+            raise InsufficientStock(line.variant.sku, max(0, sellable))
 
     subtotal = Decimal("0.00")
     items: list[OrderItem] = []
@@ -191,8 +206,18 @@ def create_order_from_cart(
     )
     db.add(order)
 
-    for line in cart.items:
-        stock[line.variant_id].quantity_available -= line.quantity
+    # NOTHING decrements here any more, and that is the point of task 6.
+    #
+    # quantity_available is the physical shelf count; this order has not taken
+    # anything off a shelf, it has promised to. The promise is the pending order
+    # itself -- its order_items rows ARE the reservation, which services/stock.py
+    # sums. quantity_available moves only when payment confirms
+    # (apply_payment_event), and moves back when a paid order is cancelled.
+    #
+    # The old `quantity_available -= line.quantity` here was correct while
+    # pending -> paid was a human decision. Once payment became a separate step
+    # that can simply never happen, it meant an abandoned checkout consumed stock
+    # for good.
 
     for line in list(cart.items):
         db.delete(line)

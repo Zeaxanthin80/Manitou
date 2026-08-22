@@ -290,8 +290,21 @@ class AdminInventoryRow(BaseModel):
     product_name: str
     product_slug: str
     product_active: bool
+    #: Three numbers, three meanings -- and conflating them is what made a
+    #: variant read "Sold out" on the storefront while this screen said 12.
+    #:
+    #:   quantity_available  physically on the shelf   -> what can I pick?
+    #:   quantity_reserved   held by pending orders    -> why can't they buy it?
+    #:   quantity_sellable   available - reserved      -> what the shop shows
+    #:
+    #: reserved and sellable are DERIVED per request (services/stock.py), never
+    #: stored, so they cannot drift from the orders that produce them.
     quantity_available: int
+    quantity_reserved: int
+    quantity_sellable: int
     reorder_level: int
+    #: Compares against quantity_available, NOT sellable, on purpose: reordering
+    #: is about an empty shelf, not about units already spoken for.
     needs_reorder: bool
 
 

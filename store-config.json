@@ -26,6 +26,9 @@
     "mode": "flat",
     "rate": "0.00"
   },
+  "checkout": {
+    "reservation_minutes": 30
+  },
   "catalog": {
     "default_unit_of_measure": "each"
   },

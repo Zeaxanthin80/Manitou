@@ -30,6 +30,7 @@ from app.models import (
     ProductVariant,
     User,
 )
+from app.services.stock import reserved_expr, restock_for_order, sellable_expr
 from app.services.payments import (
     PaymentError,
     PaymentGateway,
@@ -255,7 +256,9 @@ def list_all_products(
     )
 
 
-InventorySort = Literal["status", "product", "sku", "stock", "reorder"]
+InventorySort = Literal[
+    "status", "product", "sku", "stock", "reserved", "sellable", "reorder"
+]
 InventoryFilter = Literal["low", "out"]
 
 
@@ -281,15 +284,27 @@ def list_inventory(
     out of stock first, then needs-reorder, then everything else, tie-broken by
     product name and SKU. The urgent rows are the reason anyone opens this page.
     """
+    # SELLABLE, not the shelf count, decides "out of stock" here.
+    #
+    # A variant with 12 on the shelf and 12 held by pending orders reads Sold out
+    # to customers. Ranking it as healthy because the shelf is full is exactly
+    # the confusion this screen exists to remove -- the vendor sees 12, the shop
+    # says Sold out, and nothing connects the two.
+    #
+    # needs_reorder stays on quantity_available: reordering is about an empty
+    # shelf, not about units already spoken for.
+    sellable = sellable_expr()
+    reserved = reserved_expr()
+
     urgency = case(
-        (Inventory.quantity_available == 0, 0),
+        (sellable <= 0, 0),
         # The model's hybrid, so this cannot drift from the badge the row shows.
         (Inventory.needs_reorder, 1),
         else_=2,
     )
 
     base = (
-        select(Inventory, ProductVariant, Product)
+        select(Inventory, ProductVariant, Product, reserved.label("reserved"), sellable.label("sellable"))
         .join(ProductVariant, ProductVariant.id == Inventory.variant_id)
         .join(Product, Product.id == ProductVariant.product_id)
     )
@@ -301,20 +316,22 @@ def list_inventory(
     counts = select(
         func.count().label("total"),
         func.count().filter(Inventory.needs_reorder).label("low"),
-        func.count().filter(Inventory.quantity_available == 0).label("out"),
+        func.count().filter(sellable <= 0).label("out"),
     ).select_from(Inventory)
     totals = db.execute(counts).one()
 
     if filter == "low":
         base = base.where(Inventory.needs_reorder)
     elif filter == "out":
-        base = base.where(Inventory.quantity_available == 0)
+        base = base.where(sellable <= 0)
 
     columns = {
         "status": urgency,
         "product": Product.name,
         "sku": ProductVariant.sku,
         "stock": Inventory.quantity_available,
+        "reserved": reserved,
+        "sellable": sellable,
         "reorder": Inventory.reorder_level,
     }
     column = columns[sort]
@@ -344,10 +361,16 @@ def list_inventory(
                 product_slug=product.slug,
                 product_active=product.is_active,
                 quantity_available=inventory.quantity_available,
+                quantity_reserved=reserved_qty,
+                # Floored for display: an oversold position is real and worth
+                # keeping in the data, but "Available to sell: -2" is not a
+                # number a vendor can act on. The Reserved column beside it makes
+                # the shortfall visible without inventing a negative stock level.
+                quantity_sellable=max(0, sellable_qty),
                 reorder_level=inventory.reorder_level,
                 needs_reorder=inventory.needs_reorder,
             )
-            for inventory, variant, product in rows
+            for inventory, variant, product, reserved_qty, sellable_qty in rows
         ],
         total=filtered_total or 0,
         limit=limit,
@@ -917,6 +940,41 @@ def update_order_status(
         target_id=order_id, customer=order.user.email,
         **audit.changes({"status": previous}, {"status": payload.status}, "status"),
     )
+
+    # Cancelling a PAID order puts the stock back. Defect 11: nothing did this,
+    # so every cancelled order leaked its inventory permanently -- measured by
+    # cancelling one and watching quantity_available stay down.
+    #
+    # `previous == "paid"` is the whole condition, and each half matters:
+    #
+    #   from pending -> cancelled   nothing to return. A pending order never took
+    #                               anything off the shelf; its hold was the
+    #                               reservation, which stops counting the moment
+    #                               the status changes. Restocking here would
+    #                               manufacture stock out of an abandoned checkout.
+    #
+    #   paid -> REFUNDED            deliberately NOT restocked. A refunded order
+    #                               may have shipped, and what comes back may be
+    #                               damaged, opened, or never returned at all.
+    #                               Adding it to sellable stock would invent
+    #                               inventory that does not exist. The vendor
+    #                               restocks from /admin/inventory if the goods
+    #                               actually arrive.
+    #
+    # Cancelled and refunded look alike in a status column and are opposites in
+    # the warehouse.
+    if previous == "paid" and payload.status == "cancelled":
+        restock_for_order(db, order)
+        audit.record(
+            db, actor=user, action="inventory.restocked", target_type="order",
+            target_id=order_id,
+            lines=[
+                {"variant_id": i.variant_id, "quantity": i.quantity}
+                for i in order.items
+            ],
+            reason="paid order cancelled before dispatch",
+        )
+
     db.commit()
     return _to_order_detail(_admin_order(db, order_id))
 

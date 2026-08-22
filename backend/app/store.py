@@ -52,6 +52,21 @@ class Shipping(BaseModel):
     rate: Decimal = Field(ge=0)
 
 
+class Checkout(BaseModel):
+    """How long an unpaid order keeps holding its stock.
+
+    Store behaviour, not a secret and not per-environment, so it belongs here
+    rather than in .env: a grocery clone picking stock the same morning wants a
+    much shorter window than a T-shirt store.
+
+    The floor is 1 rather than 0. Zero would mean orders stop reserving the
+    instant they are placed, so two customers could buy the last unit in the same
+    breath -- silently turning the guard off through configuration.
+    """
+
+    reservation_minutes: int = Field(ge=1)
+
+
 class Catalog(BaseModel):
     default_unit_of_measure: str = Field(min_length=1)
 
@@ -67,6 +82,7 @@ class StoreConfig(BaseModel):
     locale: str
     tax: Tax
     shipping: Shipping
+    checkout: Checkout
     catalog: Catalog
     features: Features
 

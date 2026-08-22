@@ -35,6 +35,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models import Order, Payment
 from app.services import audit
+from app.services.stock import consume_for_order
 from app.store import store_config
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -558,6 +559,13 @@ def apply_payment_event(
         return CONFLICT
 
     order.status = "paid"
+
+    # The units leave the shelf HERE, not at order placement, and in this same
+    # transaction as the status change. Split across two commits you could end up
+    # with an order marked paid and stock untouched -- and nothing afterwards
+    # could tell that apart from an order that legitimately shipped.
+    shortfalls = consume_for_order(db, order)
+
     audit.record(
         db,
         actor=actor,
@@ -569,6 +577,31 @@ def apply_payment_event(
         currency=payment.currency,
         **audit.changes({"status": "pending"}, {"status": "paid"}, "status"),
     )
+
+    if shortfalls:
+        # The reservation expired and the stock was resold underneath it, or the
+        # vendor adjusted the count down while this order sat pending.
+        #
+        # The order is STILL marked paid: the money genuinely arrived, and
+        # refusing here would leave a paid customer with no order while we hold
+        # their cash. Same rule as paying into a cancelled order -- never
+        # silently overrule reality, record it and let a human resolve it by
+        # restocking, backordering or refunding.
+        audit.record(
+            db,
+            actor=actor,
+            action="stock.shortfall",
+            target_type="order",
+            target_id=order.id,
+            shortfalls=[
+                {"variant_id": v, "needed": w, "on_hand": h} for v, w, h in shortfalls
+            ],
+            note=(
+                "Paid, but the shelf could not cover every line. Restock, "
+                "backorder or refund deliberately."
+            ),
+        )
+
     db.commit()
     return CONFIRMED
 
