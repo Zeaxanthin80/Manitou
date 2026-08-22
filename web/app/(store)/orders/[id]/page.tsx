@@ -57,7 +57,7 @@ export default async function OrderPage({
         Order #{order.id} &middot; {placed}
       </p>
       <h1 className="mt-2 font-display text-2xl uppercase leading-none tracking-tight text-text">
-        Thank you
+        {orderHeading(order.status, order.payment_status)}
       </h1>
       <PaymentState
         orderId={order.id}
@@ -202,4 +202,28 @@ function PaymentState({
       .
     </p>
   );
+}
+
+/**
+ * The heading has to agree with the sentence under it.
+ *
+ * It used to be "Thank you" unconditionally, which sat directly above "Your
+ * order is saved and nothing has been charged" -- two statements contradicting
+ * each other on the same screen. That was survivable while an unpaid order was a
+ * momentary state; it stopped being survivable once carts began surviving
+ * abandonment, because a customer can now sit in the unpaid state indefinitely
+ * and come back to a page thanking them for something they never bought.
+ *
+ * "Thank you" is reserved for money having actually arrived. Everything else
+ * gets a label that describes where the order really is.
+ */
+function orderHeading(orderStatus: string, paymentStatus: string | null): string {
+  if (orderStatus === "cancelled") return "Order cancelled";
+  if (orderStatus === "refunded") return "Order refunded";
+  if (orderStatus !== "pending") return "Thank you";
+  // pending: thank them only once Stripe has taken the card, even though the
+  // webhook has not yet promoted the order.
+  return paymentStatus === "succeeded" || paymentStatus === "processing"
+    ? "Thank you"
+    : "Your order";
 }

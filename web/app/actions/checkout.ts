@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { ApiError, placeOrder } from "@/lib/api";
+import { ApiError, createPaymentIntent, placeOrder } from "@/lib/api";
 import { getSession } from "@/lib/session";
 
 /**
@@ -58,4 +58,46 @@ export async function placeOrderAction(
   // PaymentIntent (Phase 5 task 2), so the next thing the customer owes us is a
   // card -- and /orders/{id}/pay is the URL that resumes it if they wander off.
   redirect(`/orders/${orderId}/pay`);
+}
+
+/**
+ * Called once the browser has seen Stripe accept the card.
+ *
+ * **Why this exists at all.** Payment is confirmed by Stripe talking to the
+ * WEBHOOK, server to server. The browser never hears about that, and Next.js
+ * caches rendered pages client-side -- so the receipt rendered at the instant of
+ * redirect (order still pending, cart still full) was being served back
+ * afterwards, saying "nothing has been charged" about an order that was paid,
+ * beside a cart badge counting goods that were gone.
+ *
+ * Two things fix it, and both have to happen on the SERVER:
+ *
+ * 1. `createPaymentIntent` re-retrieves the intent from Stripe, so payments.status
+ *    reflects reality immediately rather than waiting for the webhook. Note what
+ *    this does NOT do: it does not mark the order paid. Only the webhook may do
+ *    that, because only Stripe can be trusted to say money moved and the browser
+ *    is the one party with a reason to lie about it. What the customer sees in
+ *    the gap is "Payment received - confirming your order", which is true.
+ *
+ * 2. `revalidatePath('/', 'layout')` throws away the cached payloads for every
+ *    route under the root layout -- which is what the header cart badge lives
+ *    in, and why the badge and the page body could disagree with each other.
+ *
+ * Errors are swallowed on purpose. The customer's money has already moved; the
+ * webhook will settle the order regardless, and failing here would show an alarm
+ * about a payment that actually succeeded.
+ */
+export async function paymentSettledAction(orderId: number): Promise<void> {
+  const token = await getSession();
+  if (!token) return;
+
+  try {
+    await createPaymentIntent(token, orderId);
+  } catch {
+    /* the webhook is the authority; this is only to make the page truthful sooner */
+  }
+
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/cart");
+  revalidatePath("/", "layout");
 }

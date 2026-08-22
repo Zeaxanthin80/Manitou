@@ -10,6 +10,7 @@ import { loadStripe } from "@stripe/stripe-js";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { paymentSettledAction } from "@/app/actions/checkout";
 import { Button } from "@/components/ui/button";
 import { designTokens as t } from "@/lib/design-tokens";
 import { formatMoney } from "@/lib/format";
@@ -273,20 +274,37 @@ function CardStep({ orderId, amount }: { orderId: number; amount: string }) {
       return;
     }
 
-    // Payment succeeded at Stripe. The ORDER is still `pending` until the task 4
-    // webhook says otherwise -- deliberately, because only Stripe can confirm
-    // money moved and the browser is the one party with a reason to lie about
-    // it. The receipt reads payment_status and acknowledges the card there.
+    // Stripe has accepted the card. The ORDER is still `pending` until the task
+    // 4 webhook says otherwise -- deliberately, because only Stripe can confirm
+    // money moved and the browser is the one party with a reason to lie about it.
     //
-    // refresh() before push() so the receipt renders with the payment already
-    // visible rather than showing a stale "awaiting payment" for a beat.
-    router.refresh();
+    // **Settle the SERVER before navigating, and await it.** The previous
+    // version called router.refresh() then push(), which refreshed the page
+    // being LEFT and rendered the receipt at the one instant the data was still
+    // wrong -- order pending, cart full -- and Next then served that cached
+    // render back afterwards. The result was "nothing has been charged" on a
+    // paid order, beside a badge counting goods already gone.
+    //
+    // paymentSettledAction re-retrieves the intent server-side and revalidates
+    // the root layout, which is where the cart badge lives. Only then is it safe
+    // to navigate.
+    await paymentSettledAction(orderId);
     router.push(`/orders/${orderId}`);
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <PaymentElement options={paymentElementOptions} />
+      <PaymentElement
+        options={paymentElementOptions}
+        // Clear OUR form-level error the moment the customer touches the form.
+        //
+        // Without this it survives being fixed: "Your card number is incomplete"
+        // sat under a fully entered card, because the message is set on a failed
+        // submit and nothing ever took it down. Stripe's own per-field messages
+        // inside the iframe update as you type; this one is ours, and it has to
+        // be cleared by us.
+        onChange={() => setError(null)}
+      />
 
       {error && (
         <p role="alert" className="font-body text-sm text-error">

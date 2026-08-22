@@ -16,6 +16,9 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [20](#20-a-validation-error-outlived-the-problem-it-described) | 2026-08-22 | A validation error outlived the problem it described | Fixed — uncommitted |
+| [19](#19-the-receipt-contradicted-itself-after-payment) | 2026-08-22 | The receipt contradicted itself after payment | Fixed — uncommitted |
+| [18](#18-the-cart-emptied-at-the-payment-step) | 2026-08-22 | The cart emptied at the payment step | Fixed — uncommitted |
 | [17](#17-an-abandoned-checkout-consumed-its-stock-permanently) | 2026-08-21 | An abandoned checkout consumed its stock permanently | Fixed — uncommitted |
 | [16](#16-the-payment-form-rendered-in-a-different-typeface-from-the-rest-of-the-site) | 2026-08-21 | The payment form rendered in a different typeface from the rest of the site | Fixed — uncommitted |
 | [15](#15-the-payment-page-offered-a-card-form-for-an-order-already-paid) | 2026-08-21 | The payment page offered a card form for an order already paid | Fixed — uncommitted |
@@ -33,6 +36,95 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 20. A validation error outlived the problem it described
+
+**Status:** Fixed, uncommitted. Owner-reported.
+
+**Seen.** "Your card number is incomplete." sitting under a fully entered card — 4242 4242 4242 4242,
+expiry, CVC and ZIP all present — with the Pay button still offering to charge.
+
+**Cause.** The message is OURS, not Stripe's. It is set from `stripeError.message` when a submit
+fails and nothing ever took it down. Stripe's Element does per-field validation inside its iframe
+and updates as you type; our form-level error had no such lifecycle.
+
+**Fixed.** `<PaymentElement onChange={() => setError(null)}>`. The message clears the moment the
+customer touches the form — the same gesture that begins fixing it.
+
+**The button stays ENABLED, deliberately.** Disabling submit until a form validates is a familiar
+pattern and a poor one: it removes the feedback loop, so a customer who cannot proceed has no way to
+ask why. An enabled button that explains what is missing, and an error that disappears when they
+start correcting it, beats a dead button every time.
+
+---
+
+## 19. The receipt contradicted itself after payment
+
+**Status:** Fixed, uncommitted. Owner-reported.
+
+**Seen.** A paid order rendering "THANK YOU" above "Your order is saved and nothing has been
+charged. Complete payment.", with a cart badge counting goods that were already gone. On another
+screen the cart page said "Your cart is empty" beside a badge reading 2.
+
+**Two separate causes with one symptom**, which is why it took two wrong diagnoses to find:
+
+**(a) A page rendered while its data was still momentarily wrong, then cached.** Payment is
+confirmed by Stripe talking to the WEBHOOK, server to server. The browser never hears about it. The
+old flow called `router.refresh()` then `router.push()` — refreshing the page being LEFT, and
+rendering the receipt at the one instant the order was still `pending` and the cart still full.
+Next.js then served that cached payload back. The header badge lives in the root layout and is
+cached separately from the page body, which is how the two came to disagree.
+
+**(b) The heading said "Thank you" unconditionally.** Wrong on a *fresh* render too, and newly
+reachable for good: defect 18 made carts survive abandonment, so a customer can now sit in the
+unpaid state indefinitely and return to a page thanking them for something they never bought.
+
+**Fixed.** A Server Action, `paymentSettledAction`, runs before navigating: it re-retrieves the
+intent from Stripe so `payments.status` is current without waiting for the webhook, then calls
+`revalidatePath('/', 'layout')`, which is what discards the cached payloads — including the layout
+the badge lives in. And `orderHeading()` derives the heading from the same two signals the body
+uses, so the six status/payment pairings can no longer contradict each other.
+
+**What it deliberately does NOT do.** It does not mark the order paid from the browser's word.
+Between Stripe accepting the card and the webhook landing, the receipt says "Payment received — we
+are confirming your order now", which is true. Making it say "Paid" instantly would mean trusting
+the one party with a reason to lie about money.
+
+**The shape worth keeping.** Every other entry in this log is about verifying the wrong thing. This
+one is about a render being *true when it happened* and false a second later — correctness with a
+timestamp. Anything that caches a view of state changed by an out-of-band event has it.
+
+---
+
+## 18. The cart emptied at the payment step
+
+**Status:** Fixed, uncommitted. Owner-reported.
+
+**Seen.** Clicking "Continue to payment" emptied the cart and zeroed the badge — before any money
+moved. Abandoning at the card form left the customer with nothing.
+
+**Cause.** `create_order_from_cart` deleted the cart lines at order creation.
+
+**Why it was wrong.** The owner's analogy: the clerk scans your goods out of the trolley, but if you
+say "hold on, do not ring that up", you do not walk away empty-handed. Every major platform keeps
+the cart until payment SUCCEEDS — abandonment runs around 70%, and a cart that still holds its items
+is the entire basis of cart recovery. Emptying at the payment step throws that away and punishes a
+customer who merely wanted to add one more thing.
+
+Same root as defect 17, one layer up: both treated "started to check out" as "bought". Task 6 fixed
+it for stock; this fixed it for the cart. The test guarding it has now been renamed twice for
+exactly that reason.
+
+**Fixed.** The cart survives; `apply_payment_event` consumes it when money actually arrives, and
+subtracts the ordered quantities rather than emptying — so a jumper added after checking out is not
+silently binned. Checking out again supersedes any existing unpaid order, so one customer cannot
+hold the same units under two pending orders (task 6 derives reservations from pending order items).
+
+**Safe against the tab-left-open case** by machinery that already existed: if a superseded order's
+payment lands anyway, `apply_payment_event` refuses to revive a cancelled order and writes
+`payment.conflict` instead (defect from task 4's design, not a new guard).
 
 ---
 
@@ -679,3 +771,20 @@ than no check: it produces confidence without evidence.
   `MAX_PAGE_SIZE = 100`, so the API answered 422 and the test was pulling `items` off an error body.
   The error named the test's own shape and sent the search to the wrong place. Assert the status
   first; a 4xx should say so, not surface three lines later as a missing key.
+- **Diagnosing a mechanism from a screenshot.** Defect 19, twice in a row. The first reading was "a
+  race between the redirect and the webhook"; the second, looking at a page whose body said "Your
+  cart is empty" beside a badge reading 2, was "the badge is stale". The database said the badge was
+  right and the BODY was stale — the exact opposite. Both readings were built from a picture plus a
+  plausible story, and a picture cannot show which of two disagreeing numbers is the wrong one.
+
+  What settled it took ten minutes: register a probe account, drive the whole flow with curl, and
+  ask the Next.js server what it renders with no browser involved. Server correct at every layer,
+  staleness entirely client-side. A screenshot is evidence that something is wrong, never evidence
+  of why.
+- **Verifying the layer that was never broken.** Defect 19 again. Those curl checks proved the
+  server renders correctly at every payment state — which was equally true BEFORE the fix, because
+  the bug was never server-side. Confirming it after the change felt like verification and
+  established nothing about whether the fix worked. Only a real browser doing a real payment could,
+  and the owner did that. When a bug is in a cache, testing the thing being cached tests the wrong
+  end.
+
