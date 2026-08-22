@@ -83,7 +83,13 @@ class OrderItem(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
-    variant_id: Mapped[int] = mapped_column(ForeignKey("product_variants.id"))
+    # Indexed because services/stock.py sums pending quantities BY VARIANT on
+    # every stock read. order_items is the one table here that grows forever --
+    # one row per line of every order ever placed -- so an unindexed filter on
+    # it degrades without limit.
+    variant_id: Mapped[int] = mapped_column(
+        ForeignKey("product_variants.id"), index=True
+    )
     product_name_snapshot: Mapped[str] = mapped_column(Text)
     unit_price_snapshot: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     quantity: Mapped[int] = mapped_column()
