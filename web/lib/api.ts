@@ -126,6 +126,16 @@ export type CartLineVariant = {
   price: string;
   /** Is there inventory? "check back later" */
   in_stock: boolean;
+  /** How many the customer could actually buy right now.
+   *
+   *  The cart needs a NUMBER where in_stock is only a boolean: holding 3 when 1
+   *  is left is neither "in stock" nor "out of stock", and saying nothing until
+   *  zero is what let a basket look fine until checkout refused it (defect 10).
+   *
+   *  Cart lines only -- the public catalogue deliberately withholds exact
+   *  counts, but a count for something already in this customer's basket is a
+   *  far narrower disclosure. */
+  quantity_sellable: number;
   /** Is the product still listed? "this is not coming back". A separate axis
    *  from in_stock on purpose -- a withdrawn product can be fully stocked, and
    *  that combination is exactly what hid the discontinued-cart defect. */
@@ -612,6 +622,10 @@ export type AdminInventoryRow = {
   product_slug: string;
   product_active: boolean;
   quantity_available: number;
+  /** Held by pending orders. Derived per request, never stored. */
+  quantity_reserved: number;
+  /** available - reserved: what the storefront will actually offer. */
+  quantity_sellable: number;
   reorder_level: number;
   needs_reorder: boolean;
 };

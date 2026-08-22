@@ -69,22 +69,11 @@ export default async function CartPage() {
                   <p className="mt-1 font-body text-sm text-muted">
                     {item.variant.variant_name} &middot; {formatMoney(item.variant.price)}
                   </p>
-                  {/* Discontinued wins when both are true. A product that is
-                      withdrawn AND out of stock should say the thing the
-                      customer can act on: "Out of stock" means check back later,
-                      which would send them away to wait for something that is
-                      never coming back. */}
-                  {!item.variant.is_for_sale ? (
-                    <p className="mt-1 font-body text-xs uppercase tracking-tight text-accent">
-                      No longer available &middot; remove to check out
-                    </p>
-                  ) : (
-                    !item.variant.in_stock && (
-                      <p className="mt-1 font-body text-xs uppercase tracking-tight text-accent">
-                        Out of stock
-                      </p>
-                    )
-                  )}
+                  <StockNote
+                    isForSale={item.variant.is_for_sale}
+                    sellable={item.variant.quantity_sellable}
+                    quantity={item.quantity}
+                  />
                 </div>
 
                 {/* Each control is its own form posting to a Server Action, so
@@ -146,5 +135,54 @@ export default async function CartPage() {
         </>
       )}
     </main>
+  );
+}
+
+/**
+ * What one cart line has to say about itself, in strict precedence.
+ *
+ * Three states, where the cart used to carry two:
+ *
+ *   discontinued        the product is withdrawn -- remove it
+ *   nothing left        sellable is 0 -- check back later
+ *   NOT ENOUGH LEFT     sellable is short of this line's quantity
+ *
+ * That third one is defect 10. Holding 3 when 1 remains is neither "in stock"
+ * nor "out of stock", and saying nothing until zero meant a basket looked
+ * entirely fine until checkout refused it -- after the customer had picked an
+ * address and reached the payment step.
+ *
+ * **Discontinued wins over both stock cases**, and the order of these branches
+ * is what enforces it. "Out of stock" means check back later, which is exactly
+ * the wrong advice for something that is never coming back.
+ *
+ * The exact count is published deliberately. VariantRead withholds counts from
+ * the public catalogue; this is a count for a line the customer already holds,
+ * and it is the difference between fixing the problem here and discovering it
+ * at the till.
+ */
+function StockNote({
+  isForSale,
+  sellable,
+  quantity,
+}: {
+  isForSale: boolean;
+  sellable: number;
+  quantity: number;
+}) {
+  const note = !isForSale
+    ? "No longer available \u00b7 remove to check out"
+    : sellable === 0
+      ? "Out of stock"
+      : sellable < quantity
+        ? `Only ${sellable} left \u00b7 reduce to check out`
+        : null;
+
+  if (!note) return null;
+
+  return (
+    <p className="mt-1 font-body text-xs uppercase tracking-tight text-accent">
+      {note}
+    </p>
   );
 }

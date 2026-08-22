@@ -18,6 +18,8 @@ export type InventoryRow = {
   productSlug: string;
   productActive: boolean;
   quantityAvailable: number;
+  quantityReserved: number;
+  quantitySellable: number;
   reorderLevel: number;
   needsReorder: boolean;
 };
@@ -77,6 +79,22 @@ function Row({ row }: { row: InventoryRow }) {
         />
       </TD>
 
+      {/* Reserved and Available to sell are DERIVED from pending orders, so
+          they are read-only. Rendering them as inputs would invite a vendor to
+          type a number that the next request silently recomputes. */}
+      <TD className="font-body text-sm tabular-nums text-muted">
+        {row.quantityReserved > 0 ? row.quantityReserved : "\u2014"}
+      </TD>
+
+      <TD
+        className={cn(
+          "font-body text-sm tabular-nums",
+          row.quantitySellable === 0 ? "text-accent" : "text-text",
+        )}
+      >
+        {row.quantitySellable}
+      </TD>
+
       <TD>
         <Input
           form={formId}
@@ -89,7 +107,10 @@ function Row({ row }: { row: InventoryRow }) {
       </TD>
 
       <TD>
-        {row.quantityAvailable === 0 ? (
+        {/* SELLABLE, not the shelf count. A variant with twelve on the
+            shelf and twelve reserved reads Sold out to customers, and this
+            badge is what connects the two numbers beside it. */}
+        {row.quantitySellable === 0 ? (
           <span className="rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-tight text-accent">
             Out of stock
           </span>
@@ -127,6 +148,8 @@ const SORTS = [
   { column: "product", label: "Product" },
   { column: "sku", label: "SKU" },
   { column: "stock", label: "In stock" },
+  { column: "reserved", label: "Reserved" },
+  { column: "sellable", label: "Available to sell" },
   { column: "reorder", label: "Reorder at" },
   { column: "status", label: "Status" },
 ];

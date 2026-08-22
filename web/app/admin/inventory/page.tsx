@@ -82,6 +82,8 @@ export default async function InventoryPage({
     productSlug: r.product_slug,
     productActive: r.product_active,
     quantityAvailable: r.quantity_available,
+    quantityReserved: r.quantity_reserved,
+    quantitySellable: r.quantity_sellable,
     reorderLevel: r.reorder_level,
     needsReorder: r.needs_reorder,
   }));
