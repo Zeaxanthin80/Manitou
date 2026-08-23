@@ -12,7 +12,9 @@ import {
   createProduct,
   deactivateProduct,
   deleteProductImage,
+  dispatchOrder,
   recheckOrderPayment,
+  recordShipmentEvent,
   sendAdminPasswordReset,
   updateAdminUser,
   updateOrderStatus,
@@ -485,4 +487,73 @@ export async function anonymiseUserAction(
 
   revalidateUser(id);
   return { ok: "Account anonymised. Their orders are kept, without their details." };
+}
+
+/**
+ * Record a dispatch: carrier, tracking number, and the order moves to shipped.
+ *
+ * Replaces the old "Mark shipped" button. That button set a status with nothing
+ * behind it; PATCH now refuses `shipped` outright and names this path instead,
+ * because a shipped order without a tracking number is precisely the row a
+ * payment processor asks for during a "not received" dispute.
+ */
+export async function dispatchOrderAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+
+  const id = Number(formData.get("order_id"));
+  const carrier = String(formData.get("carrier") ?? "").trim();
+  const tracking = String(formData.get("tracking_number") ?? "").trim();
+  if (!id) return { error: "Nothing to dispatch." };
+
+  // Checked here as well as by the API. Not duplication for its own sake: a
+  // round trip to be told "you left the box empty" is a worse experience than
+  // being told immediately, and the API still refuses regardless -- this is the
+  // courtesy, that is the guard.
+  if (!carrier) return { error: "Choose a carrier." };
+  if (!tracking) return { error: "Enter the tracking number." };
+
+  try {
+    await dispatchOrder(token, id, { carrier, tracking_number: tracking });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+
+  revalidatePath(`/admin/orders/${id}`);
+  revalidatePath("/admin/orders");
+  return { ok: `Dispatched. Order #${id} is now shipped.` };
+}
+
+/**
+ * Append an event to the parcel's history.
+ *
+ * `source` is submitted as `admin` because that is the truth: a human is
+ * asserting this. There is no carrier webhook yet, and recording it as anything
+ * else would launder an assertion into a confirmation.
+ */
+export async function recordShipmentEventAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+
+  const id = Number(formData.get("order_id"));
+  const status = String(formData.get("status") ?? "");
+  if (!id || !status) return { error: "Nothing to record." };
+
+  try {
+    await recordShipmentEvent(token, id, { status, source: "admin" });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+
+  revalidatePath(`/admin/orders/${id}`);
+  revalidatePath("/admin/orders");
+  return { ok: `Recorded: ${status.replace(/_/g, " ")}.` };
 }

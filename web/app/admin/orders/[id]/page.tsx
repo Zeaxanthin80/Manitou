@@ -76,7 +76,9 @@ export default async function AdminOrderPage({
           <OrderStatusActions
             orderId={order.id}
             allowed={order.allowed_transitions}
-          />
+        evidenceRequired={order.evidence_required}
+          shipment={order.shipment}
+        />
         </div>
       </section>
 

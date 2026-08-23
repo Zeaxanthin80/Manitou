@@ -208,6 +208,8 @@ export type OrderDetail = OrderSummary & {
    * Absent from OrderSummary on purpose: a listing does not need it.
    */
   payment_status: string | null;
+  /** null until dispatched. Drives the tracking timeline. */
+  shipment: OrderShipment | null;
 };
 
 /**
@@ -219,6 +221,26 @@ export type OrderDetail = OrderSummary & {
  * not touch another order. That narrowness is why it may reach a browser at all
  * while the secret key never may.
  */
+/** One step of the parcel's journey, as the customer may see it.
+ *  Deliberately narrower than the admin's ShipmentEvent: no actor_email (a staff
+ *  address) and no recorded_at (an audit question). */
+export type OrderShipmentEvent = {
+  status: string;
+  occurred_at: string;
+  /** admin | carrier | courier | customer. Shown, because "confirmed by the
+   *  carrier" and "marked by the store" are different facts. */
+  source: string;
+};
+
+export type OrderShipment = {
+  carrier_name: string | null;
+  tracking_number: string | null;
+  tracking_url: string | null;
+  dispatched_at: string;
+  delivered_at: string | null;
+  events: OrderShipmentEvent[];
+};
+
 export type PaymentIntentRead = {
   client_secret: string;
   amount: string;
@@ -350,6 +372,11 @@ export type AdminOrderDetail = AdminOrderSummary & {
    *  of the workflow in another language is one that will drift, and the portal
    *  would then offer a button the API refuses. */
   allowed_transitions: string[];
+  /** null until dispatched. */
+  shipment: Shipment | null;
+  /** Of allowed_transitions, those that need evidence and so are set by
+   *  a dedicated endpoint rather than PATCH. */
+  evidence_required: string[];
 };
 
 export class ApiError extends Error {
@@ -573,6 +600,45 @@ export type PaymentRecheck = {
   outcome: string;
   order: AdminOrderDetail;
 };
+
+/** One line of a parcel's history. */
+export type ShipmentEvent = {
+  id: number;
+  status: string;
+  /** When it HAPPENED, per whoever reported it. */
+  occurred_at: string;
+  /** When WE LEARNED. Differs whenever a report arrives late. */
+  recorded_at: string;
+  /** admin | carrier | courier | customer -- what makes evidence quality legible. */
+  source: string;
+  actor_email: string | null;
+};
+
+export type Shipment = {
+  id: number;
+  method: string;
+  carrier: string | null;
+  carrier_name: string | null;
+  tracking_number: string | null;
+  /** Built server-side from store config, or null. Never a bare carrier
+   *  homepage: a link that does not reach the parcel looks like it worked. */
+  tracking_url: string | null;
+  dispatched_at: string;
+  delivered_at: string | null;
+  events: ShipmentEvent[];
+};
+
+export const dispatchOrder = (
+  token: string,
+  id: number,
+  body: { carrier?: string; tracking_number?: string; method?: string },
+) => request<Shipment>(`/admin/orders/${id}/shipment`, { token, body });
+
+export const recordShipmentEvent = (
+  token: string,
+  id: number,
+  body: { status: string; source?: string; occurred_at?: string },
+) => request<Shipment>(`/admin/orders/${id}/shipment/events`, { token, body });
 
 export const recheckOrderPayment = (token: string, id: number) =>
   request<PaymentRecheck>(`/admin/orders/${id}/recheck-payment`, {
