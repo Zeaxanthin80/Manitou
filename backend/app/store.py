@@ -18,7 +18,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # repo root -- app/store.py -> app -> backend -> repo
 CONFIG_PATH = Path(__file__).resolve().parents[2] / "store-config.json"
@@ -67,6 +67,80 @@ class Checkout(BaseModel):
     reservation_minutes: int = Field(ge=1)
 
 
+class Carrier(BaseModel):
+    """One shipping company the vendor can dispatch with.
+
+    `tracking_url` is a template containing `{tracking}`. It lives beside the
+    carrier rather than in a lookup somewhere in the web app, because the pairing
+    is per-store: a UK clone's list is Royal Mail and Evri, and a TRACKING_URLS
+    dict in a component would hand it American links.
+    """
+
+    code: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    tracking_url: str = Field(min_length=1)
+
+    @field_validator("tracking_url")
+    @classmethod
+    def _must_take_a_tracking_number(cls, value: str) -> str:
+        """Refuse a URL with nowhere to put the number.
+
+        Without the placeholder the link still renders and still looks clickable
+        -- it just lands on the carrier's homepage. A customer chasing a parcel
+        finds a search box, and nothing in the system ever reports a fault.
+        """
+        if "{tracking}" not in value:
+            raise ValueError(
+                "tracking_url must contain the {tracking} placeholder, or the "
+                "link goes to the carrier's homepage instead of the parcel."
+            )
+        return value
+
+
+class Fulfilment(BaseModel):
+    """How goods reach the customer.
+
+    The Section 1.1 seam. T-shirts and candles ship by carrier; the grocery clone
+    delivers with its own staff and has no carriers at all; a market stall is
+    collected. One config value picks which, and the schema accepts all three
+    with no migration.
+    """
+
+    method: Literal["carrier", "courier", "pickup"]
+    carriers: list[Carrier] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _carrier_method_needs_carriers(self) -> "Fulfilment":
+        """A carrier store with no carriers must not boot.
+
+        Left unvalidated, the app starts cleanly and the vendor discovers it at
+        the first dispatch -- an empty picker, with a parcel in hand and an order
+        that cannot be advanced. Same instinct as defect 12: a configuration
+        mistake should be found by whoever deployed it, not by whoever is trying
+        to work.
+        """
+        if self.method == "carrier" and not self.carriers:
+            raise ValueError(
+                'fulfilment.method is "carrier" but fulfilment.carriers is empty. '
+                "Add at least one carrier, or change the method to courier or pickup."
+            )
+        return self
+
+    def carrier_by_code(self, code: str) -> Carrier | None:
+        return next((c for c in self.carriers if c.code == code), None)
+
+    def tracking_url_for(self, code: str, tracking_number: str) -> str | None:
+        """The customer-facing link, or None if we cannot build one.
+
+        None rather than a bare carrier homepage: a link that does not reach the
+        parcel is worse than no link, because it looks like it worked.
+        """
+        carrier = self.carrier_by_code(code)
+        if carrier is None or not tracking_number:
+            return None
+        return carrier.tracking_url.replace("{tracking}", tracking_number)
+
+
 class Catalog(BaseModel):
     default_unit_of_measure: str = Field(min_length=1)
 
@@ -83,6 +157,7 @@ class StoreConfig(BaseModel):
     tax: Tax
     shipping: Shipping
     checkout: Checkout
+    fulfilment: Fulfilment
     catalog: Catalog
     features: Features
 
