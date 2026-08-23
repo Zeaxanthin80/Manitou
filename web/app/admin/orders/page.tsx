@@ -112,11 +112,22 @@ export default async function AdminOrdersPage({
             <Table>
               <THead>
                 <TR>
+                  {/* No width classes, deliberately -- the Products and
+                      Inventory tables carry none either, and auto-layout
+                      distributes six columns sensibly on its own. Constraining
+                      some of them does not create room; it moves the slack into
+                      whichever columns are left flexible, which is how Order
+                      and Customer ended up with gaps beside them. */}
                   <TH>Order</TH>
                   <TH>Placed</TH>
                   <TH>Customer</TH>
                   <TH className="text-right">Items</TH>
-                  <TH>Status</TH>
+                  {/* Extra left padding on Status only. Items is
+                      right-aligned, so its digits sit hard against the next
+                      column -- the gap that reads as generous elsewhere in this
+                      table collapses to nothing right here. pl-6 is the token
+                      scale's 24px, twice the base cell padding. */}
+                  <TH className="pl-6">Status</TH>
                   <TH className="text-right">Total</TH>
                 </TR>
               </THead>
@@ -138,11 +149,16 @@ export default async function AdminOrdersPage({
                         day: "numeric",
                       })}
                     </TD>
-                    <TD className="max-w-0 truncate" title={o.user_email}>
+                    {/* max-w-0 truncate removed. THAT was what clipped the
+                        address -- not a shortage of space -- and it was never
+                        needed here: this table sits in overflow-x-auto, so a
+                        pathologically long email scrolls inside the box instead
+                        of breaking the page. title stays for that case. */}
+                    <TD className="whitespace-nowrap" title={o.user_email}>
                       {o.user_email}
                     </TD>
                     <TD className="text-right">{o.item_count}</TD>
-                    <TD>
+                    <TD className="pl-6">
                       <OrderStatus status={o.status} />
                     </TD>
                     <TD className="text-right font-display">

@@ -27,7 +27,10 @@ const base = {
 
 export function CartIcon({ className }: IconProps) {
   return (
-    <svg {...base} className={className}>
+    // strokeWidth overridden rather than changed in `base`, which every other
+    // icon shares. The cart sits in the header at a larger size than the rest,
+    // where 1.5 reads heavier than its neighbours.
+    <svg {...base} strokeWidth={1} className={className}>
       <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
       <path d="M3 6h18" />
       <path d="M16 10a4 4 0 0 1-8 0" />

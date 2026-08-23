@@ -26,10 +26,37 @@ CONFIG_PATH = Path(__file__).resolve().parents[2] / "store-config.json"
 
 class StoreIdentity(BaseModel):
     name: str = Field(min_length=1)
+    #: Optional path to a wordmark or logo, served from web/public.
+    #:
+    #: EMPTY BY DEFAULT, and that is the intended state for most clones. The
+    #: header renders `name` in the display font when this is blank, so a clone
+    #: gets a correctly styled wordmark by editing one string -- no artwork
+    #: required. Set it only when there is a real mark to point at.
+    #:
+    #: SVG is the format to use: it stays crisp at any density, weighs a couple
+    #: of kilobytes, and -- unlike a text wordmark -- cannot silently fall back
+    #: to a different typeface if the font fails to load.
+    logo: str = ""
     support_email: str
     # One line of store voice, shown on the home hero and in the footer. Here
     # rather than in a component so a clone changes its pitch by editing config.
     tagline: str = Field(min_length=1)
+
+    @field_validator("logo")
+    @classmethod
+    def _must_be_a_public_path(cls, value: str) -> str:
+        """A bare filename would 404 and leave a broken image in the header.
+
+        Checked here rather than trusted, because the failure is silent in the
+        place it matters most: the header renders, the alt text stands in, and
+        nothing reports a fault.
+        """
+        if value and not value.startswith(("/", "http://", "https://")):
+            raise ValueError(
+                f"store.logo must be a public path like /logo.svg (got {value!r}). "
+                "Put the file in web/public and reference it from the root."
+            )
+        return value
 
 
 class Currency(BaseModel):

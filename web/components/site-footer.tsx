@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Wordmark } from "@/components/ui/wordmark";
 import { listCategories } from "@/lib/api";
 import { storeConfig } from "@/lib/store-config";
 
@@ -67,7 +68,7 @@ export async function SiteFooter() {
         <div className="grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-4">
           <div className="col-span-2">
             <p className="font-display text-lg uppercase tracking-tight text-text">
-              {storeConfig.store.name}
+              <Wordmark />
             </p>
             <p className="mt-2 max-w-xs font-body text-sm text-muted">
               {storeConfig.store.tagline}

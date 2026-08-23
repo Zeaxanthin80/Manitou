@@ -7,8 +7,8 @@ import { CategoryNav } from "@/components/category-nav";
 import { MobileMenu } from "@/components/mobile-menu";
 import { buttonClasses } from "@/components/ui/button";
 import { CartIcon } from "@/components/ui/icons";
+import { Wordmark } from "@/components/ui/wordmark";
 import { listCategories } from "@/lib/api";
-import { storeConfig } from "@/lib/store-config";
 
 /** Persistent top nav -- Section 4.3: the web expects one. Mobile gets native
  *  patterns in Phase 7, not a copy of this. */
@@ -49,7 +49,7 @@ export async function SiteHeader() {
           href="/"
           className="shrink-0 font-display text-lg uppercase tracking-tight text-text"
         >
-          {storeConfig.store.name}
+          <Wordmark />
         </Link>
 
         <div className="hidden min-w-0 overflow-x-auto wide:block">

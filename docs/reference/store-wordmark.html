@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wordmark &amp; Logo — Manitou Reference</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="reference.css" />
+    <style>
+      /* Only what this document needs. Everything else is the house style. */
+
+      /* --- the spec sheet ------------------------------------------------ */
+      .spec {
+        display: grid; grid-template-columns: max-content 1fr; gap: 0;
+        border: 1px solid var(--line); border-radius: 3px;
+        margin: 20px 0; overflow: hidden;
+      }
+      .spec dt {
+        font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em;
+        text-transform: uppercase; color: var(--muted);
+        padding: 11px 16px; background: var(--surface);
+        border-bottom: 1px solid var(--line); white-space: nowrap;
+      }
+      .spec dd {
+        margin: 0; padding: 11px 16px; font-size: 14.5px;
+        border-bottom: 1px solid var(--line); background: var(--surface-2);
+      }
+      .spec dt:last-of-type, .spec dt:last-of-type + dd { border-bottom: 0; }
+      .spec dd b { color: var(--server); font-weight: 600; }
+
+      /* --- the 375px width budget, drawn at actual size ------------------- */
+      .budget {
+        position: relative;
+        display: flex; width: 375px; min-width: 375px; height: 42px;
+        border: 1px solid var(--line); border-radius: 2px;
+        font-family: var(--mono); font-size: 9px; margin: 24px 0 4px;
+      }
+      /* The 375px screen edge, for the bar that deliberately runs past it.
+         An <i> rather than a <span> so the segment rules above skip it. */
+      .budget i.edge {
+        position: absolute; top: -8px; bottom: -8px; left: 375px;
+        border-left: 2px dotted var(--risk); pointer-events: none;
+      }
+      .budget i.edge::after {
+        content: "screen edge · 375px"; position: absolute;
+        top: -13px; right: 4px; font-style: normal;
+        font-size: 9px; color: var(--risk); white-space: nowrap;
+      }
+      .budget > span {
+        display: grid; place-content: center; text-align: center;
+        overflow: hidden; white-space: nowrap; line-height: 1.25;
+        border-right: 1px dashed var(--line);
+      }
+      .budget > span:last-child { border-right: 0; }
+      .seg-pad  { background: var(--surface-2); color: var(--muted); }
+      .seg-ui   { background: var(--surface);   color: var(--muted); }
+      .seg-gap  { background: transparent;      color: var(--muted); }
+      .seg-mark { background: var(--server);    color: var(--ground); font-weight: 500; }
+      .seg-over { background: var(--risk);      color: var(--ground); font-weight: 500; }
+      .budget-cap {
+        font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+        margin: 0 0 22px; max-width: none;
+      }
+
+      /* --- mock mastheads ------------------------------------------------ */
+      .mocks { display: grid; gap: 14px; margin: 20px 0; }
+      @media (min-width: 720px) { .mocks { grid-template-columns: 1fr 1fr; } }
+      .mock { border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+      .mock-label {
+        font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+        text-transform: uppercase; color: var(--muted);
+        padding: 7px 12px; background: var(--surface-2);
+        border-bottom: 1px solid var(--line);
+      }
+      /* The real store is a light theme, so the mock is light on purpose --
+         judging a mark against this document's dark ground would mislead. */
+      .mock-bar {
+        display: flex; align-items: center; gap: 16px;
+        padding: 16px 24px; background: #ffffff;
+      }
+      .mock-burger { width: 28px; color: #1c1917; flex: none; font-size: 15px; }
+      .mock-mark { flex: none; }
+      .mock-mark.astext {
+        font-family: "Archivo Black", system-ui, sans-serif;
+        font-size: 18px; line-height: 1.5; text-transform: uppercase;
+        letter-spacing: -0.025em; color: #1c1917;
+      }
+      .mock-mark svg { height: 20px; width: auto; display: block; }
+      .mock-right {
+        margin-left: auto; flex: none; display: flex; align-items: center; gap: 8px;
+        font-family: system-ui, sans-serif; font-size: 13px; color: #57534e;
+      }
+
+      /* --- colour chip --------------------------------------------------- */
+      .chip {
+        display: inline-block; width: 11px; height: 11px; border-radius: 2px;
+        border: 1px solid var(--line); vertical-align: -1px; margin-right: 6px;
+      }
+
+      /* --- do / don't ---------------------------------------------------- */
+      .pair { display: grid; gap: 14px; margin: 20px 0; }
+      @media (min-width: 720px) { .pair { grid-template-columns: 1fr 1fr; } }
+      .pair > div {
+        border: 1px solid var(--line); border-radius: 3px;
+        padding: 14px 16px; background: var(--surface);
+      }
+      .pair > div.ok  { border-left: 2px solid var(--safe); }
+      .pair > div.bad { border-left: 2px solid var(--risk); }
+      .pair h4 {
+        font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em;
+        text-transform: uppercase; margin: 0 0 10px; font-weight: 400;
+      }
+      .pair > div.ok  h4 { color: var(--safe); }
+      .pair > div.bad h4 { color: var(--risk); }
+      .pair pre { margin: 0 0 10px; }
+      .pair p { margin: 0; font-size: 14px; color: var(--muted); max-width: none; }
+    </style>
+  </head>
+
+  <body>
+    <nav class="toc">
+      <div class="toc-inner">
+        <a href="#s0">00 · Where it appears</a>
+        <a href="#s1">01 · A different name</a>
+        <a href="#s2">02 · An SVG logo</a>
+        <a href="#s3">03 · Size &amp; ratio</a>
+        <a href="#s4">04 · Colour</a>
+        <a href="#s5">05 · Preparing the file</a>
+        <a href="#s6">06 · Before you commit</a>
+      </div>
+    </nav>
+
+    <div class="wrap">
+      <header class="masthead">
+        <p class="eyebrow">Manitou Reference · Store config · Brand</p>
+        <h1>Wordmark<br />&amp; Logo</h1>
+        <p class="standfirst">
+          The masthead is <strong>one config field away</strong> from being a
+          different store's. Set <code>store.name</code> and it renders as text in
+          the display face; set <code>store.logo</code> and it renders your artwork
+          instead. Neither is a placeholder for the other — the header, the footer
+          and the vendor portal all read the same two values through one component.
+          <strong>Every measurement below was taken in a browser</strong>, not
+          estimated.
+        </p>
+      </header>
+
+      <!-- ============================================================ 00 -- -->
+      <section id="s0">
+        <div class="sec-head">
+          <span class="sec-num">00</span><h2>Where it appears</h2>
+        </div>
+        <p class="lede">
+          Three places swap to artwork. Four stay as live text no matter what,
+          because a picture is the wrong thing in each of them.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Place</th><th>Renders</th><th>Follows <code>logo</code></th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Storefront header</strong></td><td><code>&lt;Wordmark /&gt;</code></td><td class="yes">yes</td></tr>
+              <tr><td><strong>Storefront footer</strong>, brand block</td><td><code>&lt;Wordmark /&gt;</code></td><td class="yes">yes</td></tr>
+              <tr><td><strong>Vendor portal nav</strong></td><td><code>&lt;Wordmark /&gt;</code></td><td class="yes">yes</td></tr>
+              <tr><td>Footer copyright line</td><td><code>store.name</code></td><td>no &mdash; always text</td></tr>
+              <tr><td>Home page <code>&lt;h1&gt;</code></td><td><code>store.name</code></td><td>no &mdash; always text</td></tr>
+              <tr><td>Browser tab &amp; meta description</td><td><code>store.name</code></td><td>no &mdash; always text</td></tr>
+              <tr><td>The logo's <code>alt</code> text</td><td><code>store.name</code></td><td>&mdash; it <em>is</em> the name</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note">
+          <strong><code>store.name</code> still matters when a logo is set.</strong>
+          It is the browser tab, the home hero, the copyright line, and the
+          <code>alt</code> text a screen reader announces in place of the image.
+          A store that sets <code>logo</code> and leaves <code>name</code> reading
+          "Manitou" looks correct and announces itself as somebody else.
+        </div>
+
+        <div class="mocks">
+          <div class="mock">
+            <p class="mock-label">logo: "" — the default</p>
+            <div class="mock-bar">
+              <span class="mock-burger">&#9776;</span>
+              <span class="mock-mark astext">Manitou</span>
+              <span class="mock-right">Sign in &nbsp;&#128722;</span>
+            </div>
+          </div>
+          <div class="mock">
+            <p class="mock-label">logo: "/logo.svg"</p>
+            <div class="mock-bar">
+              <span class="mock-burger">&#9776;</span>
+              <span class="mock-mark">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 116 20" role="img" aria-label="Example mark">
+                  <circle cx="10" cy="10" r="9" fill="#1C1917" />
+                  <rect x="26" y="4" width="90" height="5" rx="2.5" fill="#1C1917" />
+                  <rect x="26" y="13" width="62" height="4" rx="2" fill="#1C1917" />
+                </svg>
+              </span>
+              <span class="mock-right">Sign in &nbsp;&#128722;</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ 01 -- -->
+      <section id="s1">
+        <div class="sec-head">
+          <span class="sec-num">01</span><h2>A different name</h2>
+        </div>
+        <p class="lede">
+          No artwork needed. This is the intended path for most clones, and it
+          produces a finished-looking masthead on its own.
+        </p>
+
+<pre><code>// store-config.json  (repo root)
+"store": {
+  "name": <span class="out">"Ridgeline"</span>,
+  "logo": "",
+  "support_email": "support@ridgeline.example",
+  "tagline": "..."
+}</code></pre>
+
+<pre><code>cd web &amp;&amp; npm run tokens</code></pre>
+
+        <p>
+          <code>store-config.json</code> is the source; <code>web/lib/store-config.ts</code>
+          is generated from it and is git-ignored. Editing the generated file is
+          editing something the next build overwrites.
+        </p>
+
+        <h3>How the text is set</h3>
+        <div class="spec">
+          <dt>Face</dt><dd>Archivo Black — <code>typography.fontFamily.display</code></dd>
+          <dt>Size</dt><dd>18px, line-height 1.5 — <code>text-lg</code></dd>
+          <dt>Case</dt><dd>Uppercase, applied in CSS. Type the name normally in config.</dd>
+          <dt>Tracking</dt><dd>-0.025em — <code>tracking-tight</code></dd>
+          <dt>Colour</dt><dd><span class="chip" style="background:#1C1917"></span><code>#1C1917</code> — <code>color.text</code></dd>
+          <dt>Ink height</dt><dd><b>13px</b> cap height at this size</dd>
+        </div>
+
+        <h3>How long a name can be</h3>
+        <p>
+          The masthead does not shrink or wrap — it is <code>shrink-0</code> — so a
+          long name pushes the page sideways on a phone rather than compressing.
+          Measured in Chrome at a 375px viewport:
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Characters</th><th>Rendered width</th><th>At 375px</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Manitou</strong></td><td>7</td><td>92.2px</td><td class="yes">fits</td></tr>
+              <tr><td>Ridgeline</td><td>9</td><td>106.0px</td><td class="yes">fits</td></tr>
+              <tr><td>Ember &amp; Ash</td><td>11</td><td>136.0px</td><td class="yes">fits</td></tr>
+              <tr><td>Northbay Co</td><td>11</td><td>142.0px</td><td class="yes">fits</td></tr>
+              <tr><td>Northbay Provisions</td><td>19</td><td>234.3px</td><td class="no">overflows by 84px</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note warn">
+          <strong>Roughly 11 characters, including spaces.</strong> Archivo Black is
+          a wide face — about 13px per character at 18px — so the limit arrives
+          sooner than it looks. A longer trading name goes in
+          <code>store.tagline</code> or in the footer; the masthead takes the short
+          form. If the full name must appear, that is the case for artwork: a
+          two-line lockup fits horizontally where one line cannot.
+        </div>
+      </section>
+
+      <!-- ============================================================ 02 -- -->
+      <section id="s2">
+        <div class="sec-head">
+          <span class="sec-num">02</span><h2>An SVG logo</h2>
+        </div>
+        <p class="lede">Three steps, no code change.</p>
+
+<pre><code><span class="out">1.</span> Put the file in web/public/          &rarr;  web/public/logo.svg
+<span class="out">2.</span> Point store-config.json at it       &rarr;  "logo": "/logo.svg"
+<span class="out">3.</span> Regenerate                          &rarr;  cd web &amp;&amp; npm run tokens</code></pre>
+
+        <p>
+          The path is the <em>served</em> path, not the path on disk. Everything in
+          <code>web/public/</code> is served from the site root, so
+          <code>web/public/logo.svg</code> is <code>/logo.svg</code>.
+        </p>
+
+        <div class="pair">
+          <div class="ok">
+            <h4>Accepted</h4>
+<pre><code>"logo": "/logo.svg"
+"logo": "/brand/wordmark.svg"
+"logo": "https://cdn.example/logo.svg"</code></pre>
+            <p>A root-relative path, or an absolute URL — the second is there for Phase 6, if assets move behind CloudFront.</p>
+          </div>
+          <div class="bad">
+            <h4>Refused at startup</h4>
+<pre><code>"logo": "logo.svg"
+"logo": "./logo.svg"
+"logo": "public/logo.svg"</code></pre>
+            <p>None of these resolve from a nested route like <code>/products/tee</code>. The API refuses to boot rather than let it through.</p>
+          </div>
+        </div>
+
+<pre><code>ValidationError: store.logo must be a public path like /logo.svg
+(got 'logo.svg'). Put the file in web/public and reference it from the root.</code></pre>
+
+        <div class="note">
+          <strong>Why refuse to start over a logo?</strong> Because a broken
+          <code>src</code> is the quietest failure on the page. Nothing raises,
+          nothing logs, no build fails: the header renders, the <code>alt</code>
+          text stands in, and the store simply looks unfinished with nothing saying
+          why. Better to stop while whoever just edited the config is still watching.
+        </div>
+
+        <p>
+          Setting <code>"logo": ""</code> returns to the text wordmark. That is a
+          supported state, not a broken one — no code change either direction.
+        </p>
+      </section>
+
+      <!-- ============================================================ 03 -- -->
+      <section id="s3">
+        <div class="sec-head">
+          <span class="sec-num">03</span><h2>Size &amp; ratio</h2>
+        </div>
+        <p class="lede">
+          The height is fixed and the width follows the artwork. So the only spec
+          that constrains you is <strong>how wide the mark may be</strong>, and the
+          phone decides it.
+        </p>
+
+        <div class="spec">
+          <dt>Rendered height</dt><dd><b>20px</b>, always — <code>h-5 w-auto</code> in <code>components/ui/wordmark.tsx</code></dd>
+          <dt>Width</dt><dd>Intrinsic. Whatever your <code>viewBox</code> ratio makes it at 20px tall.</dd>
+          <dt>Recommended max width</dt><dd><b>126px</b> &nbsp;(6.3 : 1)</dd>
+          <dt>Hard limit</dt><dd><b>150px</b> &nbsp;(7.5 : 1) — 151px scrolls the page sideways</dd>
+          <dt>Minimum</dt><dd>None, but under ~60px a wordmark stops being legible at 20px tall</dd>
+          <dt>For reference</dt><dd>The text "Manitou" occupies 92.2px — 4.6 : 1</dd>
+        </div>
+
+        <h3>Where those numbers come from</h3>
+        <p>
+          A 375px viewport is the narrowest the storefront is designed for, and the
+          header packs the most into one row there. Drawn at actual size — these
+          bars are 375 real pixels wide:
+        </p>
+
+        <div class="table-wrap">
+          <div class="budget">
+            <span class="seg-pad"  style="width:24px">pad<br />24</span>
+            <span class="seg-ui"   style="width:28px">&#9776;<br />28</span>
+            <span class="seg-gap"  style="width:16px">16</span>
+            <span class="seg-mark" style="width:126px">MARK<br />126</span>
+            <span class="seg-gap"  style="width:16px">16</span>
+            <span class="seg-ui"   style="width:141px">account + cart<br />141</span>
+            <span class="seg-pad"  style="width:24px">pad<br />24</span>
+          </div>
+          <p class="budget-cap">
+            126px — the gutter on both sides survives. This is the number to design to.
+          </p>
+
+          <div class="budget">
+            <span class="seg-pad"  style="width:24px">pad<br />24</span>
+            <span class="seg-ui"   style="width:28px">&#9776;<br />28</span>
+            <span class="seg-gap"  style="width:16px">16</span>
+            <span class="seg-mark" style="width:150px">MARK<br />150</span>
+            <span class="seg-gap"  style="width:16px">16</span>
+            <span class="seg-ui"   style="width:141px">account + cart<br />141</span>
+          </div>
+          <p class="budget-cap">
+            150px — it fits, but only by eating the right-hand gutter. The mark now
+            touches the screen edge.
+          </p>
+
+          <div class="budget" style="width:405px;min-width:405px">
+            <span class="seg-pad"  style="width:24px">pad<br />24</span>
+            <span class="seg-ui"   style="width:28px">&#9776;<br />28</span>
+            <span class="seg-gap"  style="width:16px">16</span>
+            <span class="seg-over" style="width:180px">MARK<br />180</span>
+            <span class="seg-gap"  style="width:16px">16</span>
+            <span class="seg-ui"   style="width:141px">account + cart<br />141</span>
+            <i class="edge"></i>
+          </div>
+          <p class="budget-cap">
+            180px — 30px past the edge, and the right-hand gutter is gone
+            entirely. The whole page scrolls sideways, on every screen of the site.
+          </p>
+        </div>
+
+        <p>
+          Verified by stepping a probe SVG through 126, 140, 150, 151, 155, 160,
+          170 and 180px and reading <code>document.documentElement.scrollWidth</code>
+          each time. 150 fits; <strong>151 overflows by exactly 1px</strong>, and the
+          overflow grows 1:1 from there. The same 150px budget applies to the text
+          wordmark — "Northbay Provisions" at 234.3px overflowed by 84px, which is
+          234.3 − 150.
+        </p>
+
+        <div class="note">
+          <strong>Wider screens are not the constraint.</strong> At 769px the budget
+          is 228px and at 1280px it is 611px, because the category nav takes the
+          slack rather than the mark. Design to 375px and every other width is free.
+        </div>
+
+        <h3>One thing that will surprise you</h3>
+        <p>
+          The text wordmark is 18px type but only <strong>13px of actual ink</strong>
+          — the rest of the line box is empty. Artwork trimmed tight to its shapes
+          renders the full 20px, so a logo swapped in for the text reads about half
+          again as large.
+        </p>
+        <p>
+          That is usually right: a logo is meant to have more presence than a line of
+          type. If you want it to sit at the same optical weight as the text it
+          replaced, add breathing room inside the <code>viewBox</code> rather than
+          changing the class — a mark with ~3px of padding top and bottom in a 20-unit
+          box lands at 13-14px of ink.
+        </p>
+      </section>
+
+      <!-- ============================================================ 04 -- -->
+      <section id="s4">
+        <div class="sec-head">
+          <span class="sec-num">04</span><h2>Colour</h2>
+        </div>
+        <p class="lede">
+          The colour has to be inside the file. This is the part that catches people.
+        </p>
+
+        <div class="note warn">
+          <strong><code>currentColor</code> does not work here.</strong> An SVG
+          loaded through <code>&lt;img src&gt;</code> is a separate document. It
+          cannot see the page's CSS, its <code>color</code>, or any Tailwind class —
+          the same isolation that makes <code>&lt;img&gt;</code> safe to point at
+          untrusted files. <code>fill="currentColor"</code> falls back to the
+          browser's default text colour, which is plain black. Against
+          <code>#1C1917</code> that looks almost right, which is exactly what makes
+          it worth calling out: it will not look broken, it will just quietly stop
+          matching the day the token changes.
+        </div>
+
+        <div class="spec">
+          <dt>Fill</dt><dd><span class="chip" style="background:#1C1917"></span><code>#1C1917</code> — <code>color.text</code>, the same value the text wordmark uses</dd>
+          <dt>Sits on</dt><dd><span class="chip" style="background:#FFFFFF"></span><code>#FFFFFF</code> — <code>color.surface</code>, in the header, the footer and the portal nav</dd>
+          <dt>Colours</dt><dd>One, unless the brand genuinely needs more. A single-fill mark is a smaller file and stays legible at 20px.</dd>
+          <dt>Dark theme</dt><dd>None today, so one file is enough</dd>
+        </div>
+
+        <p>
+          If a dark theme ever arrives, an <code>&lt;img&gt;</code> cannot adapt and
+          there are two honest fixes: inline the SVG as a React component so it
+          inherits <code>currentColor</code>, or ship two files and pick between them
+          with <code>&lt;picture&gt;</code>. Both are changes to
+          <code>wordmark.tsx</code>, not to config — which is the right place for
+          that decision to live.
+        </p>
+
+        <div class="note">
+          Hardcoding <code>#1C1917</code> inside an artwork file is not a breach of
+          the "never hardcode a colour" rule. That rule governs
+          <em>components</em>, which must read <code>design-tokens.json</code>. An
+          SVG is an asset, like a product photo — but note the value here so that if
+          <code>color.text</code> ever changes, the logo is on the list of things to
+          re-export.
+        </div>
+      </section>
+
+      <!-- ============================================================ 05 -- -->
+      <section id="s5">
+        <div class="sec-head">
+          <span class="sec-num">05</span><h2>Preparing the file</h2>
+        </div>
+        <p class="lede">What to check before the file goes in <code>web/public/</code>.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Check</th><th>Why</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>Text converted to paths</strong></td>
+                <td>The most important one. A <code>&lt;text&gt;</code> element naming a font renders in whatever the viewer's machine substitutes. Outline it in the design tool before exporting.</td>
+              </tr>
+              <tr>
+                <td><code>viewBox</code> present</td>
+                <td>Without it the browser cannot compute a width from the fixed height, and <code>w-auto</code> has nothing to work from.</td>
+              </tr>
+              <tr>
+                <td><code>xmlns</code> present</td>
+                <td>Required when an SVG is loaded as an image rather than inlined. Most exporters include it; hand-edited files often lose it.</td>
+              </tr>
+              <tr>
+                <td>Trimmed to the artwork</td>
+                <td>Stray whitespace in the <code>viewBox</code> becomes invisible padding, so the mark renders smaller than 20px and sits off-centre.</td>
+              </tr>
+              <tr>
+                <td>No <code>width</code>/<code>height</code> attributes</td>
+                <td>Harmless — the CSS classes win — but they suggest a size the page ignores. Drop them so the file does not mislead the next person.</td>
+              </tr>
+              <tr>
+                <td>No <code>&lt;script&gt;</code>, no external references</td>
+                <td>An <code>&lt;img&gt;</code> will not run scripts or fetch external resources, so anything relying on them silently does not render.</td>
+              </tr>
+              <tr>
+                <td>No embedded raster</td>
+                <td>A PNG inside an SVG is a PNG: it is not scalable and it is not small. If the mark cannot be vector, use a real PNG.</td>
+              </tr>
+              <tr>
+                <td>Under ~4KB</td>
+                <td>A one-colour wordmark should be 1-2KB. Much more means the exporter left editor metadata behind.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>A minimal, correct file</h3>
+<pre><code>&lt;svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 116 20"&gt;
+  &lt;path fill="#1C1917" d="M4 2h6l4 11 4-11h6v16h-4V8l-4 10h-4L8 8v10H4z"/&gt;
+&lt;/svg&gt;</code></pre>
+        <p>
+          116 by 20 — a 5.8 : 1 mark, inside the recommended budget. One fill, one
+          path, no metadata, no font dependency.
+        </p>
+
+        <h3>PNG, and why not JPG</h3>
+        <p>
+          PNG is the fallback if the mark cannot be vector — a photographic texture,
+          a gradient mesh. Export at <strong>3× (60px tall)</strong> so it stays sharp
+          on high-density screens, and keep transparency.
+        </p>
+        <p>
+          <strong>Never JPG.</strong> It has no transparency, so the mark arrives in
+          a box of near-white that will not match the header, and its compression
+          puts visible haloes exactly where a logo has hard edges against a flat
+          background.
+        </p>
+      </section>
+
+      <!-- ============================================================ 06 -- -->
+      <section id="s6">
+        <div class="sec-head">
+          <span class="sec-num">06</span><h2>Before you commit</h2>
+        </div>
+
+<pre><code><span class="out">#</span> regenerate the config the app reads
+cd web &amp;&amp; npm run tokens
+
+<span class="out">#</span> the path is validated here -- a bad one fails these
+cd ../backend &amp;&amp; .venv/bin/python -m pytest tests/test_store_identity.py
+
+<span class="out">#</span> and the app still compiles
+cd ../web &amp;&amp; npx tsc --noEmit</code></pre>
+
+        <p>Then look at it, which is the part no test covers:</p>
+        <ul>
+          <li>Load <code>/</code> — header and footer both show the mark.</li>
+          <li>Load <code>/admin</code> — the portal masthead matches the storefront.</li>
+          <li>Narrow the window to <strong>375px</strong> and confirm the page does
+              not scroll sideways. This is the check that catches an oversized mark,
+              and the only one that does.</li>
+          <li>Check the tab title and the home hero still read correctly — those
+              follow <code>store.name</code>, not the artwork.</li>
+        </ul>
+
+        <div class="note good">
+          <strong>Commit the source, not the output.</strong>
+          <code>store-config.json</code> and the file in <code>web/public/</code> are
+          tracked. <code>web/lib/store-config.ts</code> is generated by
+          <code>npm run tokens</code> and is git-ignored — if it shows up in
+          <code>git status</code>, something has gone wrong with the ignore rules
+          rather than with your change.
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          Manitou · Store config reference. Widths measured in Chrome at a 375px
+          viewport against the running dev server. The component is
+          <code>web/components/ui/wordmark.tsx</code>; the field is validated in
+          <code>backend/app/store.py</code> and tested in
+          <code>backend/tests/test_store_identity.py</code>.
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>

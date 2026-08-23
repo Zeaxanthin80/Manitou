@@ -8,8 +8,8 @@ import { MobileMenu } from "@/components/mobile-menu";
 import type { NavItem } from "@/components/mobile-menu";
 import { avatarClass, initials } from "@/components/ui/avatar";
 import { DropdownMenu, menuItemClass } from "@/components/ui/dropdown-menu";
+import { Wordmark } from "@/components/ui/wordmark";
 import { cn } from "@/lib/cn";
-import { storeConfig } from "@/lib/store-config";
 
 const SECTIONS: NavItem[] = [
   { href: "/admin", label: "Summary" },
@@ -65,7 +65,7 @@ export function AdminNav({
           href="/admin"
           className="shrink-0 font-display text-lg uppercase tracking-tight text-text"
         >
-          {storeConfig.store.name}
+          <Wordmark />
         </Link>
 
         {/* The badge is the one thing that must never be dropped on a small
