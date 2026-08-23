@@ -50,6 +50,45 @@ class OrderSummary(BaseModel):
     created_at: datetime
 
 
+class OrderShipmentEventRead(BaseModel):
+    """One step of the parcel's journey, as the CUSTOMER may see it.
+
+    Deliberately narrower than the admin's ShipmentEventRead, and the narrowing
+    is the point rather than an oversight:
+
+      actor_email  ABSENT. It is a staff member's email address. Reusing the
+                   admin shape here would ship an internal identity to every
+                   customer who opens an order page.
+      recorded_at  ABSENT. When WE learned is an audit question; the customer
+                   asked when it HAPPENED.
+      source       PRESENT. "Confirmed by the carrier" and "marked by the store"
+                   are different facts, and a customer chasing a parcel deserves
+                   to know which one they are looking at.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    status: str
+    occurred_at: datetime
+    source: str
+
+
+class OrderShipmentRead(BaseModel):
+    """The parcel, for the person waiting on it."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    carrier_name: str | None = None
+    tracking_number: str | None = None
+    #: Built server-side from store config, or None. Never a bare carrier
+    #: homepage -- a link that does not reach the parcel is worse than no link,
+    #: because it looks like it worked.
+    tracking_url: str | None = None
+    dispatched_at: datetime
+    delivered_at: datetime | None = None
+    events: list[OrderShipmentEventRead] = []
+
+
 class OrderDetail(OrderSummary):
     """One order in full.
 
@@ -66,6 +105,8 @@ class OrderDetail(OrderSummary):
     shipping_address: AddressRead
     billing_address: AddressRead
     payment_status: str | None = None
+    #: None until dispatched. Drives the tracking timeline on the receipt.
+    shipment: OrderShipmentRead | None = None
 
 
 class OrderPage(BaseModel):

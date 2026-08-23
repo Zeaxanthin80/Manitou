@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
 from app.dependencies import get_current_user, get_payment_gateway
-from app.models import Order, User
+from app.models import Order, Shipment, User
 from app.schemas import (
     OrderCreate,
     OrderDetail,
@@ -62,6 +62,7 @@ def _owned_order(db: Session, order_id: int, user_id: int) -> Order:
             # version becomes an N+1 silently. Not a fix for a problem that
             # exists today; insurance against one that would not announce itself.
             selectinload(Order.payments),
+            selectinload(Order.shipment).selectinload(Shipment.events),
         )
     )
     if order is None:

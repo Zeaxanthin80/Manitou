@@ -28,7 +28,13 @@ from app.models import (
     Product,
     ProductImage,
     ProductVariant,
+    Shipment,
     User,
+)
+from app.services.fulfilment import (
+    FulfilmentError,
+    create_shipment,
+    record_event,
 )
 from app.services.stock import reserved_expr, restock_for_order, sellable_expr
 from app.services.payments import (
@@ -66,6 +72,10 @@ from app.schemas.admin import (
     AdminVariantCreate,
     AdminVariantRead,
     AdminVariantUpdate,
+    ShipmentCreate,
+    ShipmentEventCreate,
+    ShipmentEventRead,
+    ShipmentRead,
 )
 from app.schemas.catalog import MAX_PAGE_SIZE
 from app.config import settings
@@ -93,6 +103,25 @@ router = APIRouter(
 #
 # pending -> paid is manual for now. Phase 5's Stripe webhook takes that hop over;
 # everything after it stays a human decision.
+#: Statuses that may no longer be set by hand, and where to set them instead.
+#:
+#: Deliberately separate from ALLOWED_TRANSITIONS. That map answers "is this move
+#: legal?"; this one answers "does this move need evidence?". Folding them
+#: together would mean the vendor UI, which reads allowed_transitions to decide
+#: which buttons to render, could no longer tell the difference between a move
+#: that is forbidden and one that simply happens elsewhere.
+EVIDENCE_REQUIRED: dict[str, str] = {
+    "shipped": (
+        "Record a dispatch instead: POST /admin/orders/{id}/shipment. "
+        "A shipped order needs a carrier and a tracking number -- that row is "
+        "what answers a 'not received' dispute."
+    ),
+    "delivered": (
+        "Record a delivery instead: POST /admin/orders/{id}/shipment/events. "
+        "Delivery is an event with a time and a source, not a status someone types."
+    ),
+}
+
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "pending": {"paid", "cancelled"},
     "paid": {"shipped", "cancelled", "refunded"},
@@ -868,11 +897,22 @@ def _admin_order(db: Session, order_id: int) -> Order:
             selectinload(Order.user),
             selectinload(Order.shipping_address),
             selectinload(Order.billing_address),
+            selectinload(Order.shipment).selectinload(Shipment.events),
         )
     )
     if order is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
     return order
+
+
+def _shipment_read(shipment) -> ShipmentRead:
+    """Serialise a shipment.
+
+    carrier_name and tracking_url are model properties resolved from store
+    config -- one definition, so the vendor's panel and the customer's timeline
+    cannot show different links for the same parcel.
+    """
+    return ShipmentRead.model_validate(shipment)
 
 
 def _to_order_detail(order: Order) -> AdminOrderDetail:
@@ -887,11 +927,22 @@ def _to_order_detail(order: Order) -> AdminOrderDetail:
         user_id=order.user_id,
         user_email=order.user.email,
         user_full_name=order.user.full_name,
+        # None until dispatched. The portal renders the dispatch form or
+        # the shipment panel from exactly this.
+        shipment=_shipment_read(order.shipment) if order.shipment else None,
         item_count=sum(i.quantity for i in order.items),
         items=order.items,
         shipping_address=order.shipping_address,
         billing_address=order.billing_address,
         allowed_transitions=sorted(ALLOWED_TRANSITIONS[order.status]),
+        # The intersection, not the whole map: "of the moves you may make
+        # right now, these need evidence". Computed from the same constant
+        # the PATCH guard raises on, so the screen and the guard cannot
+        # disagree -- which is the rule this router already follows for
+        # allowed_transitions.
+        evidence_required=sorted(
+            ALLOWED_TRANSITIONS[order.status] & EVIDENCE_REQUIRED.keys()
+        ),
     )
 
 
@@ -920,6 +971,23 @@ def update_order_status(
         # Not an error. Two vendors clicking "Ship" on the same order should not
         # produce a failure for the slower one -- the outcome they wanted holds.
         return _to_order_detail(order)
+
+    # Legal is no longer the same as sufficient.
+    #
+    # ALLOWED_TRANSITIONS still says paid -> shipped is legal, and it remains the
+    # single authority on THAT question. But since Phase 5.5 those two statuses
+    # also require EVIDENCE -- a carrier, a tracking number, a date -- and this
+    # endpoint collects none of it. Setting them here would produce an order
+    # claiming to be shipped with nothing behind the claim, which is precisely
+    # the state this phase exists to remove.
+    #
+    # 409 naming the endpoint that does the job, rather than a bare refusal: a
+    # "no" is a dead end, a signpost is not.
+    if payload.status in EVIDENCE_REQUIRED:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            EVIDENCE_REQUIRED[payload.status],
+        )
 
     allowed = ALLOWED_TRANSITIONS[order.status]
     if payload.status not in allowed:
@@ -1028,6 +1096,88 @@ def recheck_order_payment(
     return AdminPaymentRecheck(
         outcome=outcome, order=_to_order_detail(_admin_order(db, order_id))
     )
+
+
+@router.post(
+    "/orders/{order_id}/shipment",
+    response_model=ShipmentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def dispatch_order(
+    order_id: int,
+    payload: ShipmentCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+) -> ShipmentRead:
+    """Record dispatch, and advance the order to `shipped`.
+
+    Replaces setting the status by hand. The shipment, its opening event and the
+    status change land in one transaction (services/fulfilment.py) -- an order
+    marked shipped with no tracking number is indistinguishable afterwards from a
+    parcel that legitimately went out.
+    """
+    order = _admin_order(db, order_id)
+    try:
+        shipment = create_shipment(
+            db,
+            order,
+            carrier=payload.carrier,
+            tracking_number=payload.tracking_number,
+            method=payload.method,
+            actor=user,
+        )
+    except FulfilmentError as exc:
+        # 409, like the other "the store's state makes this impossible" answers
+        # in this router: the request is well-formed and the message is written
+        # for the vendor, so it is passed through as written.
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+    db.refresh(shipment)
+    return _shipment_read(shipment)
+
+
+@router.post(
+    "/orders/{order_id}/shipment/events",
+    response_model=ShipmentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def record_shipment_event(
+    order_id: int,
+    payload: ShipmentEventCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+) -> ShipmentRead:
+    """Append an event to this order's parcel.
+
+    `delivered` advances the order; `failed` and `returned` deliberately do not
+    (see ADVANCES_ORDER). Manual delivery is still possible -- there is no carrier
+    webhook yet -- and is recorded honestly with `source: admin`, which is what
+    makes evidence quality legible later.
+    """
+    order = _admin_order(db, order_id)
+    shipment = db.scalar(select(Shipment).where(Shipment.order_id == order_id))
+    if shipment is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This order has not been dispatched yet, so there is nothing to "
+            "record against. Record a dispatch first.",
+        )
+
+    try:
+        record_event(
+            db,
+            shipment,
+            status=payload.status,
+            source=payload.source,
+            actor=user,
+            occurred_at=payload.occurred_at,
+            detail=payload.detail,
+        )
+    except FulfilmentError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+    db.refresh(shipment)
+    return _shipment_read(shipment)
 
 
 # Money actually collected. Deliberately excludes pending (not paid yet),

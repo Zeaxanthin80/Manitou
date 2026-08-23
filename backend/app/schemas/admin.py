@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 from decimal import Decimal
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -348,6 +348,78 @@ class AdminOrderPage(BaseModel):
     offset: int
 
 
+class ShipmentEventRead(BaseModel):
+    """One line of a parcel's history.
+
+    Both timestamps are exposed. `occurred_at` is when it happened according to
+    whoever is telling us; `recorded_at` is when we learned. They differ whenever
+    a report arrives late, and the timeline must show the first while the audit
+    question "when did we know?" is answered by the second.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    status: str
+    occurred_at: datetime
+    recorded_at: datetime
+    #: admin / carrier / courier / customer. What makes evidence quality
+    #: legible: a delivery an admin asserted is not the same fact as one a
+    #: carrier confirmed.
+    source: str
+    actor_email: str | None = None
+
+
+class ShipmentRead(BaseModel):
+    """The parcel, with its history and a working tracking link."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    method: str
+    carrier: str | None = None
+    carrier_name: str | None = None
+    tracking_number: str | None = None
+    #: Built from the store-config template, or None. Never a bare carrier
+    #: homepage: a link that does not reach the parcel is worse than no link,
+    #: because it looks like it worked.
+    tracking_url: str | None = None
+    dispatched_at: datetime
+    delivered_at: datetime | None = None
+    events: list[ShipmentEventRead] = []
+
+
+class ShipmentCreate(BaseModel):
+    """A dispatch, as the vendor's form submits it.
+
+    carrier and tracking_number are optional HERE and required by the service for
+    a carrier shipment. Validating it in the schema would hard-code a rule that
+    depends on store config -- a courier or pickup store legitimately sends
+    neither.
+    """
+
+    carrier: str | None = None
+    tracking_number: str | None = None
+    method: str | None = None
+
+
+class ShipmentEventCreate(BaseModel):
+    """Something that happened to the parcel.
+
+    `source` defaults to `admin` and is the honest answer while there is no
+    carrier webhook: a human is asserting this.
+    """
+
+    status: Literal[
+        "dispatched", "in_transit", "out_for_delivery", "delivered", "failed", "returned"
+    ]
+    source: Literal["admin", "carrier", "courier", "customer"] = "admin"
+    #: When it HAPPENED, if that differs from now -- a carrier reporting on
+    #: Tuesday what happened on Monday.
+    occurred_at: datetime | None = None
+    detail: dict[str, Any] = Field(default_factory=dict)
+
+
 class AdminOrderDetail(AdminOrderSummary):
     """One order, everything the vendor needs to fulfil it.
 
@@ -357,6 +429,7 @@ class AdminOrderDetail(AdminOrderSummary):
     """
 
     user_full_name: str
+    shipment: ShipmentRead | None = None
     items: list[OrderItemRead]
     shipping_address: AddressRead
     billing_address: AddressRead
@@ -367,6 +440,16 @@ class AdminOrderDetail(AdminOrderSummary):
     #: The portal renders one button per entry, so the screen cannot offer a move
     #: the API would reject.
     allowed_transitions: list[str]
+    #: Of those, the ones that may NOT be set by PATCH because they now require
+    #: evidence -- a carrier and a tracking number, or a delivery event with a
+    #: time and a source.
+    #:
+    #: Sent alongside rather than removed from allowed_transitions, because the
+    #: two answer different questions: "is this move legal?" and "does it need
+    #: evidence?". The portal needs both -- it renders a dispatch FORM where it
+    #: used to render a button, and it must not confuse a move that is forbidden
+    #: with one that simply happens elsewhere.
+    evidence_required: list[str] = []
 
 
 class AdminPaymentRecheck(BaseModel):
