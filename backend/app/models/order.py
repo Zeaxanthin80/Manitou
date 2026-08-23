@@ -55,6 +55,9 @@ class Order(Base):
     )
     items: Mapped[list["OrderItem"]] = relationship(back_populates="order")
     payments: Mapped[list["Payment"]] = relationship(back_populates="order")
+    #: One per order in v1 -- shipments.order_id is UNIQUE, so this is a
+    #: scalar rather than a list.
+    shipment: Mapped["Shipment | None"] = relationship(back_populates="order")
 
     @property
     def payment_status(self) -> str | None:

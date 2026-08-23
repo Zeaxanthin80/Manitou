@@ -14,6 +14,7 @@ from app.models.catalog import (
     ProductImage,
     ProductVariant,
 )
+from app.models.fulfilment import Shipment, ShipmentEvent
 from app.models.order import Order, OrderItem, Payment
 from app.models.user import Address, PasswordResetToken, RecoveryCode, User
 
@@ -28,6 +29,8 @@ __all__ = [
     "OrderItem",
     "PasswordResetToken",
     "Payment",
+    "Shipment",
+    "ShipmentEvent",
     "Product",
     "ProductImage",
     "ProductVariant",
