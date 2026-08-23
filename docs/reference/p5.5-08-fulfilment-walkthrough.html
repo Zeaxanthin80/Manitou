@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fulfilment Walkthrough — Manitou Reference</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="reference.css" />
+    <style>
+      /* Only the checklist. Everything else is the shared house style. */
+      .counter {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+        color: var(--muted); margin-left: auto; white-space: nowrap;
+      }
+      .counter.done { color: var(--safe); }
+
+      ol.check { list-style: none; margin: 0; padding: 0; counter-reset: item; }
+      ol.check > li {
+        counter-increment: item;
+        display: grid; grid-template-columns: 26px 1fr; gap: 14px;
+        padding: 14px 0; border-bottom: 1px solid var(--line); align-items: start;
+      }
+      ol.check > li:last-child { border-bottom: 0; }
+      /* Without this a grid item refuses to shrink below its content's
+         min-content width, so a long command in a <pre> widens the whole page
+         instead of scrolling inside its own box. Measured at 755px of sideways
+         scroll at 375px on the Phase 4.5 walkthrough before this line existed. */
+      ol.check > li > div { min-width: 0; }
+
+      ol.check input[type="checkbox"] {
+        appearance: none; -webkit-appearance: none;
+        width: 20px; height: 20px; margin: 2px 0 0;
+        border: 1px solid var(--line); border-radius: 3px;
+        background: var(--surface); cursor: pointer;
+        display: grid; place-content: center; flex: none;
+      }
+      ol.check input[type="checkbox"]::after {
+        content: ""; width: 10px; height: 6px;
+        border-left: 2px solid var(--ground); border-bottom: 2px solid var(--ground);
+        transform: rotate(-45deg) translateY(-1px); opacity: 0;
+      }
+      ol.check input[type="checkbox"]:checked {
+        background: var(--safe); border-color: var(--safe);
+      }
+      ol.check input[type="checkbox"]:checked::after { opacity: 1; }
+      ol.check input[type="checkbox"]:focus-visible {
+        outline: 2px solid var(--client); outline-offset: 2px;
+      }
+      ol.check > li.ticked .do {
+        color: var(--muted); text-decoration: line-through;
+        text-decoration-color: var(--line);
+      }
+
+      .do { font-weight: 500; margin: 0; max-width: none; }
+      .expect {
+        margin: 6px 0 0; color: var(--muted); font-size: 14.5px; max-width: none;
+      }
+      .expect::before { content: "Expect: "; color: var(--safe); }
+      .why {
+        margin: 6px 0 0; color: var(--muted); font-size: 13.5px;
+        font-style: italic; max-width: none;
+      }
+
+      .reset {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+        text-transform: uppercase; color: var(--muted);
+        background: transparent; border: 1px solid var(--line);
+        border-radius: 2px; padding: 6px 10px; cursor: pointer;
+      }
+      .reset:hover { color: var(--ink); background: var(--surface-2); }
+      .sec-head .counter { font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <nav class="toc">
+      <div class="toc-inner">
+        <a href="#s0">00 · Before you start</a>
+        <a href="#s1">01 · Vendor: dispatch</a>
+        <a href="#s2">02 · Customer: tracking</a>
+        <a href="#s3">03 · Vendor: delivery</a>
+        <a href="#s4">04 · The database refuses you</a>
+        <a href="#s5">05 · Record what failed</a>
+      </div>
+    </nav>
+
+    <div class="wrap">
+      <header class="masthead">
+        <p class="eyebrow">Manitou Reference · Phase 5.5 · Task 8</p>
+        <h1>Fulfilment<br />Walkthrough</h1>
+        <p class="standfirst">
+          Everything below has passing tests. This walks the parts a test cannot
+          reach: <strong>a real tracking number that opens a real parcel page</strong>,
+          and a database refusing <em>you</em>, at a bare prompt, with full
+          credentials. Tick as you go — progress survives a closed tab.
+        </p>
+        <p style="margin-top: 20px">
+          <button class="reset" id="reset" type="button">Reset all ticks</button>
+          <span class="counter" data-for="all" style="margin-left: 12px"></span>
+        </p>
+      </header>
+
+      <!-- ============================================================ 00 -- -->
+      <section id="s0">
+        <div class="sec-head">
+          <span class="sec-num">00</span><h2>Before you start</h2>
+          <span class="counter" data-for="s0"></span>
+        </div>
+        <p class="lede">
+          Three services, and an order that has been paid for but not yet sent.
+        </p>
+
+        <ol class="check" data-section="s0">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Postgres, the API and the web app are all up.</p>
+              <pre><code>docker ps --format '{{.Names}}\t{{.Status}}'
+cd backend &amp;&amp; .venv/bin/uvicorn app.main:app --reload
+cd web &amp;&amp; npm run dev</code></pre>
+              <p class="expect">
+                <code>manitou-db-1</code> healthy, API on :8000, web on :3000.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Pick a paid order that has not been dispatched.</p>
+              <pre><code>docker exec manitou-db-1 psql -U manitou -d manitou -c \
+"SELECT o.id, o.total, u.email FROM orders o
+   JOIN users u ON u.id=o.user_id
+   LEFT JOIN shipments s ON s.order_id=o.id
+  WHERE o.status='paid' AND s.id IS NULL ORDER BY o.id DESC LIMIT 5;"</code></pre>
+              <p class="expect">
+                At least one row. Note the id — every step below uses it.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Find a <strong>real tracking number</strong> — a genuine USPS, UPS
+                or FedEx number from anything you have had delivered recently.
+              </p>
+              <p class="why">
+                A made-up number proves the link is built correctly and nothing
+                more. A real one proves it reaches a parcel, which is the only
+                claim that matters to a customer chasing a delivery.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ============================================================ 01 -- -->
+      <section id="s1">
+        <div class="sec-head">
+          <span class="sec-num">01</span><h2>Vendor · dispatch</h2>
+          <span class="counter" data-for="s1"></span>
+        </div>
+        <p class="lede">
+          The bare “Mark shipped” button is gone. A shipped order now needs
+          evidence, and this is where it is collected.
+        </p>
+
+        <ol class="check" data-section="s1">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Sign in as <code>admin@manitou.example</code> and open
+                <code>/admin/orders/{id}</code>.
+              </p>
+              <p class="expect">
+                A <strong>Dispatch this order</strong> form with a carrier picker
+                — and <strong>no “Mark shipped” button</strong>.
+              </p>
+              <p class="why">
+                The API refuses <code>shipped</code> via PATCH now, so the portal
+                stops offering a control that would 409. It learns which ones
+                from <code>evidence_required</code>, not from its own copy of the
+                rule.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Confirm the picker lists <strong>USPS, UPS and FedEx</strong>, and
+                that “Mark cancelled” and “Mark refunded” are still ordinary
+                buttons.
+              </p>
+              <p class="why">
+                Those two buttons are the control. A portal that hid every button
+                would look identical on this screen and be badly wrong.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Submit with the carrier blank or the number blank.</p>
+              <p class="expect">
+                Refused, with a sentence — not a silent no-op and not a crash.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Dispatch properly: pick the carrier matching your real tracking
+                number, paste it, submit.
+              </p>
+              <p class="expect">
+                The form is replaced by a <strong>Shipment</strong> panel showing
+                the carrier, the tracking number as a link, and one timeline entry
+                — <code>dispatched · admin</code>.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Reload the order list at <code>/admin/orders</code>.</p>
+              <p class="expect">The order now reads <strong>shipped</strong>.</p>
+              <p class="why">
+                The shipment, its first event and the status change were one
+                transaction. An order marked shipped with no tracking number would
+                be indistinguishable afterwards from a parcel that really went out.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ============================================================ 02 -- -->
+      <section id="s2">
+        <div class="sec-head">
+          <span class="sec-num">02</span><h2>Customer · tracking</h2>
+          <span class="counter" data-for="s2"></span>
+        </div>
+        <p class="lede">
+          The transparency this whole phase exists for. Before it, a customer saw
+          a status word and no dates, no carrier and no link.
+        </p>
+
+        <ol class="check" data-section="s2">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Sign in as the customer who placed that order and open
+                <code>/orders/{id}</code>.
+              </p>
+              <p class="expect">
+                A <strong>Tracking</strong> section: Ordered, Paid and Dispatched
+                filled; Delivered still hollow. Dates on the filled ones.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                <strong>Click the tracking link.</strong> This is the one step
+                nothing automated can do for you.
+              </p>
+              <p class="expect">
+                The carrier's site opens on <em>your actual parcel</em> — not
+                their homepage, not a search box.
+              </p>
+              <p class="why">
+                A link that does not reach the parcel is worse than no link,
+                because it looks like it worked. That is why the URL template must
+                contain <code>{tracking}</code> and why a missing carrier yields
+                no link at all rather than a bare homepage.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                View source (<code>Ctrl-U</code>) and search for
+                <code>admin@manitou.example</code> and for
+                <code>recorded_at</code>.
+              </p>
+              <p class="expect"><strong>Neither appears.</strong></p>
+              <p class="why">
+                The customer's shape is deliberately narrower than the vendor's.
+                Reusing the admin's would ship a staff email address to every
+                customer who opens an order page.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ============================================================ 03 -- -->
+      <section id="s3">
+        <div class="sec-head">
+          <span class="sec-num">03</span><h2>Vendor · delivery</h2>
+          <span class="counter" data-for="s3"></span>
+        </div>
+        <p class="lede">
+          Delivery is an event with a time and a source, not a status somebody
+          types.
+        </p>
+
+        <ol class="check" data-section="s3">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Back on <code>/admin/orders/{id}</code>, press
+                <strong>failed</strong> first.
+              </p>
+              <p class="expect">
+                A new timeline entry — and the order is <strong>still
+                shipped</strong>.
+              </p>
+              <p class="why">
+                A failed attempt means the parcel is still out with the carrier
+                and will be retried. Only <code>delivered</code> moves an order.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Now press <strong>delivered</strong>.</p>
+              <p class="expect">
+                The order reads <strong>delivered</strong>, the event buttons
+                disappear, and the timeline holds all three entries.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Reload the customer's order page.</p>
+              <p class="expect">
+                All four steps filled. Both timelines agree.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Check what the events actually recorded.</p>
+              <pre><code>docker exec manitou-db-1 psql -U manitou -d manitou -c \
+"SELECT status, source, occurred_at, recorded_at FROM shipment_events ORDER BY id;"</code></pre>
+              <p class="expect">
+                Every <code>source</code> is <code>admin</code>.
+              </p>
+              <p class="why">
+                Which is the truth: you clicked a button, no carrier confirmed
+                anything. That honesty is what makes the column worth having when
+                a real carrier integration arrives — a delivery an admin asserted
+                is not the same fact as one a carrier confirmed.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Look at <code>occurred_at</code> beside <code>recorded_at</code>.
+              </p>
+              <p class="expect">Seconds apart, and looking redundant.</p>
+              <p class="why">
+                They will be, today. They exist for the case that has not happened
+                yet: a carrier webhook arriving Tuesday about a Monday delivery.
+                Collapse them into one column and the customer's timeline lies,
+                and the dispute evidence carries the wrong shipping date — on the
+                one row where the date is the whole argument.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ============================================================ 04 -- -->
+      <section id="s4">
+        <div class="sec-head">
+          <span class="sec-num">04</span><h2>The database refuses you</h2>
+          <span class="counter" data-for="s4"></span>
+        </div>
+        <p class="lede">
+          The suite already asserts this. Seeing it refuse <em>you</em> — full
+          credentials, bare prompt, no application in the way — is a different
+          kind of knowing.
+        </p>
+
+        <ol class="check" data-section="s4">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Open a prompt and look at what is there.</p>
+              <pre><code>docker exec -it manitou-db-1 psql -U manitou -d manitou
+
+SELECT id, status, source FROM shipment_events ORDER BY id;</code></pre>
+              <p class="expect">Your three events. Note the first id.</p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Try to rewrite history.</p>
+              <pre><code>UPDATE shipment_events SET status = 'delivered' WHERE id = 1;</code></pre>
+              <p class="expect">
+                <code>ERROR: shipment_events is append-only; UPDATE is not
+                permitted</code>
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Try to erase it.</p>
+              <pre><code>DELETE FROM shipment_events WHERE id = 1;</code></pre>
+              <p class="expect">The same refusal, naming <code>DELETE</code>.</p>
+              <p class="why">
+                Evidence an application can rewrite is not evidence. Enforced by a
+                trigger rather than in Python, because a Python guard is one a
+                script, a shell or an endpoint written next year can step around.
+                This is the property a chargeback rests on.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Confirm an <code>INSERT</code> still works — the table is
+                append-<em>only</em>, not read-only.
+              </p>
+              <pre><code>INSERT INTO shipment_events (shipment_id, status, occurred_at, source)
+VALUES (1, 'in_transit', now(), 'carrier');</code></pre>
+              <p class="expect"><code>INSERT 0 1</code>.</p>
+              <p class="why">
+                The control. A trigger that blocked everything would satisfy both
+                steps above and quietly break the feature.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Try an event status that does not exist.</p>
+              <pre><code>INSERT INTO shipment_events (shipment_id, status, occurred_at, source)
+VALUES (1, 'eaten_by_dog', now(), 'admin');</code></pre>
+              <p class="expect">
+                <code>ERROR: new row … violates check constraint
+                "ck_shipment_events_status_valid"</code>
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                And the constraint a dispute depends on — a carrier shipment with
+                no tracking number.
+              </p>
+              <pre><code>INSERT INTO shipments (order_id, method, carrier, dispatched_at)
+VALUES (999999, 'carrier', 'usps', now());</code></pre>
+              <p class="expect">
+                Refused by <code>ck_shipments_method_requires_tracking</code>
+                (or the foreign key, if order 999999 does not exist — use a real
+                order id without a shipment to see the right one).
+              </p>
+              <p class="why">
+                That row is exactly what a payment processor asks for during a
+                “not received” dispute. Left optional, the field ends up empty
+                precisely on the orders where it matters.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">Leave, and tidy up the extra event you inserted.</p>
+              <pre><code>ALTER TABLE shipment_events DISABLE TRIGGER shipment_events_no_update_delete;
+DELETE FROM shipment_events WHERE status = 'in_transit' AND source = 'carrier';
+ALTER TABLE shipment_events ENABLE TRIGGER shipment_events_no_update_delete;
+\q</code></pre>
+              <p class="why">
+                Needing to disable the trigger to clean up is the guard proving
+                itself one last time.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ============================================================ 05 -- -->
+      <section id="s5">
+        <div class="sec-head">
+          <span class="sec-num">05</span><h2>Record what failed</h2>
+          <span class="counter" data-for="s5"></span>
+        </div>
+        <p class="lede">
+          Anything that surprised you is worth writing down while it is fresh.
+        </p>
+
+        <ol class="check" data-section="s5">
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Add anything that behaved unexpectedly to
+                <code>docs/defect-log.md</code>, newest first.
+              </p>
+              <p class="why">
+                Twenty entries so far, and almost none came from a test failing —
+                the suite was green throughout. They came from reading code,
+                using the store, and breaking guards on purpose to watch a test
+                fail.
+              </p>
+            </div>
+          </li>
+          <li>
+            <input type="checkbox" />
+            <div>
+              <p class="do">
+                Note anything the <em>documents</em> got wrong, not just the code.
+              </p>
+              <p class="why">
+                A verification step vague enough to be read two ways is its own
+                defect, and there is already a section of the log for exactly
+                that.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <footer>
+        <p>
+          Manitou · Phase 5.5 task 8 · Ticks are stored in this browser only.
+          Companion documents in <code>docs/reference/</code>; the concepts behind
+          this walkthrough are in <code>p5-payments.html</code>.
+        </p>
+      </footer>
+    </div>
+
+    <script>
+      // Progress lives in localStorage so the walkthrough survives a closed tab.
+      // Keys are section + index rather than the item's text, so re-wording an
+      // item does not silently lose a tick.
+      (function () {
+        const KEY = "manitou-p55-t08";
+        let saved = {};
+        try {
+          saved = JSON.parse(localStorage.getItem(KEY) || "{}");
+        } catch {
+          saved = {};
+        }
+
+        const boxes = [];
+        document.querySelectorAll("ol.check").forEach((list) => {
+          const section = list.dataset.section;
+          list.querySelectorAll('input[type="checkbox"]').forEach((box, i) => {
+            const id = section + ":" + i;
+            box.id = id;
+            box.checked = Boolean(saved[id]);
+            box.closest("li").classList.toggle("ticked", box.checked);
+            box.addEventListener("change", () => {
+              saved[id] = box.checked;
+              localStorage.setItem(KEY, JSON.stringify(saved));
+              box.closest("li").classList.toggle("ticked", box.checked);
+              render();
+            });
+            boxes.push({ id, box, group: section });
+          });
+        });
+
+        function render() {
+          const groups = {};
+          boxes.forEach((b) => {
+            groups[b.group] = groups[b.group] || { done: 0, total: 0 };
+            groups[b.group].total++;
+            if (b.box.checked) groups[b.group].done++;
+          });
+          document.querySelectorAll(".counter").forEach((el) => {
+            const key = el.dataset.for;
+            const g =
+              key === "all"
+                ? {
+                    done: boxes.filter((b) => b.box.checked).length,
+                    total: boxes.length,
+                  }
+                : groups[key];
+            if (!g) return (el.textContent = "");
+            el.textContent = g.done + " / " + g.total + " done";
+            el.classList.toggle("done", g.done === g.total && g.total > 0);
+          });
+        }
+
+        document.getElementById("reset").addEventListener("click", () => {
+          if (!confirm("Clear every tick on this page?")) return;
+          saved = {};
+          localStorage.removeItem(KEY);
+          boxes.forEach((b) => {
+            b.box.checked = false;
+            b.box.closest("li").classList.remove("ticked");
+          });
+          render();
+        });
+
+        render();
+      })();
+    </script>
+  </body>
+</html>
