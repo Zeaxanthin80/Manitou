@@ -16,19 +16,19 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
-| [22](#22-seedpy-could-no-longer-reseed-a-database-that-had-shipped-an-order) | 2026-08-29 | `seed.py` could no longer reseed a database that had shipped an order | Fixed — uncommitted |
-| [21](#21-any-database-password-containing--broke-alembic) | 2026-08-29 | Any database password containing `%` broke Alembic | Fixed — uncommitted |
-| [20](#20-a-validation-error-outlived-the-problem-it-described) | 2026-08-22 | A validation error outlived the problem it described | Fixed — uncommitted |
-| [19](#19-the-receipt-contradicted-itself-after-payment) | 2026-08-22 | The receipt contradicted itself after payment | Fixed — uncommitted |
-| [18](#18-the-cart-emptied-at-the-payment-step) | 2026-08-22 | The cart emptied at the payment step | Fixed — uncommitted |
-| [17](#17-an-abandoned-checkout-consumed-its-stock-permanently) | 2026-08-21 | An abandoned checkout consumed its stock permanently | Fixed — uncommitted |
-| [16](#16-the-payment-form-rendered-in-a-different-typeface-from-the-rest-of-the-site) | 2026-08-21 | The payment form rendered in a different typeface from the rest of the site | Fixed — uncommitted |
-| [15](#15-the-payment-page-offered-a-card-form-for-an-order-already-paid) | 2026-08-21 | The payment page offered a card form for an order already paid | Fixed — uncommitted |
-| [14](#14-one-payment-per-order-was-enforced-only-by-application-timing) | 2026-08-21 | "One payment per order" was enforced only by application timing | Fixed — uncommitted |
-| [13](#13-the-money-conversion-promised-to-refuse-a-fraction-and-rounded-it-instead) | 2026-08-20 | The money conversion promised to refuse a fraction and rounded it instead | Fixed — uncommitted |
+| [22](#22-seedpy-could-no-longer-reseed-a-database-that-had-shipped-an-order) | 2026-08-29 | `seed.py` could no longer reseed a database that had shipped an order | Fixed — 86b11a7 |
+| [21](#21-any-database-password-containing--broke-alembic) | 2026-08-29 | Any database password containing `%` broke Alembic | Fixed — 86b11a7 |
+| [20](#20-a-validation-error-outlived-the-problem-it-described) | 2026-08-22 | A validation error outlived the problem it described | Fixed — a32d114 |
+| [19](#19-the-receipt-contradicted-itself-after-payment) | 2026-08-22 | The receipt contradicted itself after payment | Fixed — a32d114 |
+| [18](#18-the-cart-emptied-at-the-payment-step) | 2026-08-22 | The cart emptied at the payment step | Fixed — cc1a4c0 |
+| [17](#17-an-abandoned-checkout-consumed-its-stock-permanently) | 2026-08-21 | An abandoned checkout consumed its stock permanently | Fixed — 2ba3e4d |
+| [16](#16-the-payment-form-rendered-in-a-different-typeface-from-the-rest-of-the-site) | 2026-08-21 | The payment form rendered in a different typeface from the rest of the site | Fixed — 6c80c73 |
+| [15](#15-the-payment-page-offered-a-card-form-for-an-order-already-paid) | 2026-08-21 | The payment page offered a card form for an order already paid | Fixed — 6c80c73 |
+| [14](#14-one-payment-per-order-was-enforced-only-by-application-timing) | 2026-08-21 | "One payment per order" was enforced only by application timing | Fixed — 989772e |
+| [13](#13-the-money-conversion-promised-to-refuse-a-fraction-and-rounded-it-instead) | 2026-08-20 | The money conversion promised to refuse a fraction and rounded it instead | Fixed — 837b4c8 |
 | [12](#12-storing-a-config-value-is-not-the-same-as-the-app-reading-it) | 2026-08-19 | Storing a config value is not the same as the app reading it | Fixed `92f6182` |
-| [11](#11-cancelling-an-order-never-returns-its-stock) | 2026-08-17 | Cancelling an order never returns its stock | Fixed — uncommitted |
-| [10](#10-partial-stock-is-invisible-in-the-cart) | 2026-08-17 | Partial stock is invisible in the cart | Fixed — uncommitted |
+| [11](#11-cancelling-an-order-never-returns-its-stock) | 2026-08-17 | Cancelling an order never returns its stock | Fixed — 2ba3e4d |
+| [10](#10-partial-stock-is-invisible-in-the-cart) | 2026-08-17 | Partial stock is invisible in the cart | Fixed — 2ba3e4d |
 | [9](#9-a-discontinued-product-could-still-be-bought-from-an-old-cart) | 2026-08-17 | A discontinued product could still be bought from an old cart | Fixed `db9dbc0` |
 | [8](#8-slug-and-sku-uniqueness-was-case-sensitive) | 2026-08-16 | Slug and SKU uniqueness was case-sensitive | Fixed `6d3f14b` |
 | [7](#7-the-product-edit-page-404d-for-any-product-past-the-first-page) | 2026-08-15 | The product edit page 404'd past the first page | Fixed `b083ec4` |
@@ -43,7 +43,7 @@ was changed, and what makes it not happen again.
 
 ## 22. `seed.py` could no longer reseed a database that had shipped an order
 
-**Status:** Fixed, uncommitted (Phase 6 task 5).
+**Status:** Fixed in `86b11a7` (Phase 6 task 5).
 
 **Seen.** `python seed.py` against the local development database died with
 `ForeignKeyViolation: update or delete on table "orders" violates constraint
@@ -78,7 +78,7 @@ rejects an `UPDATE` afterwards — TRUNCATE empties a table without disarming it
 
 ## 21. Any database password containing `%` broke Alembic
 
-**Status:** Fixed, uncommitted (Phase 6 task 5).
+**Status:** Fixed in `86b11a7` (Phase 6 task 5).
 
 **Seen.** The first `alembic upgrade head` against RDS raised
 `ValueError: invalid interpolation syntax in 'postgresql://…' at position 32` — before any
@@ -107,7 +107,7 @@ retention. The RDS master password was rotated.
 
 ## 20. A validation error outlived the problem it described
 
-**Status:** Fixed, uncommitted. Owner-reported.
+**Status:** Fixed in `a32d114`. Owner-reported.
 
 **Seen.** "Your card number is incomplete." sitting under a fully entered card — 4242 4242 4242 4242,
 expiry, CVC and ZIP all present — with the Pay button still offering to charge.
@@ -128,7 +128,7 @@ start correcting it, beats a dead button every time.
 
 ## 19. The receipt contradicted itself after payment
 
-**Status:** Fixed, uncommitted. Owner-reported.
+**Status:** Fixed in `a32d114`. Owner-reported.
 
 **Seen.** A paid order rendering "THANK YOU" above "Your order is saved and nothing has been
 charged. Complete payment.", with a cart badge counting goods that were already gone. On another
@@ -166,7 +166,7 @@ timestamp. Anything that caches a view of state changed by an out-of-band event 
 
 ## 18. The cart emptied at the payment step
 
-**Status:** Fixed, uncommitted. Owner-reported.
+**Status:** Fixed in `cc1a4c0`. Owner-reported.
 
 **Seen.** Clicking "Continue to payment" emptied the cart and zeroed the badge — before any money
 moved. Abandoning at the card form left the customer with nothing.
@@ -196,7 +196,7 @@ payment lands anyway, `apply_payment_event` refuses to revive a cancelled order 
 
 ## 17. An abandoned checkout consumed its stock permanently
 
-**Status:** Fixed, uncommitted (Phase 5 task 6).
+**Status:** Fixed in `2ba3e4d` (Phase 5 task 6).
 
 **Seen.** Eight orders sitting `pending` in the development database, none of them paid, every one
 still holding stock it had taken at placement. A product could read sold out having earned nothing,
@@ -239,7 +239,7 @@ catalogue listing never asks. The numbers are in `stock.py`'s docstring.
 
 ## 16. The payment form rendered in a different typeface from the rest of the site
 
-**Status:** Fixed, uncommitted (Phase 5 task 3). Owner spotted it; four attempts to fix it.
+**Status:** Fixed in `6c80c73` (Phase 5 task 3). Owner spotted it; four attempts to fix it.
 
 **Seen.** The Stripe Payment Element rendered in the system font while every other page used Inter.
 `appearance.variables.fontFamily` was already set to `"Inter, system-ui, sans-serif"` and was doing
@@ -283,7 +283,7 @@ sitting in a panel nobody opened.
 
 ## 15. The payment page offered a card form for an order already paid
 
-**Status:** Fixed, uncommitted (Phase 5 task 3).
+**Status:** Fixed in `6c80c73` (Phase 5 task 3).
 
 **Seen.** The owner pressed "Pay", then reloaded shortly after. Navigating back to
 `/orders/{id}/pay` for an order whose payment had already succeeded rendered a live card form for
@@ -323,7 +323,7 @@ conditional rather than unconditional.
 
 ## 14. "One payment per order" was enforced only by application timing
 
-**Status:** Fixed, uncommitted (migration `4ff248d16b7f`).
+**Status:** Fixed in `989772e` (migration `4ff248d16b7f`).
 
 **Seen.** Found by reading the `payments` table during the task 2 walkthrough, not by a failure.
 `ensure_payment_intent` refuses to open a second payment for an order — but by `SELECT`ing first
@@ -362,7 +362,7 @@ on an unhandled `UniqueViolation`.
 
 ## 13. The money conversion promised to refuse a fraction and rounded it instead
 
-**Status:** Fixed, uncommitted (Phase 5 task 2 walkthrough).
+**Status:** Fixed in `837b4c8` (Phase 5 task 2 walkthrough).
 
 **Seen.** Not in production — found by reading `to_minor_units` in `app/services/payments.py`
 during the task 2 walkthrough, and confirmed by measuring rather than trusting the comment.
@@ -433,7 +433,7 @@ That last case is the task 4 rehearsal, since `STRIPE_WEBHOOK_SECRET` lands in `
 
 ## 11. Cancelling an order never returns its stock
 
-**Status:** Fixed, uncommitted (Phase 5 task 6). Open for four days.
+**Status:** Fixed in `2ba3e4d` (Phase 5 task 6). Open for four days.
 
 **Seen.** After a probe order was cancelled, the stock count stayed decremented. Putting it back
 meant editing the number by hand in `/admin/inventory`.
@@ -475,7 +475,7 @@ shelf went 0 → 2 with the audit row to match.
 
 ## 10. Partial stock is invisible in the cart
 
-**Status:** Fixed, uncommitted (Phase 5 task 6). Open for four days.
+**Status:** Fixed in `2ba3e4d` (Phase 5 task 6). Open for four days.
 
 **Seen.** A cart line is labelled only when stock hits **zero**. Hold 3 of something, let the vendor
 drop to 1, and the cart looks entirely fine until checkout fails with "only 1 in stock".
