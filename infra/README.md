@@ -157,6 +157,91 @@ did this; CloudWatch is how is it behaving.** CloudWatch is task 11.
 
 ---
 
+## Database — RDS PostgreSQL (task 4)
+
+A single `db.t4g.micro` running **PostgreSQL 16.15**, in `us-east-1`.
+
+### Why 16 and not the newest
+
+Local development runs `postgres:16-alpine` and this laptop has `psql`/`pg_dump` 16.15. **`pg_dump`
+refuses to dump a server newer than itself**, so an 18 server would break the backup-and-restore
+exercise Section 6.10 asks for — and it would fail as a version-mismatch error rather than
+anything that looks like a backup problem.
+
+The console offered 18.3 by default, and the tell that it had been applied was the parameter group
+reading `default.postgres18`. Worth knowing where that shows: the engine version itself is far up
+the form, but the parameter group sits right beside the settings you are actually checking.
+
+### Public, with the security group as the control
+
+`publicly_accessible = yes`, and `manitou-db-sg` allows port 5432 from **one `/32`** — the
+development laptop. Everything else is dropped.
+
+The alternatives all cost more than they are worth for a database with no data in it: a NAT Gateway
+is ~$32/month (more than the database), a bastion adds an EC2 to patch plus a tunnel in front of
+every migration, and running migrations from inside the VPC makes task 5 depend on task 6 while a
+private subnet has no internet for `pip install`.
+
+**Open item, Phase 8:** flip `publicly_accessible` to No and replace the IP rule with the API's
+security group, once ECS can apply migrations itself. The `/32` also needs re-editing whenever the
+ISP reassigns the laptop's address.
+
+### Settings that were chosen rather than defaulted
+
+| Setting | Value | Reason |
+| --- | --- | --- |
+| Instance class | `db.t4g.micro` | Graviton, cheaper than t3. Section 10.1 sizes to the early-launch tier. |
+| Availability | Single-AZ | Multi-AZ is ~2×. Section 6.10 puts it before launch — Phase 8. |
+| Storage autoscaling | **Off** | On by default with a 1,000 GB ceiling. Storage never scales back down, so it is a bill that only grows. |
+| Master username | `manitou` | Not `postgres`; the default is what scanners try first. |
+| Master password | RDS-managed in Secrets Manager | Never exists in plaintext outside an explicit retrieval. Rotation is built in. |
+| Initial database name | `manitou` | **Blank creates an instance with no database in it** — the failure surfaces much later as a confusing connection error. |
+| Backup retention | 7 days | Enables point-in-time recovery. |
+| Encryption at rest | On | Cannot be added later without a snapshot-and-restore. |
+| Deletion protection | On | Unticked by default. |
+| Enhanced Monitoring, Performance Insights | Off | Both bill. |
+
+Actual cost at creation: **$13.98/month** ($11.68 instance + $2.30 storage), against a ~$15
+estimate. The console's figure excludes backup storage, IOs and data transfer.
+
+### Two traps in the console
+
+**The credit tutorial pre-fills an Aurora production cluster.** Starting the "Create an Aurora or
+RDS database" activity opened the form set to Aurora PostgreSQL-Compatible, Production template,
+`db.r7g.large` with a replica, Enhanced Monitoring and Advanced Database Insights. Aurora is a
+different engine with a different pricing model — none of the estimates here apply to it. Changing
+*Engine type* to PostgreSQL re-renders the form with sane defaults without leaving the tutorial.
+
+**Express configuration creates Aurora Serverless, not RDS.** "Create with full configuration" is
+what used to be called Standard create, and it is the one that exposes public access, initial
+database name, storage autoscaling and deletion protection.
+
+### How it was verified
+
+A permit test and a refusal test, because either alone proves nothing:
+
+- **From the laptop** — `psql` connects, TLS 1.3 / AES-256-GCM, prompt reads `manitou=>`.
+- **From a phone hotspot** — the same command **times out**. Not "connection refused": security
+  groups have no deny rule, so unmatched traffic is dropped silently. A password prompt here would
+  have meant the source was wider than one IP.
+
+Connecting only from the laptop is equally consistent with the group being open to the world. The
+second test is what separates those.
+
+Incidental confirmation of the version: `psql` prints `psql (16.15, server 18.3)` when majors
+differ. It printed no server line, so the server is 16.x.
+
+### Notes for later
+
+- The master user is **not** a Postgres superuser (`manitou=>`, not `=#`). AWS keeps superuser to
+  itself — part of what "managed" means. `rds_superuser` covers everything Alembic does.
+- A **stopped instance still bills for storage, and RDS restarts it after 7 days.** Stopping
+  between sessions is worth doing; it is not a way to park the instance.
+- **RDS Proxy** (Section 6.11, connection pooling) bills per vCPU-hour and solves a problem this
+  project does not have yet. Phase 8, if the load test says so.
+
+---
+
 ## Region
 
 Not yet fixed at time of writing. IAM is global, so nothing in task 3 depended on it.
