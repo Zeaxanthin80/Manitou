@@ -1,9 +1,35 @@
-from pydantic import SecretStr
+from urllib.parse import quote
+
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    database_url: str
+    #: The connection string, supplied directly OR assembled from the DB_* fields.
+    #:
+    #: Two ways in, because the two environments hand credentials over
+    #: differently. Development sets this whole string in .env. Production
+    #: cannot: ECS injects the password from the RDS-managed Secrets Manager
+    #: secret as its own variable, and that secret holds `{username, password}`
+    #: JSON rather than a URL.
+    #:
+    #: Reading the RDS secret directly is the point -- the alternative is copying
+    #: the password into a second secret holding a full URL, which goes stale the
+    #: moment RDS rotates and fails as a connection error naming nothing. It has
+    #: already been rotated twice by hand during Phase 6.
+    #:
+    #: Empty rather than required so the assembly below can fill it. The
+    #: boot-time failure a required field gave is preserved by the validator,
+    #: which raises when neither form is complete.
+    database_url: str = ""
+
+    # --- the assembly path, for production ----------------------------------
+    #: Unset in development, where DATABASE_URL is given whole.
+    db_host: str = ""
+    db_port: int = 5432
+    db_user: str = ""
+    db_name: str = ""
+    db_password: SecretStr = SecretStr("")
 
     # Signing key for JWTs. Local development uses the value in .env; production
     # draws a different one from AWS Secrets Manager (Section 4.2). A leaked
@@ -48,6 +74,63 @@ class Settings(BaseSettings):
     # working offline. Tests do not use this -- they override the dependency
     # directly, so the suite never depends on how a laptop happens to be set up.
     payment_gateway: str = "stripe"
+
+    @model_validator(mode="after")
+    def _assemble_database_url(self) -> "Settings":
+        """Build database_url from the DB_* parts when it was not supplied whole.
+
+        **The password is percent-encoded**, and the reason is narrower than it
+        looks. SQLAlchemy's make_url is a lenient parser: measured, it reads a
+        raw `#`, `)`, `%` and `/` in the password position correctly, so this is
+        not fixing a bug in the path we use today.
+
+        It is encoded because the encoded form is the RFC 3986-correct one, and
+        `database_url` is a plain string that anything may consume -- a psql
+        invocation, a future migration runner, libpq directly. Depending on one
+        parser's tolerance is a bet renewed every time a new consumer appears.
+        `safe=""` because quote() leaves `/` alone by default, and `/` ends the
+        authority section in a stricter parser.
+
+        Note this does NOT create defect 21 (percent-encoding breaking
+        configparser in alembic/env.py). A password containing a literal `%` --
+        which RDS can generate -- puts a `%` in the URL whether or not we encode,
+        so env.py's `%%` escape was always required. Encoding only makes it
+        surface sooner.
+
+        sslmode=require because assembly only ever happens against RDS, and the
+        connection crosses a network. Development sets DATABASE_URL directly and
+        keeps whatever mode it wants.
+
+        Raising here rather than defaulting to something: a misconfigured store
+        should fail at boot naming the missing field, not at the first request
+        with a connection error. Same instinct as validate_gateway_name in
+        main.py and as defect 12.
+        """
+        if self.database_url:
+            return self
+
+        missing = [
+            name
+            for name, value in (
+                ("DB_HOST", self.db_host),
+                ("DB_USER", self.db_user),
+                ("DB_NAME", self.db_name),
+                ("DB_PASSWORD", self.db_password.get_secret_value()),
+            )
+            if not value
+        ]
+        if missing:
+            raise ValueError(
+                "Set DATABASE_URL, or all of DB_HOST/DB_USER/DB_NAME/DB_PASSWORD "
+                f"so it can be assembled. Missing: {', '.join(missing)}."
+            )
+
+        password = quote(self.db_password.get_secret_value(), safe="")
+        self.database_url = (
+            f"postgresql://{self.db_user}:{password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}?sslmode=require"
+        )
+        return self
 
     model_config = SettingsConfigDict(env_file=".env")
 

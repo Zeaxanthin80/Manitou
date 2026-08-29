@@ -419,6 +419,134 @@ it. From task 7 on, a deployed tag should be treated as immutable whether or not
 
 ---
 
+## The API service — ECS Express Mode (task 7)
+
+One `aws ecs create-express-gateway-service` call provisions the lot: the `default` ECS cluster on
+Fargate, a task definition, a service with canary deployment and autoscaling, an **Application Load
+Balancer with an HTTPS listener and an ACM certificate**, security groups, a CloudWatch log group,
+metric alarms, and a public URL. Roughly 3–5 minutes.
+
+The certificate is worth noticing — TLS 1.3 on an Amazon-issued cert for the generated hostname,
+with no certificate work of our own. That is most of what task 10 would otherwise have to arrange
+for the API.
+
+### Sizing, and the default that would have cost the most
+
+| | chosen | Express Mode default |
+| --- | --- | --- |
+| CPU / memory | **512 / 1024** | 1024 / 2048 |
+| max tasks | **2** | **20** |
+| health check path | **/health** | `/` |
+
+**`maxTaskCount` defaults to 20.** At roughly $18/task that is ~$360/month if anything drives CPU
+above the 60% scaling target. Capping it is the single most valuable line in the whole command.
+
+Not 256/512 for CPU/memory: Fargate hard-kills a task that exceeds its memory limit, and diagnosing
+an OOM restart loop costs more than the ~$9/month saved. Trim from CloudWatch data later rather than
+guessing now — Section 10.1's principle applied to the compute rather than the database.
+
+The health check path is not optional here. The default is `/`, and this API has no route there, so
+every health check would 404 and the deployment would fail with nothing obviously wrong.
+
+### Reaching the database: authorise before deploying
+
+`/health` runs `SELECT 1`. The target group checks it every 30s and marks a target unhealthy after
+**2 failures**, against a 300s grace period — so a task that cannot reach RDS fails the deployment
+about six minutes in, and Express Mode's canary strategy **cannot be changed** to soften that.
+
+So the security group came first, not after:
+
+1. `manitou-api-sg` created in the default VPC.
+2. `manitou-db-sg` given an inbound rule: TCP 5432, **source `manitou-api-sg`** — a group reference,
+   not a CIDR.
+3. That group passed to `--network-configuration`.
+
+A group-referencing rule admits traffic from any ENI carrying that group. And because RDS sits in
+the same VPC, its endpoint resolves to a **private** address from inside — traffic never leaves the
+VPC despite `publiclyAccessible = true`.
+
+**Providing a security group adds to Express Mode's own, it does not replace them.** The running
+service carries two: ours and the auto-created service group. Confirmed in the deployed
+configuration, and it matters — a rule referencing only ours still works because the ENI carries
+both.
+
+### Secrets: injected, never stored in the definition
+
+`ExpressGatewayContainer` takes `environment` **and** a separate `secrets` list whose `valueFrom` is
+a Secrets Manager ARN with an optional JSON key selector. So this did not wait for task 11, and
+should not have: **task definition revisions are immutable**, so a plaintext key in revision 1 stays
+readable until that revision is deregistered *and* deleted.
+
+```
+secrets (ARN references)                  environment (plaintext, by design)
+  DB_PASSWORD  → rds!db-…:password::        DB_HOST, DB_PORT, DB_USER, DB_NAME
+  JWT_SECRET   → manitou/api:jwt_secret::   STRIPE_PUBLISHABLE_KEY  (public by design)
+  STRIPE_SECRET_KEY → manitou/api:…         EMAIL_SENDER, PAYMENT_GATEWAY
+```
+
+**The database password is read straight from the RDS-managed secret** — no copy anywhere. That is
+the whole reason for the `config.py` change below: a duplicated password goes stale the moment RDS
+rotates, and fails as a connection error naming the host rather than the credential. It has already
+been rotated twice by hand during this phase.
+
+The execution role carries an inline policy granting `secretsmanager:GetSecretValue` on **exactly
+those two ARNs** — not a wildcard. This is where least privilege actually applies, as the identity
+section above argues: a machine role that can do one thing is a real control.
+
+The **JWT signing key is newly generated**, not the development one. Section 4.2: a leaked
+development secret must never be able to forge production tokens.
+
+### Why `DATABASE_URL` is assembled rather than passed
+
+The RDS-managed secret holds `{username, password}` JSON, not a connection string, so there is no
+whole URL to inject. `backend/app/config.py` therefore builds one from `DB_HOST/PORT/USER/NAME` plus
+the injected `DB_PASSWORD` when `DATABASE_URL` is absent, percent-encoding the password and
+appending `sslmode=require`.
+
+Done as a validator on the single `database_url` field rather than at the call sites, because five
+places read it — `db.py`, `alembic/env.py`, `conftest.py` twice, `seed.py` — and all of them want a
+string. None of them changed.
+
+Two things learned while building it, both by measurement:
+
+- **SQLAlchemy's `make_url` is lenient.** It parses a raw `#`, `)`, `%` or `/` in the password
+  correctly, so the encoding is not fixing a bug in today's path. It is there because the encoded
+  form is RFC 3986-correct and `database_url` is a plain string any consumer may parse. An earlier
+  version of the comment claimed a raw `#` truncates the URL; that was wrong and is corrected.
+- **The encoding does not cause defect 21.** A password containing a literal `%` — which RDS can
+  generate — puts a `%` in the URL whether or not we encode, so `env.py`'s `%%` escape was always
+  required. Encoding only makes it surface sooner.
+
+Locally, `backend/.env` always supplies `DATABASE_URL`, so the assembly branch never runs — the
+tests pass `_env_file=None` to reach it. The container has no `.env` at all (`.dockerignore`), which
+is what makes production the real exercise of that code.
+
+### Two failures worth recording
+
+**The service-linked role must exist first.** The first `create-express-gateway-service` failed with
+*"Unable to assume the service linked role"* — and **created `AWSServiceRoleForECS` as a side effect
+while failing**. The retry then worked. The console creates these implicitly; the API does not.
+`AWSServiceRoleForElasticLoadBalancing` and `AWSServiceRoleForApplicationAutoScaling_ECSService` were
+created explicitly rather than discovered the same way.
+
+**The managed policy ARN is not guessable.** It is
+`arn:aws:iam::aws:policy/service-role/AmazonECSInfrastructureRoleforExpressGatewayServices` — a
+`/service-role/` path and a lowercase `for`. `iam list-policies --scope AWS` did not surface it; the
+documentation did.
+
+### How it was verified
+
+- **`/health` → `{"status":"ok"}` over HTTPS.** One request proves the image ran, `store-config.json`
+  resolved at `parents[2]`, all three secrets were injected, the assembled URL parsed, and the task
+  reached RDS through the group-referencing rule.
+- **`/products` → `{"items":[],"total":0}`.** Empty is the pass: schema without rows.
+- **The environment contains no `DATABASE_URL`** — yet the service connects. That absence is what
+  proves the assembly path runs in production rather than only in tests.
+- **Every task definition revision scanned for `sk_test_`, `sk_live_` and `postgresql://`** — clean,
+  including revision 1 from the failed attempt. The control for the entire secrets decision.
+
+---
+
 ## Region
 
 Not yet fixed at time of writing. IAM is global, so nothing in task 3 depended on it.
