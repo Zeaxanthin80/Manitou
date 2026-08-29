@@ -1,0 +1,47 @@
+# What never reaches the build context.
+#
+# This file does real work rather than tidying, because backend/Dockerfile builds
+# from the REPOSITORY ROOT -- it has to, so that store-config.json is reachable
+# (see the comment at the top of that file). Without these rules the daemon would
+# receive the entire repo, node_modules and .venv included.
+#
+# Docker reads .dockerignore only from the context root, so this belongs here and
+# not in backend/.
+
+# --- secrets -----------------------------------------------------------------
+# The one that actually matters. An image with .env baked in hands its Stripe
+# secret key and database password to anyone who can pull it -- and a pushed
+# image is far harder to un-share than a file. .env.example stays out too; it is
+# documentation, useless inside a container.
+**/.env
+**/.env.*
+
+# --- weight ------------------------------------------------------------------
+# 166 MB, and Linux-incompatible anyway: a venv hardcodes absolute paths and
+# links against the host's interpreter. If one leaked in it would not work, it
+# would just make the image enormous.
+backend/.venv/
+
+# The web app is deployed separately to Amplify (task 8). None of it belongs in
+# the API image, and node_modules is the single largest directory in the repo.
+web/
+**/node_modules/
+
+# --- code the production image has no use for --------------------------------
+# CLAUDE.md's rule is about DEPENDENCIES -- the image installs requirements.txt
+# alone, so pytest is absent. This excludes the test FILES as well. The two fail
+# independently, which is why both are verified separately.
+backend/tests/
+
+# --- noise -------------------------------------------------------------------
+**/__pycache__/
+**/*.py[cod]
+.git/
+.gitignore
+.github/
+docs/
+infra/
+mobile-android/
+mobile-ios/
+*.md
+.claude/

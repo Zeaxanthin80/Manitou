@@ -317,6 +317,108 @@ written it to CloudWatch Logs under a 90-day retention policy. The master passwo
 
 ---
 
+## The API container and ECR (task 6)
+
+`backend/Dockerfile` on `python:3.12-slim`, `linux/amd64`, pushed to a private ECR repository
+called `manitou-api`.
+
+### Build from the repository root
+
+```
+docker build --platform linux/amd64 --provenance=false --sbom=false \
+  -f backend/Dockerfile -t manitou-api:local .
+```
+
+**The context has to be the root**, and that is not stylistic. `app/store.py` reads
+`store-config.json` at import time from `Path(__file__).resolve().parents[2]` — one level *above*
+`backend/`. An image built by copying `backend/` alone would resolve that to `/` and die on import,
+before FastAPI starts, naming a path nobody wrote.
+
+So the image mirrors the repo's shape: `/app/store-config.json` beside `/app/backend/`. Preserving
+the layout rather than making the path configurable means the logic that works in development works
+in the container for the same reason, instead of by a second arrangement someone has to keep in
+step. Verified by mutation — mount `/dev/null` over the file and the container dies on a JSON parse
+error, so the copy is load-bearing rather than decorative.
+
+### Choices worth their reasons
+
+| | |
+| --- | --- |
+| **slim, not Alpine** | Every wheel here — `psycopg2-binary`, `pillow`, `bcrypt`, `uvloop`, `httptools` — ships as `manylinux`, which Alpine's musl libc cannot use. Alpine would compile them from source and end up larger and slower to build than the image it was meant to beat. |
+| **`--host 0.0.0.0`** | A container binding loopback is unreachable from outside itself. The symptom is a process that starts cleanly and answers nothing. |
+| **Exec-form `CMD`** | uvicorn becomes PID 1 and receives SIGTERM directly. Shell form puts `/bin/sh` at PID 1, which does not forward signals, so ECS would wait out its full stop timeout on every deploy. |
+| **`PYTHONUNBUFFERED=1`** | Python block-buffers stdout when not a TTY. Without it CloudWatch shows nothing until the buffer fills, and a task killed mid-buffer loses exactly the logs that would say why. |
+| **non-root `USER`** | uid 10001. Nothing here needs root. |
+| **no `--workers`** | Express Mode scales by running more tasks; one process per container keeps the scaling unit a task rather than a hidden pool inside one. |
+
+`--platform` belongs on the build command, not pinned in `FROM` — a constant there makes the file
+unusable for any other architecture, and buildx warns about it. Getting the architecture wrong
+produces `exec format error`: a task that starts, dies and restarts forever with nothing useful in
+the logs. One `docker image inspect --format '{{.Os}}/{{.Architecture}}'` is cheaper than diagnosing
+that.
+
+### Two ECR findings, both silent
+
+**`scanOnPush=true` on the repository did nothing.** The registry-level scanning configuration
+governs, and it read `type: BASIC, rules: []` — so no rule matched and no scan ran. Nothing errors;
+`describe-image-scan-findings` simply reports that no scan exists. Fixed with a registry rule:
+
+```
+aws ecr put-registry-scanning-configuration --scan-type BASIC --region us-east-1 \
+  --rules '[{"scanFrequency":"SCAN_ON_PUSH","repositoryFilters":[{"filter":"*","filterType":"WILDCARD"}]}]'
+```
+
+**buildx's default output cannot be scanned.** It attaches provenance and SBOM attestations, which
+forces an OCI *image index* even for a single platform, and ECR basic scanning refuses that media
+type outright (`UnsupportedImageTypeException`). `--provenance=false --sbom=false` produces a plain
+`application/vnd.oci.image.manifest.v1+json`, which scans. It also stops each push leaving an
+untagged index and attestation behind.
+
+### What the scan found
+
+All Debian base-image packages, none from `requirements.txt`.
+
+| | findings | CRITICAL | HIGH |
+| --- | --- | --- | --- |
+| `v1` — base image as shipped | 28 | 4 | 15 |
+| `v2` — after `apt-get upgrade` | 18 | 4 | 8 |
+
+The `apt-get upgrade` layer is worth its cost in reproducibility: a base image is a point-in-time
+snapshot, and an image that never upgrades accumulates CVEs by standing still.
+
+**The 4 CRITICALs are carried deliberately** — 3 in `perl`, 1 in `glibc`, with no Debian fix
+available. `perl-base` is `Essential: yes, Priority: required`, and nothing in this application
+invokes perl. Removing an Essential package to move a scanner number is a worse trade than an
+unreachable CVE. A distroless base would remove perl entirely; that is a Phase 8 question, not a
+reason to break dpkg now.
+
+### Access keys now exist
+
+Deferred since task 3 specifically so they would exist for the shortest possible time; the ECR push
+is what needed them. They live in `~/.aws/credentials`, **outside the repository** — which is why
+`.env.example` has no AWS keys and must not gain any.
+
+**Docker credential storage needed a decision.** Docker Desktop's helper delegates to `pass`, which
+needs a GPG key this machine has none of. `credsStore` was removed from `~/.docker/config.json`
+(backed up alongside it), so Docker stores the registry auth base64-encoded in that file instead.
+Base64 is encoding, not encryption — but the stored value is an ECR token that expires in 12 hours,
+not a standing credential. Initialising `pass` with a GPG key is the better answer if this machine
+ever holds more registry logins.
+
+`aws ecr get-login-password | docker login --password-stdin` rather than `--password`: the latter
+puts a live token in shell history and in the process list, where any other user on the machine can
+read it.
+
+### Tags
+
+`v1`, `v2` — never `latest`. A moving tag makes "which image is running?" unanswerable and turns
+rollback into guesswork. Task 7 deploys a specific tag.
+
+The repository is `MUTABLE`, so a tag *can* be overwritten; `v1` was, once, before anything consumed
+it. From task 7 on, a deployed tag should be treated as immutable whether or not ECR enforces it.
+
+---
+
 ## Region
 
 Not yet fixed at time of writing. IAM is global, so nothing in task 3 depended on it.
