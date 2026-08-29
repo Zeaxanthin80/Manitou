@@ -18,7 +18,7 @@ picker.
 
 from decimal import Decimal
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select, text
 
 from app.config import settings
 from app.db import SessionLocal
@@ -61,7 +61,13 @@ CUSTOMER_EMAIL = "customer@manitou.example"
 CUSTOMER_PASSWORD = "customer"  # local development only
 
 # Children before parents, so no delete leaves a dangling reference.
-DELETE_ORDER = (
+#: What the summary at the end counts. Not a delete order any more -- see wipe().
+#:
+#: It listed deletion order until Phase 5.5, and went stale the moment `shipments`
+#: was added: re-seeding a database that had ever dispatched an order died on
+#: `fk_shipments_order_id_orders`. Keeping a hand-written list of every table in
+#: two places was the mistake; wipe() now reads the catalog instead.
+REPORTED_MODELS = (
     Payment,
     OrderItem,
     Order,
@@ -75,6 +81,44 @@ DELETE_ORDER = (
     Category,
     User,
 )
+
+
+def wipe(session) -> None:
+    """Empty every table, exactly the way tests/conftest.py does.
+
+    TRUNCATE rather than DELETE, over names read from the catalog rather than a
+    list kept here. Both halves were learned from failures:
+
+    - **The hand-written list went stale.** Phase 5.5 added `shipments` and
+      `shipment_events` and nothing updated it, so re-seeding any database where
+      an order had been dispatched died on a foreign key violation. A catalog
+      query cannot drift when a migration adds a table.
+    - **DELETE cannot clear the append-only tables at all.** `audit_events` and
+      `shipment_events` carry a trigger that rejects DELETE outright, so adding
+      them to a delete list would only move the failure. TRUNCATE does not fire
+      row-level triggers, so it gets past them -- and CASCADE means foreign keys
+      stop dictating an order.
+
+    RESTART IDENTITY so a fresh seed always produces the same ids, which makes
+    the URLs in a walkthrough document stable.
+
+    `alembic_version` is excluded deliberately: truncating it would discard the
+    schema state and leave the next `alembic upgrade` re-running every migration
+    against tables that already exist.
+    """
+    names = [
+        r[0]
+        for r in session.execute(
+            text(
+                "SELECT tablename FROM pg_tables "
+                "WHERE schemaname='public' AND tablename <> 'alembic_version'"
+            )
+        )
+    ]
+    if names:
+        session.execute(
+            text(f"TRUNCATE {', '.join(names)} RESTART IDENTITY CASCADE")
+        )
 
 
 def check_is_local() -> None:
@@ -120,8 +164,7 @@ def main() -> None:
     check_is_local()
 
     with SessionLocal() as session:
-        for model in DELETE_ORDER:
-            session.execute(delete(model))
+        wipe(session)
 
         # Categories -- a parent with two children, exercising categories.parent_id.
         apparel = Category(name="Apparel", slug="apparel")
@@ -264,7 +307,7 @@ def main() -> None:
         session.commit()
 
         print("Seeded:")
-        for model in reversed(DELETE_ORDER):
+        for model in reversed(REPORTED_MODELS):
             count = session.scalar(select(func.count()).select_from(model))
             print(f"  {model.__tablename__:<18} {count}")
         print(f"\nAdmin login:    {ADMIN_EMAIL} / {ADMIN_PASSWORD}")

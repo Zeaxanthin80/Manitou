@@ -242,6 +242,81 @@ differ. It printed no server line, so the server is 16.x.
 
 ---
 
+## Migrations against RDS (task 5)
+
+Schema only — no seed data, no admin user. The production database gets its first admin at task 7
+by registering through the live site and one `UPDATE users SET role='admin'`, so no password is
+ever hashed by hand.
+
+### Retargeting one shell, not the environment
+
+`alembic/env.py` resolves its URL from `settings.database_url`, and pydantic-settings reads
+**environment variables ahead of `.env`**. Exporting `DATABASE_URL` for a single terminal therefore
+points Alembic at RDS while `backend/.env` stays untouched and local development carries on against
+Docker. Closing the terminal restores everything.
+
+**`unset DATABASE_URL` when finished.** A shell still holding it aims *every* later command at
+production — including `pytest`, whose conftest derives the test database URL by string surgery on
+`settings.database_url` and would point `CREATE DATABASE` and its between-test `TRUNCATE` at RDS.
+
+### The schema matched, by number
+
+Comparing table counts alone would have proved very little. `PROJECT_PLAN.md` Section 6.8 records
+that **Alembic autogenerate detects neither CHECK constraints nor triggers** — every one of those
+was hand-written into a migration, so they are exactly the things that could have been missing while
+a table list looked perfect.
+
+| | local | RDS |
+| --- | --- | --- |
+| Tables | 18 | 18 |
+| Triggers | 4 | 4 |
+| Functions | 2 | 2 |
+| CHECK constraints | 12 | 12 |
+| Indexes | 45 | 45 |
+| Alembic head | `be02c29a9f3c` | `be02c29a9f3c` |
+
+The append-only trigger was then tested for **behaviour** rather than existence, since the triggers
+are `FOR EACH ROW` and an `UPDATE` against an empty table would not fire one — a test that passes
+for the wrong reason. Wrapped in `BEGIN … ROLLBACK` so nothing persists, which matters because
+`audit_events` rejects `DELETE` too and a stray test row could never be removed:
+
+```
+ERROR:  audit_events is append-only; UPDATE is not permitted
+CONTEXT:  PL/pgSQL function audit_events_append_only() line 3 at RAISE
+```
+
+Section 6.11's claim holds: same schema in both places, one connection string apart, because the
+same migrations built both.
+
+### Two bugs this surfaced
+
+Pointing the application at a second environment for the first time is what found them. Both were
+latent, and both are recorded in `docs/defect-log.md` (21 and 22).
+
+- **Any password containing `%` broke Alembic.** `set_main_option` writes through configparser,
+  where `%` starts an interpolation token — and percent-encoding a `#` for URL-safety produces
+  exactly that. `devpassword` has no special characters, so nothing could reveal it locally.
+- **`seed.py` could not reseed a database that had shipped an order.** Its hand-written delete
+  order went stale when Phase 5.5 added `shipments`. It now uses the catalogue-driven
+  `TRUNCATE … RESTART IDENTITY CASCADE` the test suite already used.
+
+### Handling the password
+
+Two things that are not obvious and cost time:
+
+- **URL-encode it.** RDS excludes `/`, `"`, `@` and space from generated passwords, but `#`, `%`
+  and `?` are all possible and each changes how a URL parses. A `#` truncates the string silently
+  and the resulting error names the host, not the password.
+- **`HISTCONTROL` is unset on the development machine**, so prefixing a command with a space does
+  *not* keep it out of `~/.bash_history`. That behaviour requires `HISTCONTROL=ignorespace`. Read
+  the password with `read -rsp` into a variable instead; history then stores `$PGPW`, never a value.
+
+**A traceback can publish a credential.** Alembic's configparser error quotes the whole connection
+string, password included. It reached a terminal here; one task later the same failure would have
+written it to CloudWatch Logs under a 90-day retention policy. The master password was rotated.
+
+---
+
 ## Region
 
 Not yet fixed at time of writing. IAM is global, so nothing in task 3 depended on it.

@@ -16,6 +16,8 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [22](#22-seedpy-could-no-longer-reseed-a-database-that-had-shipped-an-order) | 2026-08-29 | `seed.py` could no longer reseed a database that had shipped an order | Fixed — uncommitted |
+| [21](#21-any-database-password-containing--broke-alembic) | 2026-08-29 | Any database password containing `%` broke Alembic | Fixed — uncommitted |
 | [20](#20-a-validation-error-outlived-the-problem-it-described) | 2026-08-22 | A validation error outlived the problem it described | Fixed — uncommitted |
 | [19](#19-the-receipt-contradicted-itself-after-payment) | 2026-08-22 | The receipt contradicted itself after payment | Fixed — uncommitted |
 | [18](#18-the-cart-emptied-at-the-payment-step) | 2026-08-22 | The cart emptied at the payment step | Fixed — uncommitted |
@@ -36,6 +38,70 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 22. `seed.py` could no longer reseed a database that had shipped an order
+
+**Status:** Fixed, uncommitted (Phase 6 task 5).
+
+**Seen.** `python seed.py` against the local development database died with
+`ForeignKeyViolation: update or delete on table "orders" violates constraint
+"fk_shipments_order_id_orders" — Key (id)=(108) is still referenced from table "shipments"`.
+
+**Cause.** `DELETE_ORDER`, a hand-written tuple naming every model in dependency order, was written
+in Phase 1 and never updated. Phase 5.5 added `shipments` and `shipment_events`; neither was in the
+list, so `DELETE FROM orders` ran while a shipment still pointed at one. It only surfaced after an
+order had actually been dispatched locally, which is why five phases passed without noticing.
+
+**The obvious fix would also have failed.** Adding the two models to the list moves the failure
+rather than removing it: `shipment_events` and `audit_events` carry a trigger that rejects `DELETE`
+outright. A delete-based wipe cannot clear an append-only table at all.
+
+**Fixed.** `wipe(session)` replaces the loop, using exactly what `tests/conftest.py` already does —
+`TRUNCATE … RESTART IDENTITY CASCADE` over table names read from `pg_tables`, excluding
+`alembic_version`. Two properties matter and neither is incidental:
+
+- **Read from the catalogue, so it cannot go stale.** The bug was a second hand-maintained list of
+  every table. A migration that adds one is now picked up with no edit here.
+- **TRUNCATE does not fire row-level triggers,** so it passes the append-only guards where `DELETE`
+  cannot. `CASCADE` also removes the need to encode a dependency order by hand at all.
+
+The tuple survives, renamed `REPORTED_MODELS`, for the summary printed at the end — which is what it
+is actually used for now.
+
+**Verified against the data that broke it**, not a clean database: 45 orders, 2 shipments, 8
+shipment events and 136 audit events. All cleared, ids restarted, and the append-only trigger still
+rejects an `UPDATE` afterwards — TRUNCATE empties a table without disarming it.
+
+---
+
+## 21. Any database password containing `%` broke Alembic
+
+**Status:** Fixed, uncommitted (Phase 6 task 5).
+
+**Seen.** The first `alembic upgrade head` against RDS raised
+`ValueError: invalid interpolation syntax in 'postgresql://…' at position 32` — before any
+connection was attempted, and with the entire connection string quoted back in the message.
+
+**Cause.** `alembic/env.py` passes the URL to `config.set_main_option`, which writes through
+`configparser`, where `%` begins an interpolation token. RDS had generated a master password
+containing `#`; percent-encoding it for URL-safety produced `%23`, and configparser rejected it.
+
+Two encodings with incompatible rules for the same character, one wrapped inside the other. Local
+development never hit it because `devpassword` has no special characters — the code was wrong for
+five phases and nothing could reveal it until a password was generated rather than chosen.
+
+**Fixed.** `settings.database_url.replace("%", "%%")` at the one call site, `%%` being configparser's
+own escape. Verified as a round trip in both directions: four URLs — plain, `%23`, `%29 %23`, and a
+literal `%%` — all come back identical through `set_main_option`/`get_main_option`, and the two
+encoded cases still raise without the escape, which is what makes the escape load-bearing rather
+than decorative.
+
+**Worth its own note: the error message published the password.** Anything that quotes a connection
+string back is a credential disclosure, and here it went to a terminal and then into a screenshot.
+Had it surfaced one task later, the same traceback would have gone to CloudWatch Logs with 90-day
+retention. The RDS master password was rotated.
 
 ---
 

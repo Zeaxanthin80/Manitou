@@ -21,7 +21,19 @@ config = context.config
 # unconditionally would silently run the migration against the development
 # database instead.
 if not config.get_main_option("sqlalchemy.url", None):
-    config.set_main_option("sqlalchemy.url", settings.database_url)
+    # `%` doubled, because set_main_option writes through configparser, where a
+    # single `%` starts an interpolation token. A password containing one -- or
+    # any percent-encoded character, which is how you are told to write `#` or
+    # `@` into a URL -- raises ValueError before a connection is attempted, and
+    # the message quotes the whole URL back at you, password included.
+    #
+    # Found the first time Alembic ran against RDS: the generated master password
+    # held a `#`, percent-encoding made it `%23`, and configparser rejected it.
+    # `devpassword` locally has no special characters, so nothing caught it for
+    # five phases.
+    config.set_main_option(
+        "sqlalchemy.url", settings.database_url.replace("%", "%%")
+    )
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

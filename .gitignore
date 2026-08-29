@@ -4,7 +4,14 @@ __pycache__/
 *.pyc
 
 # Environment secrets
+#
+# `.env` alone does NOT cover .env.rds / .env.production / .env.local -- all
+# plausible names for a file holding a production database password, and all
+# committable until this pattern existed. The negation keeps .env.example
+# tracked: tests/test_config.py reads it and asserts it matches Settings.
 .env
+.env.*
+!.env.example
 
 # Node / Next.js
 node_modules/
