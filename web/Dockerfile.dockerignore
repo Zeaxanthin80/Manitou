@@ -1,0 +1,26 @@
+# Overrides the root .dockerignore for `-f web/Dockerfile` builds only.
+#
+# BuildKit gives <dockerfile-path>.dockerignore precedence over the root file.
+# Necessary because the root one excludes web/ outright -- correct for the API
+# image, fatal for this one. One build context, two images, opposite needs.
+
+**/.env
+**/.env.*
+
+# The backend is a separate image. Its venv alone is 166 MB.
+backend/
+
+# node_modules is reinstalled from the lockfile inside the image, and .next is
+# rebuilt. Copying either would be slower AND wrong: a host-built .next can
+# contain absolute paths and native binaries for the wrong platform.
+web/node_modules/
+web/.next/
+
+.git/
+.github/
+.claude/
+docs/
+infra/
+mobile-android/
+mobile-ios/
+*.md

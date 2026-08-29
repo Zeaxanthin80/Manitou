@@ -152,7 +152,7 @@ These choices are settled. Do not substitute them.
 | CI/CD                 | **GitHub Actions**                                                                                  | You know Git; automate tests and deploys                                                                                                             |
 | API hosting           | **Amazon ECS (Express Mode)**                                                                       | AWS App Runner closed to new customers April 30, 2026; Express Mode is AWS's official successor — same App Runner-like simplicity, on top of Fargate |
 | Container registry    | **Amazon ECR**                                                                                      | Express Mode deploys pre-built images only (no source builds), so the Docker image is pushed here first                                              |
-| Web hosting           | **AWS Amplify Hosting**                                                                             | Runs Next.js with built-in CI/CD from your Git repo                                                                                                  |
+| Web hosting           | **Amazon ECS (Express Mode)**                                                                             | Runs the Next.js container, sharing the API's load balancer. Not Amplify: it supports Next.js 12-15, this app is on 16 (Section 7)                                                                                                  |
 | Database hosting      | **AWS RDS (PostgreSQL)**                                                                            | Managed Postgres with backups and failover                                                                                                           |
 | Images / static files | **AWS S3 + CloudFront**                                                                             | Store product images; serve them via CDN                                                                                                             |
 | DNS + HTTPS           | **AWS Route 53 + ACM**                                                                              | Domain and free TLS certificates                                                                                                                     |
@@ -902,7 +902,9 @@ because that is when it starts mattering.
    recommended successor to App Runner (closed to new customers as of April 30, 2026). Express
    Mode runs on the same Fargate compute and automates the cluster, load balancer, HTTPS, and
    scaling setup App Runner used to handle.
-8. **[You + Claude Code]** Deploy the web app to **Amplify Hosting**, connected to your Git repo.
+8. **[You + Claude Code]** Deploy the web app as a **second ECS Express Mode service**, sharing the
+   ALB the API already pays for. Not Amplify Hosting — it supports Next.js 12–15 and this app is on
+   16.3.0. See the Amplify note in Section 7.
 9. **[You + Claude Code]** Set up **S3 + CloudFront** for product images and switch uploads to use them.
    This is where the admin image field becomes a real upload. Until now it is a picker listing the
    files already in `web/public/` — deliberately not a free-text URL box, because an external
@@ -1386,13 +1388,25 @@ pooling** (SQLAlchemy's pool, plus
 | Database              | **RDS (PostgreSQL)**   | Managed Postgres; enable backups; add Multi-AZ before launch                            |
 | API hosting           | **ECS (Express Mode)** | Runs your container on Fargate with minimal setup — AWS App Runner's official successor |
 | Container registry    | **ECR**                | Where your built API image is pushed before Express Mode deploys it                     |
-| Web hosting           | **Amplify Hosting**    | Runs Next.js with CI/CD from your Git repo                                              |
+| Web hosting           | **ECS (Express Mode)** | Amplify supports Next.js 12-15; this app is on 16. See the note below                   |
 | Images / static files | **S3 + CloudFront**    | Store product images in S3, serve via the CDN                                           |
 | DNS + HTTPS           | **Route 53 + ACM**     | Domain plus free TLS certificates                                                       |
 | Secrets               | **Secrets Manager**    | DB password, Stripe keys — out of Git                                                   |
 | Permissions           | **IAM**                | Least-privilege roles; a dedicated user for daily work                                  |
 | Networking            | **VPC**                | Keep RDS private; only the API reaches it                                               |
 | Monitoring            | **CloudWatch**         | Logs, metrics, alarms — Express Mode wires this up automatically                        |
+
+**A note on Amplify Hosting:** the original version of this plan specified Amplify Hosting for the
+web app. Amplify Hosting's compute SSR provider supports **Next.js 12 through 15**, and this project
+runs **16.3.0** — AWS's own migration page states "Currently, the Amplify Hosting compute SSR
+provider supports Next.js version 15." So the storefront is deployed as a **second ECS Express Mode
+service** instead.
+
+The cost argument makes it a comfortable substitution rather than a compromise: **up to 25 Express
+Mode services in one VPC share an Application Load Balancer**, so the web app adds Fargate capacity
+and no second ALB. What it gives up is Amplify's git-push CI/CD and PR previews — deploys are manual
+until a pipeline exists. Revisit if AWS ships Next.js 16 support; the app would move back with no
+code change.
 
 **A note on App Runner:** the original version of this plan specified App Runner for API hosting.
 AWS closed App Runner to new customers on April 30, 2026 and now directs new workloads to **ECS

@@ -1,0 +1,23 @@
+# Overrides the root .dockerignore for `-f backend/Dockerfile` builds only.
+#
+# Kept beside web/Dockerfile.dockerignore so the two images have symmetric,
+# self-describing rules rather than one relying on the root file and the other
+# overriding it. Contents mirror the root .dockerignore.
+
+**/.env
+**/.env.*
+backend/.venv/
+backend/tests/
+web/
+**/node_modules/
+**/__pycache__/
+**/*.py[cod]
+.git/
+.gitignore
+.github/
+docs/
+infra/
+mobile-android/
+mobile-ios/
+*.md
+.claude/

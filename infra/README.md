@@ -547,6 +547,98 @@ documentation did.
 
 ---
 
+## The web app — a second Express Mode service (task 8)
+
+### Amplify Hosting was in the plan and could not be used
+
+`PROJECT_PLAN.md` Section 7 named **Amplify Hosting**. Its compute SSR provider supports
+**Next.js 12 through 15**; this app is on **16.3.0**. AWS's migration page states plainly:
+*"Currently, the Amplify Hosting compute SSR provider supports Next.js version 15."* Nothing
+announces 16.
+
+So the storefront runs as a **second ECS Express Mode service**. The cost argument makes that a
+substitution rather than a compromise: **up to 25 Express Mode services in one VPC share an
+Application Load Balancer**, so the web app adds Fargate capacity and no second ~$16/month ALB.
+Confirmed after deploying — `describe-load-balancers` returns exactly one.
+
+What it gives up is real: **Amplify's git-push CI/CD and PR previews**. Deploys are manual, as for
+the API. A "Deploy Express Service" GitHub Action exists and would close the gap. Both stack tables
+in `PROJECT_PLAN.md` (Sections 3 and 7) were corrected, because a plan naming a service that cannot
+run the app is worse than no plan.
+
+### `output: 'standalone'`, and the two directories it does not copy
+
+`.next/standalone` holds a minimal `server.js` plus only the `node_modules` Next traced as
+reachable. Necessary: the working tree carries **476 MB of `node_modules` and 798 MB of `.next`**.
+
+Next's docs are explicit that standalone **does not copy `public/` or `.next/static`** — they are
+expected to sit behind a CDN. They are not yet (task 9), so the Dockerfile copies them in. Miss
+either and the container passes its health check while serving an unstyled page with broken images,
+which is why verification fetches a CSS file and a `public/` image rather than trusting the health
+check.
+
+`HOSTNAME=0.0.0.0` is mandatory. `server.js` binds loopback otherwise — the same mistake as
+uvicorn's `--host`, with the same symptom: a process that starts cleanly and answers nothing.
+
+### One build context, two images
+
+The root `.dockerignore` excludes `web/` outright — right for the API image, fatal for this one.
+BuildKit gives **`<dockerfile-path>.dockerignore`** precedence over the root file, so
+`web/Dockerfile.dockerignore` and `backend/Dockerfile.dockerignore` each describe their own image.
+
+**Verified before relying on it**, with a throwaway build: a root ignore excluding `sub/` and a
+`sub/Dockerfile.dockerignore` excluding something else — the per-Dockerfile file won.
+
+Both images still build from the repository root, because `web/scripts/build-tokens.mjs` reads
+`design-tokens.json` and `store-config.json` from there, exactly as `backend/app/store.py` does.
+Those generate `app/tokens.css`, `lib/design-tokens.ts` and `lib/store-config.ts` — all git-ignored,
+so a clone has none of them and the build must produce them. `prebuild` runs `npm run tokens`
+automatically.
+
+### Build-time versus runtime configuration
+
+| | when | why |
+| --- | --- | --- |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | **build** | `NEXT_PUBLIC_*` is compiled into the client bundle. Passing it at runtime leaves the browser with an empty string and Stripe Elements silently fails to mount. Baked into the image; changing it needs a rebuild. |
+| `API_URL` | **runtime** | A plain server-side variable read at module scope, not inlined — so one image can point at any environment. Every route is dynamic, so nothing calls the API during the build. |
+
+Baking the publishable key is acceptable for that one variable and only that one: it is designed to
+be public and can only start a payment the secret key already authorised. **No other secret may be
+handled this way** — the client bundle was audited to confirm: `sk_test_` absent, `postgresql://`
+absent, `pk_test_` present in exactly one chunk as the positive control proving the grep worked.
+
+### The health check does not call the API
+
+`web/app/api/health/route.ts` returns `{"status":"ok"}` without touching the backend. The obvious
+alternative — health-checking `/`, which renders the catalogue — would couple this service's health
+to the API's: a brief backend problem would fail the check, ECS would recycle the web tasks, and a
+short blip becomes a longer whole-site outage.
+
+A liveness probe answers "is this server up", not "is everything downstream healthy". The API has
+its own `/health` and its own alarms.
+
+### Deployment differences from the API service
+
+- **No `secrets`** — the web app holds none.
+- **No `manitou-api-sg`** — it never touches the database, and attaching that group would grant
+  Postgres reach it has no use for.
+- Otherwise identical: `--cpu 512 --memory 1024`, `maxTaskCount` **2** rather than the default 20,
+  `containerPort 3000`, `--health-check-path /api/health`.
+
+The web app calls the API over its **public HTTPS URL**, leaving the VPC and returning through the
+shared ALB. Not elegant; the alternative is service discovery for a two-service system, and the ALB
+is already in the path.
+
+### Verified
+
+Locally against the live API before pushing, then again deployed: `/api/health` 200, the storefront
+rendering `0 products` with the "Nothing here yet" empty state (correct — production has schema and
+no rows), CSS and a `public/` image both 200, `/login` 200 and `/admin` 307 to login when signed
+out. First ~90 seconds after deploy returned 503 while the target registered — expected, not a
+fault.
+
+---
+
 ## Region
 
 Not yet fixed at time of writing. IAM is global, so nothing in task 3 depended on it.
