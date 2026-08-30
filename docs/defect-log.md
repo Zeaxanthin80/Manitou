@@ -21,7 +21,7 @@ was changed, and what makes it not happen again.
 | [26](#26-the-media-library-shows-uuids-instead-of-filenames) | 2026-08-30 | The media library shows UUIDs instead of filenames | Fixed — uncommitted |
 | [25](#25-clicking-blank-space-opened-the-file-manager) | 2026-08-30 | Clicking blank space opened the file manager | Fixed — uncommitted |
 | [24](#24-uploaded-images-never-recorded-which-asset-they-came-from) | 2026-08-30 | Uploaded images never recorded which asset they came from | Fixed — uncommitted |
-| [23](#23-the-vendor-portal-cannot-bootstrap-a-store) | 2026-08-30 | The vendor portal cannot bootstrap a store | Open — Phase 8 |
+| [23](#23-the-vendor-portal-cannot-bootstrap-a-store) | 2026-08-30 | The vendor portal cannot bootstrap a store | Fixed — uncommitted |
 | [22](#22-seedpy-could-no-longer-reseed-a-database-that-had-shipped-an-order) | 2026-08-29 | `seed.py` could no longer reseed a database that had shipped an order | Fixed — 86b11a7 |
 | [21](#21-any-database-password-containing--broke-alembic) | 2026-08-29 | Any database password containing `%` broke Alembic | Fixed — 86b11a7 |
 | [20](#20-a-validation-error-outlived-the-problem-it-described) | 2026-08-22 | A validation error outlived the problem it described | Fixed — a32d114 |
@@ -315,8 +315,8 @@ render -- every link except the one joining the two tables it had just created.
 
 ## 23. The vendor portal cannot bootstrap a store
 
-**Status:** Open. Worked around in production by inserting categories with SQL;
-tracked for Phase 8. Owner-reported, on the first attempt to use the live store.
+**Status:** Fixed. Owner-reported, on the first attempt to use the live store;
+worked around at the time by inserting categories with SQL.
 
 **Seen.** A fresh production database, an admin signed in, and no way to create a
 product. `/admin/products/new` requires a Category, the dropdown is empty, and
@@ -357,6 +357,38 @@ Fixing it hastily while the store is live is how a second defect gets written.
 and Accessories underneath — directly into RDS. That keeps local and production
 agreeing, and is reversible only with more SQL, which is itself the argument for
 building the screen.
+
+**Fixed.** Four endpoints — `GET`/`POST /admin/categories`, `PATCH`/`DELETE
+/admin/categories/{id}` — plus an `/admin/categories` page and a nav entry. Each
+row carries a product count and a child count, computed per request, so the portal
+can explain a refusal before the vendor clicks rather than after.
+
+**The guard no constraint could provide.** Re-parenting a category under one of its
+own descendants leaves every `parent_id` pointing at a real row, so the foreign key
+is satisfied while the branch detaches from every root — invisible to the
+storefront, and unreachable from the screen that broke it. Only a recursive walk
+sees it. Rather than write a second `WITH RECURSIVE`, the one already in
+`catalog.py` moved to `services/categories.py` as an id-based `descendant_ids`, and
+the storefront's slug-based lookup now delegates to it. One walk, two callers.
+
+**Delete is a real delete**, unlike a product's soft `is_active` flip: a category
+has no history hanging off it. `products.category_id` is `NO ACTION`, so the
+database already refuses to orphan a product — the endpoint's work is turning that
+into a sentence naming what is in the way instead of a 500 carrying a constraint
+name. Children block it too, because silently re-parenting somebody's
+subcategories to their grandparent is a reorganisation nobody asked for.
+
+**The empty state was part of the fix, not a nicety.** `/admin/products/new` now
+detects an empty category list and points at the page that solves it, instead of
+rendering a form with a blank mandatory dropdown. Shipping the CRUD without this
+would have left the identical dead end for anyone who did not already know
+`/admin/categories` existed — which is to say, for exactly the person this defect
+was reported by.
+
+**The shape to remember: a test suite that builds its own data cannot find a
+missing screen.** Every test here creates its first category *through the API*,
+because one that starts from a fixture-built tree tests around the gap rather than
+through it. Seven mutations were applied to the guards and all seven were caught.
 
 **What makes it not happen again.** The class of question, rather than this
 instance: *can a brand-new install of this store be set up entirely through its
