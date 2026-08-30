@@ -321,13 +321,16 @@ export async function confirmUploadAction(
   key: string,
   width: number | null,
   height: number | null,
-): Promise<{ url?: string; error?: string }> {
+): Promise<{ url?: string; assetId?: number; error?: string }> {
   const { token, error } = await adminToken();
   if (!token) return { error };
 
   try {
     const asset = await confirmUpload(token, { key, width, height });
-    return { url: asset.url };
+    // The id travels with the url from here on. Without it the API cannot record
+    // which asset an image came from, which is defect 24 -- the column existed
+    // and the write path ignored it.
+    return { url: asset.url, assetId: asset.id };
   } catch (err) {
     if (err instanceof ApiError) return { error: err.message };
     throw err;
@@ -352,10 +355,15 @@ export async function addImageAction(
   if (!url) {
     return { error: "Upload a photo, or choose one of the existing files." };
   }
+  // Only ever set alongside `uploaded_url` -- a committed web/public/ file has
+  // no asset behind it, and sending an id for one would be refused by the API's
+  // match check anyway.
+  const assetId = Number(text(formData, "uploaded_asset_id")) || null;
 
   try {
     await addProductImage(token, id, {
       url,
+      asset_id: assetId,
       alt_text: text(formData, "alt_text"),
       is_primary: formData.get("is_primary") === "on",
       applies_to: parseAppliesTo(text(formData, "applies_to")),

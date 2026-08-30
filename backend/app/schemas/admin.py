@@ -144,6 +144,13 @@ class AdminImageRead(BaseModel):
 
     id: int
     url: str
+    #: The uploaded object behind this image, when there is one.
+    #:
+    #: NULL for a committed file in web/public/ -- those have no S3 object, which
+    #: is why product_images.url survives alongside this. Exposed so the media
+    #: library can mark which assets are already in use rather than asking again
+    #: per row.
+    asset_id: int | None = None
     alt_text: str
     is_primary: bool
     #: {} means "shows for every variant". See services/image_match.py.
@@ -171,6 +178,15 @@ class AdminImageCreate(BaseModel):
     """
 
     url: str = Field(min_length=1)
+
+    #: Which uploaded object this URL came from. Omitted for a committed file.
+    #:
+    #: The endpoint does not take this on trust: it loads the asset and checks
+    #: the submitted url actually resolves to that asset's key. Without that,
+    #: any URL could be filed under any asset id, and "which products use this?"
+    #: -- the question media_assets exists to answer -- would return fiction.
+    asset_id: int | None = None
+
     alt_text: str = Field(min_length=1)
     is_primary: bool = False
     #: Which variants this photo is of. Empty shows it for all of them. The KEYS

@@ -23,6 +23,7 @@ import { confirmUploadAction, requestUploadAction } from "@/app/actions/admin";
  */
 export function ImageUploadField({ name }: { name: string }) {
   const [url, setUrl] = useState("");
+  const [assetId, setAssetId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filename, setFilename] = useState("");
@@ -32,6 +33,7 @@ export function ImageUploadField({ name }: { name: string }) {
     setBusy(true);
     setError(null);
     setUrl("");
+    setAssetId("");
     setFilename(file.name);
 
     try {
@@ -69,6 +71,7 @@ export function ImageUploadField({ name }: { name: string }) {
         return;
       }
       setUrl(confirmed.url);
+      setAssetId(String(confirmed.assetId ?? ""));
     } catch {
       setError("The upload failed. Check your connection and try again.");
     } finally {
@@ -84,6 +87,10 @@ export function ImageUploadField({ name }: { name: string }) {
           because it is a machine detail -- the vendor's evidence that this
           worked is the thumbnail below. */}
       <input type="hidden" name={name} value={url} />
+      {/* Sent beside the url so the API can record which uploaded object this
+          image is. It refuses the pair if they disagree, so this is a claim it
+          checks rather than one it trusts. */}
+      <input type="hidden" name="uploaded_asset_id" value={assetId} />
 
       <input
         ref={inputRef}

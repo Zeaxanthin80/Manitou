@@ -435,3 +435,140 @@ def test_confirming_a_key_outside_pending_writes_no_row(
     )
     assert r.status_code == 409
     assert db.query(MediaAsset).count() == 0
+
+
+# ============================================================================
+# The asset linkage (defect 24)
+# ============================================================================
+#
+# Task 9 added product_images.asset_id and never wrote to it. The column and the
+# FK existed; the write path ignored them. So "which products use this asset?"
+# -- the question media_assets exists to answer -- returned nothing, and the
+# NO ACTION guard protected nothing, because nothing referenced anything.
+#
+# Populating it carelessly would be worse than leaving it null. An id that does
+# not match the url is a confident WRONG answer rather than no answer, and a
+# delete guard reading it would refuse the wrong assets and permit the rest.
+# Hence the match check, and hence these tests.
+
+CDN = "d111abcdef8.cloudfront.net"
+
+
+@pytest.fixture
+def linked(monkeypatch, db):
+    """One asset in the database, with the CDN host configured."""
+    from app.config import settings
+    from app.models import MediaAsset
+
+    monkeypatch.setattr(settings, "cdn_host", CDN)
+    asset = MediaAsset(
+        key="media/2026/08/abc.jpg",
+        original_filename="shirt.jpg",
+        content_type="image/jpeg",
+        byte_size=2048,
+    )
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+
+def test_an_uploaded_image_records_the_asset_it_came_from(
+    client, db, make_user, make_product, auth_headers, linked
+):
+    """The control, and the defect closed.
+
+    Before this, asset_id was NULL on every row and the join below returned
+    nothing no matter how many photographs had been uploaded.
+    """
+    from app.models import ProductImage
+
+    admin = make_user(email="admin@manitou.example", role="admin")
+    product = make_product()
+
+    r = client.post(
+        f"/admin/products/{product.id}/images",
+        headers=auth_headers(admin),
+        json={
+            "url": f"https://{CDN}/{linked.key}",
+            "asset_id": linked.id,
+            "alt_text": "A shirt",
+        },
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["images"][0]["asset_id"] == linked.id
+
+    row = db.query(ProductImage).one()
+    assert row.asset_id == linked.id
+    # The question the table was built to answer, asked for real.
+    assert len(linked.images) == 1
+
+
+def test_a_url_that_does_not_belong_to_the_named_asset_is_refused(
+    client, db, make_user, make_product, auth_headers, linked
+):
+    """The refusal that makes the link mean something.
+
+    Without it any URL could be filed under any asset id, and every later answer
+    about usage would be fiction -- including the one a delete guard reads.
+    """
+    from app.models import ProductImage
+
+    admin = make_user(email="admin@manitou.example", role="admin")
+    product = make_product()
+
+    r = client.post(
+        f"/admin/products/{product.id}/images",
+        headers=auth_headers(admin),
+        json={
+            "url": f"https://{CDN}/media/2026/08/somebody-elses.jpg",
+            "asset_id": linked.id,
+            "alt_text": "A shirt",
+        },
+    )
+    assert r.status_code == 409
+    assert "does not belong" in r.json()["detail"]
+    # No row, not merely no link -- a half-written image would be worse.
+    assert db.query(ProductImage).count() == 0
+
+
+def test_an_asset_id_that_does_not_exist_is_a_404_not_a_500(
+    client, db, make_user, make_product, auth_headers, linked
+):
+    """A different fault from a mismatch, and worth a different status."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    product = make_product()
+
+    r = client.post(
+        f"/admin/products/{product.id}/images",
+        headers=auth_headers(admin),
+        json={
+            "url": f"https://{CDN}/{linked.key}",
+            "asset_id": linked.id + 999,
+            "alt_text": "A shirt",
+        },
+    )
+    assert r.status_code == 404
+
+
+def test_a_committed_file_still_needs_no_asset(
+    client, db, make_user, make_product, auth_headers
+):
+    """The seeded web/public/ images have no S3 object behind them.
+
+    Their asset_id stays NULL, and that is correct rather than a gap -- it is the
+    reason product_images.url survives alongside the FK. A version of this
+    feature that required an asset would break local development entirely.
+    """
+    from app.models import ProductImage
+
+    admin = make_user(email="admin@manitou.example", role="admin")
+    product = make_product()
+
+    r = client.post(
+        f"/admin/products/{product.id}/images",
+        headers=auth_headers(admin),
+        json={"url": "/product-placeholder.png", "alt_text": "A shirt"},
+    )
+    assert r.status_code == 201
+    assert db.query(ProductImage).one().asset_id is None

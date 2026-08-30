@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [24](#24-uploaded-images-never-recorded-which-asset-they-came-from) | 2026-08-30 | Uploaded images never recorded which asset they came from | Fixed — uncommitted |
 | [23](#23-the-vendor-portal-cannot-bootstrap-a-store) | 2026-08-30 | The vendor portal cannot bootstrap a store | Open — Phase 8 |
 | [22](#22-seedpy-could-no-longer-reseed-a-database-that-had-shipped-an-order) | 2026-08-29 | `seed.py` could no longer reseed a database that had shipped an order | Fixed — 86b11a7 |
 | [21](#21-any-database-password-containing--broke-alembic) | 2026-08-29 | Any database password containing `%` broke Alembic | Fixed — 86b11a7 |
@@ -39,6 +40,61 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 24. Uploaded images never recorded which asset they came from
+
+**Status:** Fixed, uncommitted (Phase 6 task 9b).
+
+**Seen.** After the first real upload reached production, `product_images` and
+`media_assets` held two rows that should have been one:
+
+```
+ id | asset_id | asset_row | url
+----+----------+-----------+-------------------------------------
+  1 |          |           | https://d2xp3jc….cloudfront.net/media/…
+    |          |         1 |
+```
+
+A `FULL OUTER JOIN` on the foreign key matched nothing.
+
+**Cause.** Task 9's migration added `product_images.asset_id` and the FK; the
+write path never set it. `confirm_upload_target` returned the asset, the web
+action kept only its `url`, and `add_product_image` had no field for the id. Each
+piece looked complete on its own.
+
+**Why the tests did not catch it.** Every test wrote `ProductImage` rows for its
+own purposes and none of them cared where the image came from -- and the upload
+tests stopped at the asset row, because that is what the upload endpoint returns.
+The gap lived exactly between two well-tested things, which is where this kind of
+gap always lives.
+
+**Why it mattered more than a null column.** `media_assets` exists to answer one
+question S3 cannot: *which products use this?* With the column empty the answer
+was always "none". The `NO ACTION` FK -- the guard meant to stop an asset being
+deleted while a product still shows it -- protected nothing, because nothing
+referenced anything. Task 9b's delete would have reported every asset as unused
+and removed one a live product was displaying.
+
+**Fixed.** `AdminImageCreate` gained `asset_id`, the web action threads it from
+`confirmUploadAction` through a hidden field, and `AdminImageRead` exposes it.
+
+**The part worth keeping is the check, not the column.** The endpoint loads the
+asset and verifies the submitted url resolves to that asset's key -- 404 for an
+id that does not exist, 409 for one that does not match. Populating the column on
+trust would have been worse than leaving it null: a mismatched id is a confident
+WRONG answer where a null is an honest absent one, and a delete guard reading it
+would refuse the wrong assets and permit the rest.
+
+Mutation-tested three ways -- storing `None`, dropping the match check, dropping
+the existence check -- each fails a different test.
+
+**What makes it not happen again.** A column added by a migration is not evidence
+that anything writes to it. The check that would have caught this is the one this
+task ran before starting: `SELECT` the new column against real data and see
+whether it is populated. Task 9 verified the upload, the object, the CDN and the
+render -- every link except the one joining the two tables it had just created.
 
 ---
 

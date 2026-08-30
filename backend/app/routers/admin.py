@@ -755,6 +755,31 @@ def add_product_image(
     product = _get_product(db, product_id)
     _check_applies_to(product, payload.applies_to)
 
+    # An asset id is checked, not taken on trust.
+    #
+    # Task 9 shipped this column and never populated it (defect 24), which made
+    # "which products use this asset?" -- the whole reason media_assets exists --
+    # unanswerable, and left the NO ACTION guard protecting nothing. Populating
+    # it carelessly would be worse than leaving it null: an id that does not
+    # match the url produces a confident wrong answer instead of no answer, and
+    # a delete guard built on it would refuse the wrong things and permit the
+    # rest.
+    #
+    # So the url must actually resolve to that asset's key. 404 for an id that
+    # does not exist, 409 for one that does not match -- different faults, and
+    # the second is the one worth naming.
+    if payload.asset_id is not None:
+        asset = db.get(MediaAsset, payload.asset_id)
+        if asset is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "That uploaded image no longer exists."
+            )
+        if payload.url != public_url(settings.cdn_host, asset.key):
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "That image URL does not belong to the uploaded file it names.",
+            )
+
     # The first image is always primary. A product with images but no primary
     # renders "No image" on the storefront, which looks like data loss rather
     # than a choice.
@@ -766,6 +791,7 @@ def add_product_image(
         ProductImage(
             product_id=product_id,
             url=payload.url,
+            asset_id=payload.asset_id,
             alt_text=payload.alt_text,
             is_primary=make_primary,
             applies_to=payload.applies_to,
