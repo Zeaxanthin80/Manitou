@@ -15,6 +15,7 @@ const SECTIONS: NavItem[] = [
   { href: "/admin", label: "Summary" },
   { href: "/admin/orders", label: "Orders" },
   { href: "/admin/products", label: "Products" },
+  { href: "/admin/categories", label: "Categories" },
   { href: "/admin/inventory", label: "Inventory" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/audit", label: "Audit" },
@@ -38,6 +39,14 @@ const SECTIONS: NavItem[] = [
  * Re-measured when Users and Audit were added in task 11 -- six links still fit
  * at 1024 with no overflow, so the breakpoint held. Worth re-checking rather
  * than assuming if a seventh is ever added.
+ *
+ * **A seventh WAS added (Categories, defect 23) and has not been re-measured.**
+ * Recorded rather than quietly assumed: the note above exists precisely because
+ * this number was arrived at by looking, and "Categories" is one of the longer
+ * labels here. If the bar wraps between 1024 and roughly 1140, raise this to
+ * `xl` rather than shortening the label -- the nav says what the page is called,
+ * and a nav that disagrees with its heading is worse than one that collapses
+ * sooner.
  */
 export function AdminNav({
   email,

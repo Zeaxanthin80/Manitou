@@ -761,6 +761,35 @@ export type MediaAssetPage = {
   offset: number;
 };
 
+export type AdminCategory = {
+  id: number;
+  name: string;
+  slug: string;
+  parent_id: number | null;
+  /** Products directly in this category, and its immediate children. Both are
+   *  what decide whether it can be deleted, so the UI can explain a refusal
+   *  before the vendor clicks rather than after. */
+  product_count: number;
+  child_count: number;
+};
+
+/** The whole tree, unpaginated.
+ *
+ *  Unlike products and orders: a category tree a vendor maintains by hand is tens
+ *  of rows, and it renders as a tree -- which needs every row at once to place
+ *  the children under their parents. */
+export const listAdminCategories = (token: string) =>
+  request<AdminCategory[]>("/admin/categories", { token });
+
+export const createCategory = (token: string, body: unknown) =>
+  request<AdminCategory>("/admin/categories", { token, body });
+
+export const updateCategory = (token: string, id: number, body: unknown) =>
+  request<AdminCategory>(`/admin/categories/${id}`, { token, method: "PATCH", body });
+
+export const deleteCategory = (token: string, id: number) =>
+  request<void>(`/admin/categories/${id}`, { token, method: "DELETE" });
+
 /** The media library: what has been uploaded, searchable and sortable.
  *
  *  Server-side paging rather than fetching everything and filtering in the

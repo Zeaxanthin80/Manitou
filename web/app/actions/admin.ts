@@ -10,7 +10,10 @@ import {
   adminDisableTwoFactor,
   addProductImage,
   confirmUpload,
+  createCategory,
+  deleteCategory,
   listAssets,
+  updateCategory,
   requestUpload,
   addVariant,
   createProduct,
@@ -129,6 +132,97 @@ export async function recheckPaymentAction(
   revalidatePath(`/admin/orders/${id}`);
   revalidatePath("/admin/orders");
   return { ok: RECHECK_MESSAGE[outcome] ?? `Checked. Stripe says: ${outcome}.` };
+}
+
+/* ---------------------------------------------------------- categories -- */
+
+/** Categories decide what the storefront can show, and a product cannot exist
+ *  without one -- products.category_id is NOT NULL. So this page is the store's
+ *  bootstrap: on a fresh database it is the first thing that has to work.
+ *  See defect 23. */
+function revalidateCategories(): void {
+  revalidatePath("/admin/categories");
+  // Product forms read the category list, and the storefront navigates by it.
+  revalidatePath("/admin/products/new");
+  revalidatePath("/", "layout");
+}
+
+export async function createCategoryAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+
+  const name = text(formData, "name");
+  const parent = text(formData, "parent_id");
+  // Blank means "make it a root", which is a real choice rather than a missing
+  // value -- so it is sent as null, not omitted.
+  const parent_id = parent === "" ? null : Number(parent);
+
+  try {
+    await createCategory(token, {
+      name,
+      // A slug the vendor did not type is derived from the name. Typing both is
+      // busywork, and the API normalises and validates whatever arrives anyway.
+      slug: text(formData, "slug") || slugify(name),
+      parent_id,
+    });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+  revalidateCategories();
+  return { ok: `Category "${name}" created.` };
+}
+
+export async function categoryAction(
+  _prev: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+
+  const id = Number(formData.get("category_id"));
+  const intent = text(formData, "intent");
+  if (!id) return { error: "Nothing to change." };
+
+  try {
+    if (intent === "delete") {
+      await deleteCategory(token, id);
+      revalidateCategories();
+      return { ok: "Category removed." };
+    }
+
+    const parent = text(formData, "parent_id");
+    await updateCategory(token, id, {
+      name: text(formData, "name"),
+      // Same null-means-root rule as create. Always sent on this form, because
+      // the select always has a value -- "None" included.
+      parent_id: parent === "" ? null : Number(parent),
+    });
+  } catch (err) {
+    // 409 carries the message that matters here: which products or subcategories
+    // are blocking a delete, or that a move would detach a branch.
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+  revalidateCategories();
+  return { ok: "Category saved." };
+}
+
+/** A name turned into a URL-safe slug, matching the API's SLUG_PATTERN.
+ *
+ *  Convenience only: whatever this produces is re-validated server-side, so a
+ *  name that yields nothing usable ("!!!") gets the API's error rather than a
+ *  silently odd slug. */
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 /* ------------------------------------------------------------- catalog -- */
