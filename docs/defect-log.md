@@ -16,7 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
-| [28](#28-every-loggerinfo-line-is-discarded-in-production) | 2026-08-30 | Every `logger.info` line is discarded in production | Open — Phase 6 task 11 |
+| [28](#28-every-loggerinfo-line-is-discarded-in-production) | 2026-08-30 | Every `logger.info` line is discarded in production | Fixed — uncommitted |
 | [27](#27-password-reset-links-pointed-at-localhost-in-production) | 2026-08-30 | Password reset links pointed at localhost in production | Fixed — uncommitted |
 | [26](#26-the-media-library-shows-uuids-instead-of-filenames) | 2026-08-30 | The media library shows UUIDs instead of filenames | Fixed — uncommitted |
 | [25](#25-clicking-blank-space-opened-the-file-manager) | 2026-08-30 | Clicking blank space opened the file manager | Fixed — uncommitted |
@@ -49,7 +49,7 @@ was changed, and what makes it not happen again.
 
 ## 28. Every `logger.info` line is discarded in production
 
-**Status:** Open — fold into Phase 6 task 11 (CloudWatch logs and alarms).
+**Status:** Fixed (Phase 6 task 11).
 
 **Seen.** After the first real Stripe webhook delivery returned 200, CloudWatch showed
 the uvicorn access line and nothing else. The handler\'s own record of what it did
@@ -87,10 +87,25 @@ or `logger.debug` added anywhere in this application is invisible in production,
 nothing fails to announce it. The next person to add diagnostic logging will watch it
 produce nothing and go looking for a delivery problem.
 
-**Fix (task 11).** Configure logging explicitly at startup — level from an env var
-defaulting to INFO, a stdout handler, and leave uvicorn\'s own loggers alone so access
-lines are not duplicated. Verify by asserting the effective level inside the built
-image, the same way it was measured here, rather than by reading the code.
+**Fixed.** `app/logging_setup.py` adds one formatted stdout handler to the root
+logger and sets the `app` logger to `LOG_LEVEL` (default INFO), called from `main.py`
+before anything can log. **Root stays at WARNING**, so botocore and SQLAlchemy do not
+narrate every HTTP call and query into a log group billed for ingestion, storage *and*
+Logs Insights scanning alike. uvicorn\'s own loggers are untouched — they carry their
+own handlers with `propagate` already False, and adding ours would emit every access
+line twice.
+
+**Verified in production, not in the source.** The same measurement that found the
+defect, run inside `manitou-api:v8`, now reports `INFO enabled: True` with root still
+at WARNING. Then a correctly-signed webhook for a non-existent payment intent produced,
+in CloudWatch:
+
+```
+19:49:19 INFO  app.routers.webhooks: Stripe payment_intent.succeeded for pi_logprobe… -> unknown
+```
+
+A signed probe rather than a real payment because the outcome `unknown` means it
+touched no order — the log line was the thing under test, not the payment path.
 
 **The shape to remember, and it is defect 27\'s twin.** Correct code plus absent
 configuration, failing silently. Defect 27 was a variable with a working default that

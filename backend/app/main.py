@@ -6,8 +6,15 @@ from app.config import settings
 from app.db import get_db
 from app.middleware import RequestContextMiddleware
 from app.routers import address, admin, auth, cart, catalog, order, webhooks
+from app.logging_setup import configure_logging
 from app.services.payments import validate_gateway_name
 from app.store import store_config
+
+# Before anything else that might log. Without this the root logger sits at
+# WARNING with no handlers, and every logger.info in the application is discarded
+# -- which is what defect 28 was, and why a webhook could answer 200 while
+# leaving no record of what it did.
+configure_logging()
 
 # Fail here, at startup, on a payment gateway that does not exist -- rather than
 # on the first customer's checkout, which is where a lazily-built dependency

@@ -758,6 +758,92 @@ Both times the fix was to pin real behaviour, not to delete the code:
 
 ---
 
+## Logs and alarms (task 11)
+
+### The secrets half was already done
+
+Task 11 in the plan reads "move secrets into Secrets Manager **and** set up CloudWatch logs and
+alarms". The first half happened incidentally in tasks 7 and 10: `DB_PASSWORD` from the RDS-managed
+secret, `JWT_SECRET` / `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` from `manitou/api`, each with a
+`:field::` selector so one secret serves several variables and rotating one touches nothing else.
+Everything left in plain environment is non-secret by inspection — `STRIPE_PUBLISHABLE_KEY` is
+designed to be public.
+
+### An alarm is not a notification
+
+The account already had **six alarms and no way for any of them to reach a person.** Express Mode
+creates them, and their actions are machinery rather than alerts:
+
+- 4 × target-tracking alarms whose action is an Application Auto Scaling **policy ARN**.
+- 2 × `RollbackAlarm` with **zero actions** — ECS reads the alarm state directly during a deployment
+  bake. It watches deployments and nothing else.
+
+**There were no SNS topics at all.** So the first thing this task built was the notification path,
+not the alarms: a topic, an email subscription, and the confirmation click without which everything
+downstream is decorative.
+
+Two related traps worth naming:
+
+- **`ALARM` does not mean "broken".** Two of the pre-existing alarms sit in `ALARM` permanently and
+  correctly — a scale-in alarm fires when utilisation is *low*.
+- **An email subscription starts `PendingConfirmation`** and looks identical to a working one in the
+  console. The confirmation mail arrives from `no-reply@sns.amazonaws.com` and lands in spam
+  routinely; ours did.
+
+### Alarms chosen for what they would actually catch
+
+| Alarm | Why this one |
+| --- | --- |
+| RDS `FreeStorageSpace` < 2 GiB | 20 GB with **storage autoscaling off**, so a full disk is a hard stop, not a slow degradation |
+| RDS `DatabaseConnections` > 50 | exhaustion on a `t4g.micro` looks like an application hang, not a database error |
+| RDS `CPUUtilization` > 80% | the slow-burn precursor to timeouts |
+| ALB `HTTPCode_Target_5XX_Count` | the store is returning errors to customers |
+| ALB `UnHealthyHostCount` over 3 min | a task is failing health checks; three minutes so a deployment's normal churn does not page |
+| ALB `TargetResponseTime` **p95** | p95 rather than Average — an average hides the slow tail users actually feel |
+| `AppWarningCount` (metric filter) | log text no AWS metric reports |
+
+`OKActions` is set as well as `AlarmActions`. An alert with no all-clear trains you to ignore alerts.
+
+### The metric filter is the bridge between logs and metrics
+
+Metrics are cheap, numeric and pre-aggregated; logs are expensive, textual and detailed. A **metric
+filter** converts matching log lines into a metric you can alarm on — the only way to page on
+something no metric reports. Here it counts the application's own `WARNING` lines, which catches
+repeated Stripe webhook signature rejections: those return 400 and look like perfectly ordinary
+traffic to the load balancer.
+
+Two details that matter:
+
+- The pattern anchors on **both** the level and the `app.` namespace. Matching bare `WARNING` would
+  also catch any library that happens to print the word.
+- `defaultValue: 0` is required. Without it the metric reports *nothing* when there are no warnings,
+  and "no data" is not zero — the alarm could never return to OK.
+
+### Retention, because the default is forever
+
+Both log groups were `NEVER EXPIRE`, which is the default and a well-known source of surprise bills.
+Now 30 days. The CloudWatch free tier is **5 GB combined across ingestion, storage and the scanning a
+Logs Insights query does** — easy to misread as 5 GB each, and the reason the root logger is kept at
+WARNING rather than INFO.
+
+### Cost
+
+Six pre-existing alarms plus seven new is 13 against a free tier of **10 alarm metrics**, so about
+**$0.30/month**. Retention reduces cost rather than adding it.
+
+### Verified
+
+- The measurement that found defect 28, re-run inside the built image: `INFO enabled: True`, root
+  still `WARNING`, botocore INFO still suppressed.
+- A correctly-signed webhook for a non-existent intent produced the handler's INFO line in
+  CloudWatch. Before this task that line did not exist and the endpoint still answered 200.
+- **An alarm was deliberately tripped** — threshold temporarily set below the live value — and the
+  alarm history recorded `Successfully executed action …manitou-alerts`, with the email arriving.
+  Thresholds restored immediately from a captured copy rather than retyped. An alarm nobody has seen
+  fire is not an alarm.
+
+---
+
 ## The domain and HTTPS (task 10)
 
 The store had two machine-generated `.on.aws` addresses. It now answers on a registered domain,

@@ -49,6 +49,17 @@ class Settings(BaseSettings):
     # store-config.json one (Section 4.2).
     app_base_url: str = "http://localhost:3000"
 
+    # --- observability (Phase 6 task 11) -------------------------------------
+    # How much of the application's own logging reaches stdout, and therefore
+    # CloudWatch. INFO rather than WARNING because the interesting lines are the
+    # ordinary ones -- "this webhook arrived and this is what it did" is not a
+    # problem report, and it was invisible until defect 28 was fixed.
+    #
+    # This sets the level of the "app" logger only. The root logger stays at
+    # WARNING so that botocore, urllib3 and SQLAlchemy do not narrate every HTTP
+    # call and every query into a log group we pay to store.
+    log_level: str = "INFO"
+
     # --- Stripe (Phase 5) ---------------------------------------------------
     # Required, like database_url and jwt_secret: a store with no Stripe keys is
     # misconfigured, and should say so at boot naming the missing field rather
