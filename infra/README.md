@@ -822,6 +822,22 @@ advertise addresses it does not have. Checked rather than copied from a tutorial
   "the rule was extended" from "the rule was replaced".
 - Forward weights unchanged after `ModifyRule`.
 
+### The open question, now settled by experiment
+
+Nothing in the AWS documentation says whether Express Mode reconciles listener-rule conditions and
+strips a hostname it did not add. If it did, the custom domain would break on the next deployment
+rather than on the change — so it was tested rather than hoped for.
+
+**Both services were then rebuilt and deployed, and the rule conditions came back byte-identical.**
+All three hostnames still answered 200, and the forward weights were still `100/0` and `0/100`. So
+extending an Express Mode rule survives a deployment, and the CloudFront-in-front fallback is not
+needed.
+
+The canary is also visibly a *traffic* split, not just two running tasks: during the bake, successive
+requests to the same URL returned the old and the new build alternately. Worth remembering when
+verifying a deploy — one request proves nothing until the bake is over, which is why the checks above
+sample ten.
+
 ---
 
 ## Rolling out a new image (learned during task 9b)
