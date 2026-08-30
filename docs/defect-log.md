@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [25](#25-clicking-blank-space-opened-the-file-manager) | 2026-08-30 | Clicking blank space opened the file manager | Fixed — uncommitted |
 | [24](#24-uploaded-images-never-recorded-which-asset-they-came-from) | 2026-08-30 | Uploaded images never recorded which asset they came from | Fixed — uncommitted |
 | [23](#23-the-vendor-portal-cannot-bootstrap-a-store) | 2026-08-30 | The vendor portal cannot bootstrap a store | Open — Phase 8 |
 | [22](#22-seedpy-could-no-longer-reseed-a-database-that-had-shipped-an-order) | 2026-08-29 | `seed.py` could no longer reseed a database that had shipped an order | Fixed — 86b11a7 |
@@ -40,6 +41,52 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 25. Clicking blank space opened the file manager
+
+**Status:** Fixed, uncommitted (Phase 6 task 9b).
+
+**Seen.** On the deployed vendor portal, the upload control's click target extended
+far past the visible **Choose File** button — clicking apparently empty space to its
+right opened the OS file picker. Found by the owner clicking around production, and
+identified in DevTools as the `input[type=file]`, reported at `clientWidth: 672`.
+
+**Cause.** A Tailwind default, two elements up:
+
+```
+<form className="… max-w-2xl">          672px  (42rem at a 16px root)
+  <fieldset className="flex flex-col">  align-items: stretch — the default
+    <input type="file" />               stretched to 672px
+```
+
+A flex column stretches its children to the full cross-axis width unless told
+otherwise. The `file:` variant styles only the **button pseudo-element** *inside*
+the input; the remaining ~570px of stretched box is still the input, and every
+pixel of an `input[type=file]` activates the picker. So the styled affordance and
+the hit area were different rectangles, and only one of them was visible.
+
+**Why nothing caught it.** Nothing could. `tsc`, ESLint and the production build all
+pass on it — it is valid markup, valid CSS and correct Tailwind. It is not an
+accessibility fault either: the element reported the right accessible name, a
+`button` role and keyboard focusability, so an audit would call it clean. A pointer
+landing somewhere that looks empty is visible only to a person using a mouse on a
+real page, which is exactly how it was found.
+
+**Fixed.** `w-fit` on the input, so it shrinks to its intrinsic width and the
+control and the click target become the same rectangle. Verified the number rather
+than the appearance: `--container-2xl` resolves to `42rem` in the built CSS, and
+42 × 16 = 672 — the same figure DevTools reported, which is what made the cause
+proven rather than plausible.
+
+**The lesson is about pseudo-elements, not about this input.** `file:`, `before:`,
+`after:` and `placeholder:` all style something *within* an element's box. Styling
+one says nothing about the box's size, so a small, pretty pseudo-element inside a
+stretched parent silently grows the interactive region. The second time a Tailwind
+layout default has produced a surprising box in this phase — the first was
+`remotePatterns` reading empty because `CDN_HOST` was absent at build time — and
+both were found by measuring the artefact rather than reading the source.
 
 ---
 
