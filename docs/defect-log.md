@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [28](#28-every-loggerinfo-line-is-discarded-in-production) | 2026-08-30 | Every `logger.info` line is discarded in production | Open — Phase 6 task 11 |
 | [27](#27-password-reset-links-pointed-at-localhost-in-production) | 2026-08-30 | Password reset links pointed at localhost in production | Fixed — uncommitted |
 | [26](#26-the-media-library-shows-uuids-instead-of-filenames) | 2026-08-30 | The media library shows UUIDs instead of filenames | Fixed — uncommitted |
 | [25](#25-clicking-blank-space-opened-the-file-manager) | 2026-08-30 | Clicking blank space opened the file manager | Fixed — uncommitted |
@@ -43,6 +44,59 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 28. Every `logger.info` line is discarded in production
+
+**Status:** Open — fold into Phase 6 task 11 (CloudWatch logs and alarms).
+
+**Seen.** After the first real Stripe webhook delivery returned 200, CloudWatch showed
+the uvicorn access line and nothing else. The handler\'s own record of what it did
+was absent.
+
+**Cause.** **The application configures logging nowhere.** No `basicConfig`, no
+`dictConfig`, no handler. Python\'s root logger therefore sits at its default
+`WARNING`, and the "handler of last resort" that writes to stderr is also
+`WARNING`. Measured inside the deployed image rather than inferred:
+
+```
+logger name     : app.routers.webhooks
+effective level : WARNING
+handlers        : []          root handlers: []
+INFO enabled?   : False       WARNING enabled?: True
+```
+
+Which is exactly why the *rejection* warning appeared in CloudWatch during testing
+and the *success* line did not.
+
+**Scope today: one line** — `app/routers/webhooks.py`, the only `logger.info` in the
+codebase. The two `logger.warning` calls do reach CloudWatch.
+
+**Severity, stated honestly.** That line\'s comment calls it "the record of what
+arrived and what was done about it", which overstates it: `apply_payment_event`
+writes `audit_events` rows (`payment.confirmed`, `payment.conflict`) in the same
+transaction, with `actor` NULL because no human is in the room. **The durable audit
+trail is intact.** What is lost is operational visibility — from CloudWatch alone you
+can see that a delivery returned 200 but not which order it touched or what outcome
+it produced, so "why did this order not flip to paid" is a database question rather
+than a log question.
+
+**The dangerous part is the general property, not this one line.** Any `logger.info`
+or `logger.debug` added anywhere in this application is invisible in production, and
+nothing fails to announce it. The next person to add diagnostic logging will watch it
+produce nothing and go looking for a delivery problem.
+
+**Fix (task 11).** Configure logging explicitly at startup — level from an env var
+defaulting to INFO, a stdout handler, and leave uvicorn\'s own loggers alone so access
+lines are not duplicated. Verify by asserting the effective level inside the built
+image, the same way it was measured here, rather than by reading the code.
+
+**The shape to remember, and it is defect 27\'s twin.** Correct code plus absent
+configuration, failing silently. Defect 27 was a variable with a working default that
+was never set; this is a subsystem with a working default that was never configured.
+Both produce a system that starts cleanly, answers 200, and quietly does less than the
+code says it does.
 
 ---
 
