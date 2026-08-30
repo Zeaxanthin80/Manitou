@@ -22,6 +22,7 @@ from app.schemas import (
     ProductPage,
     VariantRead,
 )
+from app.services.categories import descendant_ids
 from app.schemas.catalog import MAX_PAGE_SIZE
 
 router = APIRouter(tags=["catalog"])
@@ -35,17 +36,15 @@ def _category_subtree_ids(db: Session, slug: str) -> list[int] | None:
     the seeded tree, "apparel" holds no products directly and both its children
     do, so a non-recursive filter would show an empty catalogue.
 
-    WITH RECURSIVE is the SQL tool for this. The first SELECT is the anchor (the
-    category named by the slug); the second repeatedly joins children onto what
-    has been found so far, until nothing new appears. One query, any depth.
+    The recursive walk itself lives in services/categories.py, because the admin
+    portal needs the same one for a different reason -- re-parenting a category
+    under its own descendant is a cycle the foreign key cannot catch. One walk,
+    two callers.
     """
-    anchor = select(Category.id).where(Category.slug == slug)
-    subtree = anchor.cte(name="subtree", recursive=True)
-    subtree = subtree.union_all(
-        select(Category.id).join(subtree, Category.parent_id == subtree.c.id)
-    )
-    ids = list(db.scalars(select(subtree.c.id)))
-    return ids or None
+    category_id = db.scalar(select(Category.id).where(Category.slug == slug))
+    if category_id is None:
+        return None
+    return descendant_ids(db, category_id)
 
 
 def _variant_price_bounds():

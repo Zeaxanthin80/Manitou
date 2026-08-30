@@ -78,6 +78,57 @@ class AdminVariantCreate(BaseModel):
     _sku = field_validator("sku")(classmethod(lambda cls, v: _normalise_sku(v)))
 
 
+class AdminCategoryCreate(BaseModel):
+    """A new category.
+
+    `parent_id` is optional because the tree has roots. A store with no hierarchy
+    at all is a valid shape -- every category a root, which is what a
+    single-product or candle clone would do.
+    """
+
+    name: str = Field(min_length=1)
+    slug: str = Field(min_length=1)
+    parent_id: int | None = None
+
+    _slug = field_validator("slug")(classmethod(lambda cls, v: _normalise_slug(v)))
+
+
+class AdminCategoryUpdate(BaseModel):
+    """Partial update, same exclude_unset contract as AdminProductUpdate.
+
+    `parent_id` is the awkward field: `None` is a MEANINGFUL value here -- it
+    promotes a category to a root -- so "omitted" and "sent as null" must stay
+    distinguishable, which is exactly what exclude_unset preserves.
+    """
+
+    name: str | None = Field(default=None, min_length=1)
+    slug: str | None = Field(default=None, min_length=1)
+    parent_id: int | None = None
+
+    _slug = field_validator("slug")(
+        classmethod(lambda cls, v: v if v is None else _normalise_slug(v))
+    )
+
+
+class AdminCategoryRead(BaseModel):
+    """A category plus the two numbers that decide whether it can be deleted.
+
+    Both counts are computed per request rather than stored, the same reasoning
+    `used_by_count` records on media assets: a stored counter drifts from the rows
+    that produce it. They exist so the portal can explain a refusal BEFORE the
+    vendor clicks delete, rather than turning a 409 into the first they hear of it.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    slug: str
+    parent_id: int | None
+    product_count: int
+    child_count: int
+
+
 class AdminProductCreate(BaseModel):
     name: str = Field(min_length=1)
     slug: str = Field(min_length=1)

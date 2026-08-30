@@ -13,7 +13,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, aliased, selectinload
 
 from app.db import get_db
 from app.dependencies import get_payment_gateway, require_admin
@@ -45,6 +45,9 @@ from app.services.payments import (
 )
 from app.schemas.admin import (
     AdminAssetPage,
+    AdminCategoryCreate,
+    AdminCategoryRead,
+    AdminCategoryUpdate,
     AdminAssetRead,
     AdminUploadConfirm,
     AdminUploadRequest,
@@ -91,6 +94,7 @@ from app.services.account import anonymise, count_admins, password_matches
 from app.services.email import EmailMessage, EmailSender
 from app.services.password_reset import TOKEN_TTL, request_reset
 from app.services.two_factor import disable as disable_two_factor
+from app.services.categories import descendant_ids
 from app.services.uploads import (
     PRESIGN_EXPIRY_SECONDS,
     UploadError,
@@ -226,6 +230,236 @@ def _product_totals():
         .group_by(ProductVariant.product_id)
         .subquery()
     )
+
+
+# ============================================================================
+# Categories (defect 23)
+#
+# Without these a fresh database can never get a product: products.category_id is
+# NOT NULL, categories only ever existed because seed.py made them, and seed.py
+# correctly refuses to run anywhere but a local machine. Every route to a first
+# product was closed, and the only way out was a database client.
+# ============================================================================
+
+
+def _category_counts():
+    """Products directly in a category, and its immediate children.
+
+    Correlated subqueries rather than joins, so one row comes back per category
+    whatever the counts are -- a join with two one-to-many relations multiplies
+    the rows and both numbers come back wrong. Same shape as used_by_count on
+    media assets.
+
+    Note "directly" and "immediate": product_count does NOT include products in
+    descendants. That is deliberate, because these two numbers exist to answer
+    "can this row be deleted?", and the delete is refused by children and by
+    direct products separately.
+    """
+    products = (
+        select(func.count())
+        .select_from(Product)
+        .where(Product.category_id == Category.id)
+        .correlate(Category)
+        .scalar_subquery()
+    )
+    child = aliased(Category)
+    children = (
+        select(func.count())
+        .select_from(child)
+        .where(child.parent_id == Category.id)
+        .correlate(Category)
+        .scalar_subquery()
+    )
+    return products, children
+
+
+def _get_category(db: Session, category_id: int) -> Category:
+    category = db.scalar(select(Category).where(Category.id == category_id))
+    if category is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Category not found")
+    return category
+
+
+def _read_categories(db: Session, only: int | None = None) -> list[AdminCategoryRead]:
+    products, children = _category_counts()
+    stmt = select(Category, products.label("pc"), children.label("cc"))
+    if only is not None:
+        stmt = stmt.where(Category.id == only)
+    # Parents before children, then alphabetical: the portal renders this as a
+    # tree and a stable order keeps a rename from reshuffling the page.
+    stmt = stmt.order_by(Category.parent_id.nulls_first(), Category.name)
+    return [
+        AdminCategoryRead(
+            id=c.id, name=c.name, slug=c.slug, parent_id=c.parent_id,
+            product_count=pc, child_count=cc,
+        )
+        for c, pc, cc in db.execute(stmt).all()
+    ]
+
+
+def _check_slug_free(db: Session, slug: str, exclude_id: int | None = None) -> None:
+    """A friendly refusal instead of an IntegrityError.
+
+    categories.slug is UNIQUE, so the database would catch this anyway -- as a
+    500 with a constraint name in it. Checking first turns it into a sentence the
+    vendor can act on. The constraint stays the real authority; this is the
+    message, not the guard.
+    """
+    stmt = select(Category.id).where(Category.slug == slug)
+    if exclude_id is not None:
+        stmt = stmt.where(Category.id != exclude_id)
+    if db.scalar(stmt) is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"The slug '{slug}' is already used by another category.",
+        )
+
+
+def _check_parent(db: Session, parent_id: int | None, moving: int | None = None) -> None:
+    """The parent exists, and the move does not create a cycle.
+
+    **The foreign key cannot catch a cycle.** Re-parenting Apparel under T-Shirts
+    leaves every parent_id pointing at a real row, so the constraint is satisfied
+    -- while the branch floats free of every root, vanishes from the storefront,
+    and can no longer be reached by the screen that broke it. A recursive walk is
+    the only way to see it, which is what services/categories.py is for.
+    """
+    if parent_id is None:
+        return
+    _get_category(db, parent_id)
+    if moving is None:
+        return
+    if parent_id in descendant_ids(db, moving):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "A category cannot be moved under itself or one of its own "
+            "subcategories -- that would detach the whole branch from the store.",
+        )
+
+
+@router.get("/categories", response_model=list[AdminCategoryRead])
+def list_categories_for_admin(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+) -> list[AdminCategoryRead]:
+    """The tree, with the two counts that decide whether a row can be deleted.
+
+    Not paginated, unlike products and orders: a category tree a vendor maintains
+    by hand is tens of rows, not thousands, and the portal renders it as a tree --
+    which needs every row at once to place the children.
+    """
+    return _read_categories(db)
+
+
+@router.post(
+    "/categories", response_model=AdminCategoryRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_category(
+    payload: AdminCategoryCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+) -> AdminCategoryRead:
+    _check_slug_free(db, payload.slug)
+    _check_parent(db, payload.parent_id)
+
+    category = Category(
+        name=payload.name, slug=payload.slug, parent_id=payload.parent_id
+    )
+    db.add(category)
+    db.flush()
+    audit.record(
+        db, actor=user, action="category.created", target_type="category",
+        target_id=category.id, name=category.name, slug=category.slug,
+        parent_id=category.parent_id,
+    )
+    db.commit()
+    return _read_categories(db, only=category.id)[0]
+
+
+@router.patch("/categories/{category_id}", response_model=AdminCategoryRead)
+def update_category(
+    category_id: int,
+    payload: AdminCategoryUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+) -> AdminCategoryRead:
+    """Rename, re-slug or re-parent.
+
+    exclude_unset, so an omitted field is left alone -- and `parent_id: null` is a
+    real instruction here, meaning "promote to a root", not "field not sent".
+    """
+    category = _get_category(db, category_id)
+    fields = payload.model_dump(exclude_unset=True)
+
+    if "slug" in fields and fields["slug"] != category.slug:
+        _check_slug_free(db, fields["slug"], exclude_id=category_id)
+    if "parent_id" in fields and fields["parent_id"] != category.parent_id:
+        _check_parent(db, fields["parent_id"], moving=category_id)
+
+    before = {k: getattr(category, k) for k in fields}
+    for key, value in fields.items():
+        setattr(category, key, value)
+
+    # Only the diff, matching update_product. Passing name= alongside it collides
+    # whenever the name is what changed -- audit.changes already emits a "name"
+    # key, and the from/to pair says more than the current value would.
+    diff = audit.changes(before, fields, *fields.keys())
+    if diff:
+        audit.record(
+            db, actor=user, action="category.updated", target_type="category",
+            target_id=category_id, **diff,
+        )
+    db.commit()
+    return _read_categories(db, only=category_id)[0]
+
+
+@router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+) -> None:
+    """A real delete, and the refusals are the point.
+
+    Products soft-delete because removing one would destroy order history.
+    A category has no such column and no history hanging off it, so it is removed
+    outright -- but only once nothing points at it.
+
+    **products.category_id is NO ACTION**, so the database already refuses to
+    orphan a product; this turns that into a sentence naming what is in the way,
+    rather than a 500 carrying a constraint name. Children are refused too, and
+    for a plainer reason: silently re-parenting somebody's subcategories to their
+    grandparent is a reorganisation nobody asked for.
+    """
+    category = _get_category(db, category_id)
+    row = _read_categories(db, only=category_id)[0]
+
+    if row.product_count or row.child_count:
+        blocking = []
+        if row.product_count:
+            blocking.append(
+                f"{row.product_count} product"
+                f"{'s' if row.product_count != 1 else ''}"
+            )
+        if row.child_count:
+            blocking.append(
+                f"{row.child_count} subcategor"
+                f"{'ies' if row.child_count != 1 else 'y'}"
+            )
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"'{category.name}' still holds {' and '.join(blocking)}. "
+            "Move or remove them first.",
+        )
+
+    name, slug = category.name, category.slug
+    db.delete(category)
+    audit.record(
+        db, actor=user, action="category.deleted", target_type="category",
+        target_id=category_id, name=name, slug=slug,
+    )
+    db.commit()
 
 
 @router.get("/products", response_model=AdminProductPage)
