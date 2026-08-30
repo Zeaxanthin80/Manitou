@@ -7,6 +7,7 @@ from app.db import get_db
 from app.middleware import RequestContextMiddleware
 from app.routers import address, admin, auth, cart, catalog, order, webhooks
 from app.services.payments import validate_gateway_name
+from app.store import store_config
 
 # Fail here, at startup, on a payment gateway that does not exist -- rather than
 # on the first customer's checkout, which is where a lazily-built dependency
@@ -15,7 +16,13 @@ from app.services.payments import validate_gateway_name
 # do. Same instinct as defect 12, this time on purpose.
 validate_gateway_name(settings.payment_gateway)
 
-app = FastAPI(title="Manitou API")
+# The title is store identity, not a constant: it is public in /openapi.json and
+# /docs, so a clone that left it alone would serve another store's name. Reading
+# it from store config is the same seam that keeps the store name out of every
+# component -- and this was the ONLY place the name had leaked into application
+# code. Not a display string the storefront reads; it names the API to whoever
+# opens its schema.
+app = FastAPI(title=f"{store_config.store.name} API")
 
 # Makes the client IP available to the audit trail without every audited endpoint
 # having to accept a Request. See app/middleware.py.
