@@ -758,6 +758,72 @@ Both times the fix was to pin real behaviour, not to delete the code:
 
 ---
 
+## The domain and HTTPS (task 10)
+
+The store had two machine-generated `.on.aws` addresses. It now answers on a registered domain,
+with the old names still working.
+
+### Express Mode had already built most of this
+
+The shared ALB's HTTPS listener was **already presenting two ACM certificates**, one per service,
+selected by **SNI**. Adding a third is therefore the mechanism Express Mode itself uses, not a
+workaround — which is also why one ALB can host 25 services with distinct hostnames.
+
+### Extend the existing rules; do not add new ones
+
+This is the decision the whole task turns on. Each Express Mode rule forwards to a **weighted pair**
+of target groups:
+
+```
+web rule → tg-A (weight 100) + tg-B (weight 0)
+api rule → tg-C (weight 0)   + tg-D (weight 100)
+```
+
+**A canary shifts those weights; it does not repoint the rule.** So a hand-made rule with the same
+pair would work exactly once — after the next deployment it would send every request to a drained
+target group, breaking on deploy rather than on the change, which is far harder to attribute.
+
+Adding the new hostnames to the existing rules' `host-header` values instead means the custom names
+ride on routing ECS keeps maintaining. `ModifyRule` was sent with **`Conditions` only**; omitted
+`Actions` are left untouched, and the weights were confirmed still `100/0` afterwards rather than
+assumed.
+
+### One wildcard certificate, not three names
+
+`<domain>` plus `*.<domain>`. ACM issues the **same validation CNAME** for an apex and its wildcard,
+so it is one DNS record, and a future `cdn.<domain>` needs no new request. Note a wildcard covers one
+label only: it matches `api.<domain>`, not `a.b.<domain>`.
+
+Validation took about **15 seconds**, because Route 53 holds the zone and ACM writes nothing itself —
+the records are ours to create.
+
+### ACM renews only what is in use
+
+Immediately after issuance the certificate reported `RenewalEligibility: INELIGIBLE`. Attaching it to
+the listener flipped it to **`ELIGIBLE`**. Managed renewal applies to certificates associated with a
+supported service, and it also depends on the validation CNAME still existing — delete that record
+later and renewal fails silently, months afterwards.
+
+### ALIAS, not CNAME
+
+DNS forbids a CNAME at a zone apex, so the bare domain cannot CNAME to a load balancer. Route 53's
+**ALIAS** is an AWS extension that resolves to the target's addresses at query time, works at the
+apex, and costs nothing for queries to AWS resources. The ALB's `CanonicalHostedZoneId` — not the
+zone the domain lives in — is what an ALIAS target needs; they are different values and mixing them
+is the usual first error.
+
+`AAAA` records were **not** created: the ALB reports `IpAddressType: ipv4`, so an AAAA ALIAS would
+advertise addresses it does not have. Checked rather than copied from a tutorial.
+
+### Verified
+
+- All three hostnames answer 200 over TLS 1.3, certificate `CN=<domain>`, issued by Amazon.
+- **The old `.on.aws` names still answer 200** — the control, and the only thing that distinguishes
+  "the rule was extended" from "the rule was replaced".
+- Forward weights unchanged after `ModifyRule`.
+
+---
+
 ## Rolling out a new image (learned during task 9b)
 
 Tasks 7 and 8 recorded how these services were *created*. Neither recorded how a new image reaches

@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [27](#27-password-reset-links-pointed-at-localhost-in-production) | 2026-08-30 | Password reset links pointed at localhost in production | Fixed — uncommitted |
 | [26](#26-the-media-library-shows-uuids-instead-of-filenames) | 2026-08-30 | The media library shows UUIDs instead of filenames | Fixed — uncommitted |
 | [25](#25-clicking-blank-space-opened-the-file-manager) | 2026-08-30 | Clicking blank space opened the file manager | Fixed — uncommitted |
 | [24](#24-uploaded-images-never-recorded-which-asset-they-came-from) | 2026-08-30 | Uploaded images never recorded which asset they came from | Fixed — uncommitted |
@@ -42,6 +43,48 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 27. Password reset links pointed at localhost in production
+
+**Status:** Fixed (Phase 6 task 10).
+
+**Seen.** Not seen — found by reading the deployed task definition while planning the
+domain cutover. `APP_BASE_URL` was absent from the running API\'s environment
+entirely, so `config.py` fell back to its default:
+
+```python
+app_base_url: str = "http://localhost:3000"
+```
+
+That string builds the reset link in `app/routers/auth.py:369` and
+`app/routers/admin.py:1799`. Every password-reset email generated in production
+carried `http://localhost:3000/reset-password?token=…`.
+
+**Cause.** A default that is correct in development and wrong everywhere else,
+combined with a variable nobody had to set for the app to start. Nothing failed:
+the API booted, the endpoint answered 200, the token was minted and stored
+correctly, and the audit row was written. Only the link was useless.
+
+**Why nothing caught it.** Tests set `APP_BASE_URL`, so they assert the link is
+built from it — correctly, and without ever asking whether production sets it.
+The deployment had no equivalent check because it is configuration, not code. And
+`EMAIL_SENDER=console` meant the wrong link was printed to CloudWatch rather than
+delivered, so there was no bounced mail, no user complaint, and no error anywhere.
+**The bug was scheduled to become visible at the moment real email was switched
+on** — the worst possible time to discover it.
+
+**Fixed.** `APP_BASE_URL=https://imprimapress.com` added to the API service, and
+`.env.example` now says the variable must be set in every deployed environment and
+why the default is dangerous.
+
+**The shape to remember: a working default is not a set value.** Required
+configuration should be *absent* by default and fail loudly at startup, the way
+`DATABASE_URL` does — `config.py` refuses to boot without DB_HOST/DB_USER/DB_NAME/
+DB_PASSWORD, which is why that class of mistake cannot happen there. Anything with
+a localhost fallback will eventually ship to production still holding it. Worth
+auditing the rest of `Settings` for the same pattern.
 
 ---
 
