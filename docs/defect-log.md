@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [23](#23-the-vendor-portal-cannot-bootstrap-a-store) | 2026-08-30 | The vendor portal cannot bootstrap a store | Open — Phase 8 |
 | [22](#22-seedpy-could-no-longer-reseed-a-database-that-had-shipped-an-order) | 2026-08-29 | `seed.py` could no longer reseed a database that had shipped an order | Fixed — 86b11a7 |
 | [21](#21-any-database-password-containing--broke-alembic) | 2026-08-29 | Any database password containing `%` broke Alembic | Fixed — 86b11a7 |
 | [20](#20-a-validation-error-outlived-the-problem-it-described) | 2026-08-22 | A validation error outlived the problem it described | Fixed — a32d114 |
@@ -38,6 +39,60 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 23. The vendor portal cannot bootstrap a store
+
+**Status:** Open. Worked around in production by inserting categories with SQL;
+tracked for Phase 8. Owner-reported, on the first attempt to use the live store.
+
+**Seen.** A fresh production database, an admin signed in, and no way to create a
+product. `/admin/products/new` requires a Category, the dropdown is empty, and
+nothing anywhere in the portal creates one.
+
+**Cause.** Categories are readable and nothing else:
+
+- the API exposes `GET /categories` and `GET /categories/{slug}` — no POST, PATCH
+  or DELETE, in the public router or the admin one
+- there is no `/admin/categories` page
+- `products.category_id` is NOT NULL, so no product can exist without one
+- categories have only ever existed because `seed.py` creates them — and
+  `seed.py` refuses to run against anything non-local (defect 22), correctly
+
+So on an empty database every route to a first product is closed, and the only
+way out is a database client. PROJECT_PLAN Phase 4 specced products, inventory,
+orders and a summary view; category management was never on the list, because
+every environment that had ever been developed against was already seeded.
+
+**Why five phases missed it.** The gap is invisible wherever `seed.py` has run,
+which is every local database and every test database. It can only appear on a
+schema built by migrations alone — which happened for the first time in Phase 6
+task 5, and was only *noticed* in task 9, when someone tried to add a product to
+it. A test suite that builds its own data cannot find this: the missing thing is
+not a behaviour, it is a screen.
+
+**Not fixed now, deliberately.** It surfaced mid-way through verifying an image
+upload, and category CRUD is a feature rather than a patch: endpoints, schemas,
+an admin page, and a delete rule. `products.category_id` is `NO ACTION`
+(confirmed in `pg_constraint`), so the database already refuses to delete a
+category that has products — the endpoint should turn that into a message naming
+them rather than an IntegrityError, the same treatment `media_assets` will need
+in task 9b.
+
+Fixing it hastily while the store is live is how a second defect gets written.
+
+**Worked around** by inserting the tree `seed.py` builds — Apparel with T-Shirts
+and Accessories underneath — directly into RDS. That keeps local and production
+agreeing, and is reversible only with more SQL, which is itself the argument for
+building the screen.
+
+**What makes it not happen again.** The class of question, rather than this
+instance: *can a brand-new install of this store be set up entirely through its
+own interface?* Every clone of this repo starts with an empty database, and the
+Section 1.1 reusability seams promise a store can be adapted by editing config
+and content. A setup step that requires `psql` breaks that promise. Phase 8 is
+launch readiness, and this is exactly a launch-readiness question.
 
 ---
 
