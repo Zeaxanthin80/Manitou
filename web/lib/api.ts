@@ -741,6 +741,43 @@ export const updateProduct = (token: string, id: number, body: unknown) =>
 export const deactivateProduct = (token: string, id: number) =>
   request<void>(`/admin/products/${id}`, { token, method: "DELETE" });
 
+export type MediaAsset = {
+  id: number;
+  key: string;
+  url: string;
+  original_filename: string;
+  content_type: string;
+  byte_size: number;
+  width: number | null;
+  height: number | null;
+  uploaded_at: string;
+  used_by_count: number;
+};
+
+export type MediaAssetPage = {
+  items: MediaAsset[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+/** The media library: what has been uploaded, searchable and sortable.
+ *
+ *  Server-side paging rather than fetching everything and filtering in the
+ *  browser -- the same reason /admin/orders and /admin/users page. A store with
+ *  two hundred photographs would otherwise ship all two hundred rows to render
+ *  twenty-four of them. */
+export const listAssets = (
+  token: string,
+  params: { q?: string; sort?: string; limit?: number; offset?: number },
+) => {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== "") q.set(k, String(v));
+  }
+  return request<MediaAssetPage>(`/admin/assets?${q}`, { token });
+};
+
 /** Ask the API to sign one PUT straight to S3.
  *
  *  The bytes never pass through either the API or this Next server -- no

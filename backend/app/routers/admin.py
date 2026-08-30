@@ -681,7 +681,7 @@ def list_assets(
     db: Session = Depends(get_db),
     q: str | None = Query(None),
     sort: Literal["newest", "oldest", "name", "size"] = Query("newest"),
-    limit: int = Query(24, ge=1, le=MAX_PAGE_SIZE),
+    limit: int = Query(12, ge=1, le=MAX_PAGE_SIZE),
     offset: int = Query(0, ge=0),
 ) -> AdminAssetPage:
     """The media library: what has been uploaded, searchable and sortable.
@@ -692,10 +692,24 @@ def list_assets(
     carries no alt text, dimensions or usage. A table indexed on uploaded_at
     answers all of it.
 
-    `limit` defaults to 24 rather than the usual 50 -- this renders as a grid of
-    thumbnails in a modal, and 24 fills it without scrolling past what a person
-    can scan.
+    `limit` defaults to 12 rather than the usual 50, matching the modal that
+    consumes it: three rows of four thumbnails fill a dialog without scrolling.
+
+    Refuses outright when no CDN host is configured, because every row's `url` is
+    built from one. Returning the rows without URLs would be worse than refusing:
+    the library would list images it cannot display, and the caller would have no
+    way to tell a missing photograph from a missing setting. Reachable on a
+    development machine pointed at a database whose uploads it has no CDN for.
     """
+    if not settings.cdn_host:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "No image storage is configured here, so the media library is "
+                "unavailable. Set CDN_HOST (and S3_BUCKET) to enable it."
+            ),
+        )
+
     used_by = (
         select(func.count())
         .select_from(ProductImage)

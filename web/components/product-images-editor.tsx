@@ -1,13 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { addImageAction, imageAction } from "@/app/actions/admin";
 import { Button } from "@/components/ui/button";
 import { ImageUploadField } from "@/components/image-upload-field";
+import { MediaLibraryModal } from "@/components/media-library-modal";
 import { Input } from "@/components/ui/input";
-import type { AdminProduct } from "@/lib/api";
+import type { AdminProduct, MediaAsset } from "@/lib/api";
 
 /**
  * Every option a product's variants actually offer, as "key=value" pairs.
@@ -67,6 +68,14 @@ export function ProductImagesEditor({
   const [addState, addAction, adding] = useActionState(addImageAction, {});
   const [rowState, rowAction, busy] = useActionState(imageAction, {});
   const options = variantOptions(product);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [picked, setPicked] = useState<MediaAsset | null>(null);
+  // Bumping this remounts the upload field, which is how its internal state is
+  // cleared. The two paths supersede each other: choosing from the library
+  // discards a pending upload, and finishing an upload discards a library pick.
+  // Leaving both set would make the outcome depend on the action's precedence
+  // rule -- correct, but invisible to whoever is looking at the screen.
+  const [uploadKey, setUploadKey] = useState(0);
 
   return (
     <section>
@@ -179,7 +188,67 @@ export function ProductImagesEditor({
               action is "I photographed this shirt, attach it to this product" --
               putting a library above that is what produces admin screens where
               adding an image means first going somewhere else to put it. */}
-          <ImageUploadField name="uploaded_url" />
+          <ImageUploadField
+            key={uploadKey}
+            name="uploaded_url"
+            onUploaded={() => setPicked(null)}
+          />
+
+          <fieldset className="flex flex-col gap-2">
+            <legend className="font-body text-sm text-text">
+              …or reuse a photo already uploaded
+            </legend>
+            {/* The URL and the asset id travel under their own names rather than
+                sharing "url" or "uploaded_url". Two fields with one name make
+                FormData.get() return whichever appears first in the DOM, which
+                turns "which image did I choose" into a question about markup
+                order. The action states the precedence instead. */}
+            <input type="hidden" name="library_url" value={picked?.url ?? ""} />
+            <input
+              type="hidden"
+              name="library_asset_id"
+              value={picked ? String(picked.id) : ""}
+            />
+
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setLibraryOpen(true)}
+              >
+                Browse the media library
+              </Button>
+              {picked && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPicked(null)}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+
+            {picked && (
+              <div className="flex items-center gap-3">
+                <span className="relative block size-16 shrink-0 overflow-hidden rounded-sm border border-accent bg-background">
+                  <Image
+                    src={picked.url}
+                    alt=""
+                    fill
+                    sizes="64px"
+                    className="object-cover"
+                  />
+                </span>
+                <span className="font-body text-xs text-muted">
+                  {picked.original_filename} chosen. Add alt text below, then
+                  save.
+                </span>
+              </div>
+            )}
+          </fieldset>
           <fieldset className="flex flex-col gap-1">
             <legend className="font-body text-sm text-text">
               …or reuse a file already in the site
@@ -231,8 +300,10 @@ export function ProductImagesEditor({
               Files committed to <code>web/public/</code>, for reusing an image
               across products. There is still no free-text field: a link to another
               site is accepted by the form and then fails when the page renders,
-              breaking the storefront for every visitor. Uploaded photos are not
-              listed here yet — browsing them is the media library.
+              breaking the storefront for every visitor. Uploaded photos live in
+              the media library above; these are the files shipped with the site,
+              and they are the only ones available when no image storage is
+              configured — which is every development machine.
             </span>
           </fieldset>
           <label className="flex flex-col gap-1 font-body text-sm text-text">
@@ -294,6 +365,19 @@ export function ProductImagesEditor({
           </div>
         </form>
       </details>
+
+      {/* Outside the <form> on purpose. A <dialog> nested in a form is legal,
+          but the browser's top layer moves it out of the visual flow anyway, and
+          keeping it here means nothing inside it can ever be mistaken for a
+          field of the form it is filling in. */}
+      <MediaLibraryModal
+        open={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        onSelect={(asset) => {
+          setPicked(asset);
+          setUploadKey((n) => n + 1);
+        }}
+      />
     </section>
   );
 }

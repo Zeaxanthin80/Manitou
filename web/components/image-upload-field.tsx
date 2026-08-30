@@ -21,7 +21,16 @@ import { confirmUploadAction, requestUploadAction } from "@/app/actions/admin";
  * awaits, and decodes the image to measure it. None of that survives a Server
  * Component.
  */
-export function ImageUploadField({ name }: { name: string }) {
+export function ImageUploadField({
+  name,
+  onUploaded,
+}: {
+  name: string;
+  /** Told when an upload completes, so the surrounding form can drop a media
+   *  library selection the vendor has just superseded. Optional: this component
+   *  works on its own, and the form is what knows the other paths exist. */
+  onUploaded?: () => void;
+}) {
   const [url, setUrl] = useState("");
   const [assetId, setAssetId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -72,6 +81,7 @@ export function ImageUploadField({ name }: { name: string }) {
       }
       setUrl(confirmed.url);
       setAssetId(String(confirmed.assetId ?? ""));
+      onUploaded?.();
     } catch {
       setError("The upload failed. Check your connection and try again.");
     } finally {
@@ -104,7 +114,14 @@ export function ImageUploadField({ name }: { name: string }) {
           const file = e.target.files?.[0];
           if (file) void handleFile(file);
         }}
-        className="font-body text-sm text-text file:mr-3 file:rounded-md file:border file:border-border file:bg-transparent file:px-4 file:py-2 file:font-body file:text-sm file:text-text hover:file:bg-background disabled:opacity-50"
+        // w-fit is load-bearing, not cosmetic. This fieldset is a flex column,
+        // whose default align-items:stretch pulls the input to the form's full
+        // max-w-2xl (42rem = 672px). The `file:` prefix styles only the button
+        // PSEUDO-ELEMENT inside the input -- the remaining ~570px of stretched
+        // input is still the input, so clicking apparently blank space opened
+        // the file manager. Shrinking to the intrinsic width makes the visible
+        // control and the click target the same thing.
+        className="w-fit font-body text-sm text-text file:mr-3 file:rounded-md file:border file:border-border file:bg-transparent file:px-4 file:py-2 file:font-body file:text-sm file:text-text hover:file:bg-background disabled:opacity-50"
       />
 
       {busy && (

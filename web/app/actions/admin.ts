@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import type { MediaAssetPage } from "@/lib/api";
 import {
   ApiError,
   adminAnonymise,
   adminDisableTwoFactor,
   addProductImage,
   confirmUpload,
+  listAssets,
   requestUpload,
   addVariant,
   createProduct,
@@ -286,6 +288,32 @@ function parseAppliesTo(raw: string): Record<string, string> {
   return at === -1 ? {} : { [raw.slice(0, at)]: raw.slice(at + 1) };
 }
 
+/** Fetch a page of the media library.
+ *
+ *  A server action rather than a browser fetch, for the same reason every other
+ *  admin call is one: the JWT lives in an httpOnly cookie the browser cannot
+ *  read. The modal calls this on every search, sort and page change.
+ *
+ *  Returns the page rather than throwing, so a failure renders as a message
+ *  inside the dialog instead of an error boundary that replaces the page the
+ *  vendor was working on. */
+export async function listAssetsAction(params: {
+  q?: string;
+  sort?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ page?: MediaAssetPage; error?: string }> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+
+  try {
+    return { page: await listAssets(token, params) };
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+}
+
 /** Step 1 of an upload: get a signed URL.
  *
  *  A server action rather than a client fetch because the admin's JWT lives in
@@ -350,15 +378,25 @@ export async function addImageAction(
   // return whichever comes first in the DOM -- a rule about markup order, which
   // is not a rule anyone should have to know to move a fieldset.
   const uploaded = text(formData, "uploaded_url");
+  const fromLibrary = text(formData, "library_url");
   const chosen = text(formData, "url");
-  const url = uploaded || chosen;
+  const url = uploaded || fromLibrary || chosen;
   if (!url) {
     return { error: "Upload a photo, or choose one of the existing files." };
   }
-  // Only ever set alongside `uploaded_url` -- a committed web/public/ file has
-  // no asset behind it, and sending an id for one would be refused by the API's
-  // match check anyway.
-  const assetId = Number(text(formData, "uploaded_asset_id")) || null;
+  // Read in the SAME order the url was, so the id can never end up describing a
+  // different image than the one being added. A committed web/public/ file has
+  // no asset behind it and sends neither -- and an id sent without its matching
+  // url is refused by the API, which is what makes this a claim it checks rather
+  // than one it trusts.
+  const assetId =
+    Number(
+      uploaded
+        ? text(formData, "uploaded_asset_id")
+        : fromLibrary
+          ? text(formData, "library_asset_id")
+          : "",
+    ) || null;
 
   try {
     await addProductImage(token, id, {

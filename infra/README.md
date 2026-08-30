@@ -758,6 +758,65 @@ Both times the fix was to pin real behaviour, not to delete the code:
 
 ---
 
+## The media library (task 9b)
+
+**No AWS resources were added.** This task is application work on top of task 9's bucket,
+distribution and task role. It is recorded here because one decision is an AWS design decision, and
+because the deferred piece needs an IAM change.
+
+### Why the index lives in PostgreSQL and not in the bucket
+
+The obvious thought is that S3 already knows what is in it, so `ListObjectsV2` could drive the
+library. It cannot answer the questions the screen asks:
+
+| The screen needs | `ListObjectsV2` gives |
+| --- | --- |
+| page 3 of the results | a continuation token — forward-only, no offset |
+| newest first, or largest first | key order, and nothing else |
+| "find the navy shirt photo" | no search of any kind |
+| alt text, dimensions, who uploaded it | no application metadata |
+| "which products use this?" | no idea what a product is |
+
+So a `media_assets` row is written at the moment the upload is confirmed, and the bucket holds only
+bytes. This is the general shape worth carrying into the exam: **an object store is for objects, and
+the questions you want to ask *about* those objects belong in a database beside it.** The same
+reasoning is why DynamoDB or RDS sits next to S3 in almost every reference architecture that has a
+"browse my files" screen.
+
+### The row is written on confirm, never on presign
+
+The browser PUTs straight to S3 and the API never observes it. A row written when the URL was signed
+would record uploads that were abandoned, refused by S3, or never attempted. `head_object` after the
+fact is what turns "the client says it uploaded" into "the object exists, and is this size and this
+type" — and size and content type are taken from that answer rather than from the client's claim.
+
+### The library refuses when `CDN_HOST` is unset
+
+Every row's public URL is built from the CDN host plus the key — never stored, so pointing a clone at
+its own distribution stays a configuration change. The consequence is that with no host configured
+there is no URL to return, so `GET /admin/assets` answers **503 naming the setting** rather than
+listing images the caller cannot display. This is reachable in ordinary work: a development machine
+pointed at the deployed database has the rows but not the host, and "the images are broken" and "this
+machine is not configured" are worth telling apart.
+
+The `web/public/` picker was kept below the library for the same reason — it is the only path that
+works with no bucket at all, which is every development machine.
+
+### Deleting an asset is deferred, deliberately
+
+The task role can `PutObject` on two prefixes and nothing else. Deleting needs `DeleteObject` on
+`media/*`, and that permission should not be granted before the guard that decides *whether* an asset
+may be deleted works — which depends on `product_images.asset_id` being populated. It was not
+populated until this task (defect 24): the column and its foreign key existed, and the write path
+ignored them, so every asset looked unused. **A delete built on that would have reported every
+in-use photograph as safe to remove.**
+
+Granting the permission in the same change that first makes the guard meaningful is the wrong order,
+so delete is its own task. The general lesson is the one IAM keeps teaching: a permission is easy to
+add and hard to notice, so add it when the code that needs it is already correct.
+
+---
+
 ## Region
 
 Not yet fixed at time of writing. IAM is global, so nothing in task 3 depended on it.

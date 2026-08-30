@@ -731,3 +731,29 @@ def test_paging_carries_the_search_and_does_not_repeat_rows(
     assert page1["total"] == page2["total"] == 3
     ids = [r["id"] for r in page1["items"]] + [r["id"] for r in page2["items"]]
     assert len(set(ids)) == 3, "a row appeared on two pages"
+
+
+def test_no_cdn_host_makes_the_library_refuse_rather_than_list_undisplayable_rows(
+    client, db, make_user, auth_headers, library, monkeypatch
+):
+    """A machine with assets in its database but no CDN configured.
+
+    Reachable in real life: development pointed at the deployed database. Every
+    row's url is built from the CDN host, so without one the choice is to refuse
+    or to return rows the caller cannot display. It refuses, and names the
+    setting -- the alternative looks like "the images are broken" rather than
+    "this machine is not configured".
+
+    The control is every other test in this section: they pass because the
+    fixture sets cdn_host, so this asserts the guard and not merely that the
+    endpoint can fail.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "cdn_host", "")
+    admin = make_user(email="admin@manitou.example", role="admin")
+
+    r = client.get("/admin/assets", headers=auth_headers(admin))
+
+    assert r.status_code == 503, r.text
+    assert "CDN_HOST" in r.json()["detail"]
