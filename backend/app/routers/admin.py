@@ -11,7 +11,7 @@ from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import case, func, select, update
+from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -44,6 +44,7 @@ from app.services.payments import (
     apply_payment_event,
 )
 from app.schemas.admin import (
+    AdminAssetPage,
     AdminAssetRead,
     AdminUploadConfirm,
     AdminUploadRequest,
@@ -659,6 +660,98 @@ def _s3():
     import boto3
 
     return boto3.client("s3", region_name=settings.s3_region)
+
+
+#: How the library may be ordered. A map rather than a chain of ifs, for the same
+#: reason ALLOWED_TRANSITIONS is one: the set of legal values is data the endpoint
+#: validates against, not control flow scattered through a function.
+#:
+#: `newest` first because that is the default anyone actually wants from a media
+#: library -- the photograph you just uploaded is the one you are looking for.
+_ASSET_SORTS = {
+    "newest": (MediaAsset.uploaded_at.desc(), MediaAsset.id.desc()),
+    "oldest": (MediaAsset.uploaded_at.asc(), MediaAsset.id.asc()),
+    "name": (MediaAsset.original_filename.asc(), MediaAsset.id.asc()),
+    "size": (MediaAsset.byte_size.desc(), MediaAsset.id.desc()),
+}
+
+
+@router.get("/assets", response_model=AdminAssetPage)
+def list_assets(
+    db: Session = Depends(get_db),
+    q: str | None = Query(None),
+    sort: Literal["newest", "oldest", "name", "size"] = Query("newest"),
+    limit: int = Query(24, ge=1, le=MAX_PAGE_SIZE),
+    offset: int = Query(0, ge=0),
+) -> AdminAssetPage:
+    """The media library: what has been uploaded, searchable and sortable.
+
+    Why this exists rather than reading the bucket: ListObjectsV2 pages by
+    continuation token rather than offset, so it cannot drive the same pagination
+    every other admin list uses; it sorts only by key; it cannot search; and it
+    carries no alt text, dimensions or usage. A table indexed on uploaded_at
+    answers all of it.
+
+    `limit` defaults to 24 rather than the usual 50 -- this renders as a grid of
+    thumbnails in a modal, and 24 fills it without scrolling past what a person
+    can scan.
+    """
+    used_by = (
+        select(func.count())
+        .select_from(ProductImage)
+        .where(ProductImage.asset_id == MediaAsset.id)
+        .correlate(MediaAsset)
+        .scalar_subquery()
+    )
+
+    conditions = []
+    if q and q.strip():
+        term = f"%{q.strip()}%"
+        conditions.append(
+            or_(
+                MediaAsset.original_filename.ilike(term),
+                # Alt text lives on product_images, not here: an asset used by
+                # three products has three alt texts and none of its own. So this
+                # half is an EXISTS, not a column read -- worth knowing, because
+                # it otherwise looks like a missing column.
+                select(ProductImage.id)
+                .where(
+                    ProductImage.asset_id == MediaAsset.id,
+                    ProductImage.alt_text.ilike(term),
+                )
+                .correlate(MediaAsset)
+                .exists(),
+            )
+        )
+
+    total = db.scalar(select(func.count()).select_from(MediaAsset).where(*conditions))
+    rows = db.execute(
+        select(MediaAsset, used_by.label("used_by_count"))
+        .where(*conditions)
+        .order_by(*_ASSET_SORTS[sort])
+        .limit(limit)
+        .offset(offset)
+    ).all()
+
+    return AdminAssetPage(
+        items=[
+            AdminAssetRead(
+                **{
+                    c: getattr(asset, c)
+                    for c in (
+                        "id", "key", "original_filename", "content_type",
+                        "byte_size", "width", "height", "uploaded_at",
+                    )
+                },
+                url=public_url(settings.cdn_host, asset.key),
+                used_by_count=count,
+            )
+            for asset, count in rows
+        ],
+        total=total or 0,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.post("/uploads", response_model=AdminUploadTarget)

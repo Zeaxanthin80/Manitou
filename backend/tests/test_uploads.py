@@ -572,3 +572,162 @@ def test_a_committed_file_still_needs_no_asset(
     )
     assert r.status_code == 201
     assert db.query(ProductImage).one().asset_id is None
+
+
+# ============================================================================
+# The media library listing
+# ============================================================================
+
+
+@pytest.fixture
+def library(monkeypatch, db, make_product):
+    """Three assets, one of them attached to a product with alt text."""
+    from app.config import settings
+    from app.models import MediaAsset, ProductImage
+    from datetime import datetime, timedelta, timezone
+
+    monkeypatch.setattr(settings, "cdn_host", CDN)
+    base = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    assets = []
+    for i, (name, size) in enumerate(
+        [("zebra.jpg", 3000), ("apple.png", 1000), ("mango.webp", 2000)]
+    ):
+        a = MediaAsset(
+            key=f"media/2026/08/{i}.jpg",
+            original_filename=name,
+            content_type="image/jpeg",
+            byte_size=size,
+            uploaded_at=base + timedelta(days=i),
+        )
+        db.add(a)
+        assets.append(a)
+    db.commit()
+    for a in assets:
+        db.refresh(a)
+
+    product = make_product()
+    db.add(
+        ProductImage(
+            product_id=product.id,
+            url=f"https://{CDN}/{assets[0].key}",
+            asset_id=assets[0].id,
+            alt_text="A navy crew neck shirt",
+            is_primary=True,
+        )
+    )
+    db.commit()
+    return assets
+
+
+def _get(client, headers, **params):
+    r = client.get("/admin/assets", headers=headers, params=params)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_the_library_requires_an_admin(client, db, make_user, auth_headers):
+    customer = make_user(email="c@manitou.example", role="customer")
+    assert client.get("/admin/assets", headers=auth_headers(customer)).status_code == 403
+    assert client.get("/admin/assets").status_code == 401
+
+
+def test_it_lists_every_asset_newest_first_by_default(
+    client, db, make_user, auth_headers, library
+):
+    admin = make_user(email="admin@manitou.example", role="admin")
+    body = _get(client, auth_headers(admin))
+
+    assert body["total"] == 3
+    # mango was uploaded last in the fixture.
+    assert body["items"][0]["original_filename"] == "mango.webp"
+    assert body["items"][0]["url"].startswith(f"https://{CDN}/")
+
+
+def test_used_by_count_answers_the_question_the_table_exists_for(
+    client, db, make_user, auth_headers, library
+):
+    """Zero for an unused asset, one for the attached one.
+
+    Before defect 24 was fixed this was always 0, because nothing populated
+    product_images.asset_id -- so the number looked right and meant nothing.
+    """
+    admin = make_user(email="admin@manitou.example", role="admin")
+    rows = {r["original_filename"]: r["used_by_count"] for r in _get(client, auth_headers(admin))["items"]}
+
+    assert rows["zebra.jpg"] == 1
+    assert rows["apple.png"] == 0
+    assert rows["mango.webp"] == 0
+
+
+def test_search_matches_the_filename(client, db, make_user, auth_headers, library):
+    admin = make_user(email="admin@manitou.example", role="admin")
+    body = _get(client, auth_headers(admin), q="appl")
+    assert [r["original_filename"] for r in body["items"]] == ["apple.png"]
+    assert body["total"] == 1
+
+
+def test_search_also_matches_the_alt_text_of_an_image_using_the_asset(
+    client, db, make_user, auth_headers, library
+):
+    """The EXISTS half, which is easy to write and never exercise.
+
+    Alt text is not a column on media_assets -- it lives on product_images, and
+    an asset used by three products has three of them. "navy" appears in no
+    filename, so a match here can only have come through the subquery.
+    """
+    admin = make_user(email="admin@manitou.example", role="admin")
+    body = _get(client, auth_headers(admin), q="navy")
+    assert [r["original_filename"] for r in body["items"]] == ["zebra.jpg"]
+
+
+def test_search_matching_nothing_returns_an_empty_page_not_everything(
+    client, db, make_user, auth_headers, library
+):
+    """The control for the two above: a filter that does nothing would pass them."""
+    body = _get(client, auth_headers(make_user(email="a@manitou.example", role="admin")),
+                q="nothing-matches-this")
+    assert body["items"] == [] and body["total"] == 0
+
+
+@pytest.mark.parametrize(
+    "sort,first",
+    [
+        ("newest", "mango.webp"),
+        ("oldest", "zebra.jpg"),
+        ("name", "apple.png"),
+        ("size", "zebra.jpg"),   # 3000 bytes, largest first
+    ],
+)
+def test_each_sort_actually_changes_the_order(
+    client, db, make_user, auth_headers, library, sort, first
+):
+    """Asserted on the FIRST ROW, not on the request succeeding.
+
+    A sort parameter that was silently ignored would return 200 for all four and
+    pass any test that only checked the status.
+    """
+    admin = make_user(email="admin@manitou.example", role="admin")
+    body = _get(client, auth_headers(admin), sort=sort)
+    assert body["items"][0]["original_filename"] == first
+
+
+def test_an_unknown_sort_is_refused_rather_than_silently_defaulted(
+    client, db, make_user, auth_headers, library
+):
+    admin = make_user(email="admin@manitou.example", role="admin")
+    r = client.get("/admin/assets", headers=auth_headers(admin), params={"sort": "cheapest"})
+    assert r.status_code == 422
+
+
+def test_paging_carries_the_search_and_does_not_repeat_rows(
+    client, db, make_user, auth_headers, library
+):
+    admin = make_user(email="admin@manitou.example", role="admin")
+    h = auth_headers(admin)
+    page1 = _get(client, h, limit=2, offset=0)
+    page2 = _get(client, h, limit=2, offset=2)
+
+    assert len(page1["items"]) == 2 and len(page2["items"]) == 1
+    assert page1["total"] == page2["total"] == 3
+    ids = [r["id"] for r in page1["items"]] + [r["id"] for r in page2["items"]]
+    assert len(set(ids)) == 3, "a row appeared on two pages"

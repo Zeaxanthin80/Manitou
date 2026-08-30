@@ -296,6 +296,15 @@ class AdminUploadConfirm(BaseModel):
     height: int | None = Field(default=None, gt=0)
 
 
+class AdminAssetPage(BaseModel):
+    """One page of the media library."""
+
+    items: list["AdminAssetRead"]
+    total: int
+    limit: int
+    offset: int
+
+
 class AdminAssetRead(BaseModel):
     """An uploaded asset, as the portal sees it."""
 
@@ -312,6 +321,17 @@ class AdminAssetRead(BaseModel):
     width: int | None
     height: int | None
     uploaded_at: datetime
+    #: How many product images currently use this asset.
+    #:
+    #: Computed per request from product_images, never stored. A stored counter
+    #: would drift from the rows that produce it -- the same reasoning
+    #: services/stock.py records for `reserved`, and the same reason this is a
+    #: correlated subquery rather than a column.
+    #:
+    #: 0 means the asset is unreferenced, which is what a future delete will
+    #: check. That answer is only meaningful because task 9b populates
+    #: product_images.asset_id -- before that it was always 0 (defect 24).
+    used_by_count: int = 0
 
 
 class AdminImageUpdate(BaseModel):
