@@ -22,6 +22,7 @@ from app.models import (
     AuditEvent,
     Category,
     Inventory,
+    MediaAsset,
     Order,
     OrderItem,
     Payment,
@@ -43,6 +44,10 @@ from app.services.payments import (
     apply_payment_event,
 )
 from app.schemas.admin import (
+    AdminAssetRead,
+    AdminUploadConfirm,
+    AdminUploadRequest,
+    AdminUploadTarget,
     AdminAnonymiseRequest,
     AdminAuditEvent,
     AdminAuditPage,
@@ -85,6 +90,13 @@ from app.services.account import anonymise, count_admins, password_matches
 from app.services.email import EmailMessage, EmailSender
 from app.services.password_reset import TOKEN_TTL, request_reset
 from app.services.two_factor import disable as disable_two_factor
+from app.services.uploads import (
+    PRESIGN_EXPIRY_SECONDS,
+    UploadError,
+    confirm_upload,
+    presign_put,
+    public_url,
+)
 from app.store import store_config
 
 router = APIRouter(
@@ -622,6 +634,112 @@ def _clear_primary(db: Session, product_id: int, keep_id: int | None = None) -> 
         stmt = stmt.where(ProductImage.id != keep_id)
     db.execute(stmt)
     db.flush()
+
+
+# ------------------------------------------------------------- uploads ------
+#
+# Two calls, because the browser PUTs straight to S3 and the API never sees it
+# happen. Without a confirm there would be no row and no record that an upload
+# completed; without a presign the bytes would have to pass through this process,
+# which means a request-size ceiling and a task sized for the largest photograph
+# anyone might send.
+#
+# Both are gated by the router's require_admin. Nobody unauthenticated can obtain
+# a signed URL -- which matters more than usual here, because a presigned URL
+# carries this service's own S3 authority for as long as it lives.
+
+
+def _s3():
+    """A client, built per request rather than at import.
+
+    Import-time construction would make every test and every `alembic` invocation
+    try to resolve credentials, and would fail the whole app at boot on a machine
+    with no AWS configured -- which is every development machine.
+    """
+    import boto3
+
+    return boto3.client("s3", region_name=settings.s3_region)
+
+
+@router.post("/uploads", response_model=AdminUploadTarget)
+def create_upload_target(
+    payload: AdminUploadRequest,
+    user: User = Depends(require_admin),
+) -> AdminUploadTarget:
+    """Sign one PUT into the pending prefix.
+
+    409 rather than 500 when no bucket is configured: it is not a fault, it is a
+    deployment that has not been given a bucket, and the message says which
+    variables to set. Local development runs exactly like this.
+    """
+    try:
+        key, url = presign_put(
+            _s3(), settings.s3_bucket, payload.content_type, payload.byte_size
+        )
+    except UploadError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+    return AdminUploadTarget(
+        key=key,
+        url=url,
+        # Echoed back because the signature covers them. A browser that omits or
+        # alters either gets a signature failure, which reads like a permissions
+        # problem and sends the search in entirely the wrong direction.
+        headers={
+            "Content-Type": payload.content_type,
+            "Content-Length": str(payload.byte_size),
+        },
+        expires_in=PRESIGN_EXPIRY_SECONDS,
+    )
+
+
+@router.post(
+    "/uploads/confirm",
+    response_model=AdminAssetRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def confirm_upload_target(
+    payload: AdminUploadConfirm,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+) -> AdminAssetRead:
+    """Verify the object exists, move it out of pending/, and record it.
+
+    The row is written only after head_object succeeds, so it can never describe
+    an upload that did not complete. Size and content type come from S3 rather
+    than from the client -- the browser's claims were used to SIGN the request,
+    not to describe the result.
+
+    The original filename is kept for the media library's search and is never
+    part of the key: a filename is attacker-controlled, and `.jpg.html` is a
+    filename.
+    """
+    original = payload.key.rsplit("/", 1)[-1]
+
+    try:
+        info = confirm_upload(_s3(), settings.s3_bucket, payload.key)
+    except UploadError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+    asset = MediaAsset(
+        key=info["key"],
+        original_filename=original,
+        content_type=info["content_type"],
+        byte_size=info["byte_size"],
+        width=payload.width,
+        height=payload.height,
+        uploaded_by=user.id,
+    )
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+
+    return AdminAssetRead(
+        **{c: getattr(asset, c) for c in
+           ("id", "key", "original_filename", "content_type", "byte_size",
+            "width", "height", "uploaded_at")},
+        url=public_url(settings.cdn_host, asset.key),
+    )
 
 
 @router.post(

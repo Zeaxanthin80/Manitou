@@ -15,6 +15,7 @@ from app.models.catalog import (
     ProductVariant,
 )
 from app.models.fulfilment import Shipment, ShipmentEvent
+from app.models.media import MediaAsset
 from app.models.order import Order, OrderItem, Payment
 from app.models.user import Address, PasswordResetToken, RecoveryCode, User
 
@@ -25,6 +26,7 @@ __all__ = [
     "CartItem",
     "Category",
     "Inventory",
+    "MediaAsset",
     "Order",
     "OrderItem",
     "PasswordResetToken",

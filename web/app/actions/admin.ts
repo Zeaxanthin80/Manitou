@@ -8,6 +8,8 @@ import {
   adminAnonymise,
   adminDisableTwoFactor,
   addProductImage,
+  confirmUpload,
+  requestUpload,
   addVariant,
   createProduct,
   deactivateProduct,
@@ -284,6 +286,54 @@ function parseAppliesTo(raw: string): Record<string, string> {
   return at === -1 ? {} : { [raw.slice(0, at)]: raw.slice(at + 1) };
 }
 
+/** Step 1 of an upload: get a signed URL.
+ *
+ *  A server action rather than a client fetch because the admin's JWT lives in
+ *  an httpOnly cookie the browser cannot read -- the same reason every other
+ *  admin call goes through here. What comes back is safe to hand to the browser:
+ *  it authorises one PUT, to one key, for fifteen minutes.
+ *
+ *  Takes plain arguments rather than FormData: it is called from an onChange
+ *  handler, not a form submission. */
+export async function requestUploadAction(
+  filename: string,
+  contentType: string,
+  byteSize: number,
+): Promise<{ key?: string; url?: string; headers?: Record<string, string>; error?: string }> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+
+  try {
+    const target = await requestUpload(token, {
+      filename,
+      content_type: contentType,
+      byte_size: byteSize,
+    });
+    return { key: target.key, url: target.url, headers: target.headers };
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+}
+
+/** Step 3: the PUT succeeded, so record it and get the public URL back. */
+export async function confirmUploadAction(
+  key: string,
+  width: number | null,
+  height: number | null,
+): Promise<{ url?: string; error?: string }> {
+  const { token, error } = await adminToken();
+  if (!token) return { error };
+
+  try {
+    const asset = await confirmUpload(token, { key, width, height });
+    return { url: asset.url };
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.message };
+    throw err;
+  }
+}
+
 export async function addImageAction(
   _prev: AdminActionState,
   formData: FormData,
@@ -292,9 +342,20 @@ export async function addImageAction(
   if (!token) return { error };
   const id = Number(formData.get("product_id"));
 
+  // An upload wins over a library pick. Both inputs are named separately rather
+  // than sharing "url", because two fields with one name make FormData.get()
+  // return whichever comes first in the DOM -- a rule about markup order, which
+  // is not a rule anyone should have to know to move a fieldset.
+  const uploaded = text(formData, "uploaded_url");
+  const chosen = text(formData, "url");
+  const url = uploaded || chosen;
+  if (!url) {
+    return { error: "Upload a photo, or choose one of the existing files." };
+  }
+
   try {
     await addProductImage(token, id, {
-      url: text(formData, "url"),
+      url,
       alt_text: text(formData, "alt_text"),
       is_primary: formData.get("is_primary") === "on",
       applies_to: parseAppliesTo(text(formData, "applies_to")),

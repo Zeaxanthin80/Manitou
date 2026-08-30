@@ -694,3 +694,101 @@ def test_applies_to_is_editable_in_place(
     # And the same validation applies on update, not just create.
     assert client.patch(f"/admin/images/{image_id}", headers=h,
                         json={"applies_to": {"colour": "White"}}).status_code == 422
+
+
+# ------------------------------------------ the CDN host, added in task 9 ----
+#
+# Phase 6 widened the guard above to allow ONE external host: the CloudFront
+# distribution. Widening a guard is exactly when it gets lost, so these pin both
+# halves -- the host that is now allowed, and the near-misses that must still be
+# refused. Without the second half, "accepts the CDN" is equally consistent with
+# "accepts anything".
+
+_CDN = "d111abcdef8.cloudfront.net"
+
+
+@pytest.fixture
+def cdn_configured(monkeypatch):
+    """Point settings at a CDN host for the duration of one test.
+
+    monkeypatch rather than an env var: the validator reads settings.cdn_host at
+    validation time, and the tests must be able to exercise both the configured
+    and unconfigured states in the same session.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "cdn_host", _CDN)
+    return _CDN
+
+
+def test_a_cdn_url_is_accepted_once_the_host_is_configured(
+    client, db, make_user, make_product, auth_headers, cdn_configured
+):
+    """The control. Every refusal below means nothing without it."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    product = make_product()
+
+    r = client.post(
+        f"/admin/products/{product.id}/images",
+        headers=auth_headers(admin),
+        json={"url": f"https://{_CDN}/media/2026/08/a.jpg", "alt_text": "A shirt"},
+    )
+    assert r.status_code == 201, r.text
+
+
+CDN_NEAR_MISSES = [
+    # The one the trailing slash exists for. Without it this is a different host
+    # that merely STARTS with ours -- and it is the shape an attacker registers.
+    pytest.param(f"https://{_CDN}.evil.example/a.jpg", id="host-prefix-of-ours"),
+    pytest.param(f"https://evil.example/{_CDN}/a.jpg", id="ours-in-the-path"),
+    # userinfo: everything before "@" is credentials, so the real host is evil.
+    pytest.param(f"https://user@{_CDN}.evil.example/a.jpg", id="userinfo"),
+    pytest.param(f"http://{_CDN}/a.jpg", id="plain-http"),
+    # Still refused ON the trusted host -- the shared guards run before the two
+    # forms diverge, so a hole in one branch is a hole in both.
+    pytest.param(f"https://{_CDN}/../../etc/passwd", id="traversal-on-cdn"),
+    pytest.param(f"https://{_CDN}/a b.jpg", id="space-on-cdn"),
+]
+
+
+@pytest.mark.parametrize("url", CDN_NEAR_MISSES)
+def test_near_misses_for_the_cdn_host_are_still_refused(
+    client, db, make_user, make_product, auth_headers, cdn_configured, url
+):
+    admin = make_user(email="admin@manitou.example", role="admin")
+    product = make_product()
+
+    r = client.post(
+        f"/admin/products/{product.id}/images",
+        headers=auth_headers(admin),
+        json={"url": url, "alt_text": "A shirt"},
+    )
+    assert r.status_code == 422, f"{url!r} was accepted"
+
+
+def test_a_cdn_url_is_refused_when_no_host_is_configured(
+    client, db, make_user, make_product, auth_headers
+):
+    """Local development has no cdn_host, and must not accept CDN URLs.
+
+    Also guards the empty-string case: a naive check would build "https:///" and
+    match any URL beginning with that.
+    """
+    admin = make_user(email="admin@manitou.example", role="admin")
+    product = make_product()
+
+    for url in (
+        f"https://{_CDN}/media/a.jpg",
+        # The case the `cdn and` guard exists for, found by mutation: with an
+        # empty cdn_host the host check builds the prefix "https:///", and a URL
+        # beginning with exactly that would match it. Malformed, but defect 1 was
+        # precisely a URL the API accepted and next/image then threw on -- so
+        # "malformed" is the failure mode, not a reason to ignore it.
+        "https:///evil.example/x.png",
+    ):
+        r = client.post(
+            f"/admin/products/{product.id}/images",
+            headers=auth_headers(admin),
+            json={"url": url, "alt_text": "A shirt"},
+        )
+        assert r.status_code == 422, f"{url!r} was accepted"

@@ -90,7 +90,29 @@ class ProductImage(Base):
     # product_variants.product_id already has this; here it was simply missed.
     # Postgres does not index a foreign key column automatically (Section 6.6).
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+
+    #: Where the storefront fetches the picture. Still the single source of truth
+    #: for RENDERING -- every read path reads this, unchanged by Phase 6 task 9.
     url: Mapped[str] = mapped_column(Text)
+
+    #: The uploaded object this image came from, when it came from one.
+    #:
+    #: **Nullable on purpose, and url stays alongside it.** Two representations
+    #: of one idea is a real cost, so the reason has to be worth it: a seeded or
+    #: committed image points at web/public/ and has no S3 object behind it, so
+    #: requiring an asset would make local development and seed.py depend on
+    #: objects existing in a bucket. url keeps those working; asset_id is what an
+    #: UPLOADED image adds.
+    #:
+    #: What the FK buys is the question S3 cannot answer -- "which products use
+    #: this?" -- and the guard that follows from it: NO ACTION, like every other
+    #: reference in this schema, so an asset a product still shows cannot be
+    #: deleted out from under it. Task 9b turns that into a message naming the
+    #: products rather than an integrity error.
+    asset_id: Mapped[int | None] = mapped_column(
+        ForeignKey("media_assets.id"), nullable=True, index=True
+    )
+
     alt_text: Mapped[str] = mapped_column(Text)
     is_primary: Mapped[bool] = mapped_column(server_default=text("false"))
 
@@ -112,6 +134,9 @@ class ProductImage(Base):
     )
 
     product: Mapped["Product"] = relationship(back_populates="images")
+    asset: Mapped["MediaAsset | None"] = relationship(  # noqa: F821
+        back_populates="images"
+    )
 
 
 class Inventory(Base):

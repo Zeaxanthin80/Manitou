@@ -75,6 +75,30 @@ class Settings(BaseSettings):
     # directly, so the suite never depends on how a laptop happens to be set up.
     payment_gateway: str = "stripe"
 
+    # --- media storage (Phase 6 task 9) --------------------------------------
+    #: The private S3 bucket product photographs are uploaded to, and the
+    #: CloudFront host they are served from. Block Public Access is on: nothing
+    #: reads the bucket directly, only the distribution does, via OAC.
+    #:
+    #: All three default to empty, so **local development needs no AWS at all**.
+    #: An empty bucket name means the upload endpoints refuse rather than
+    #: half-work -- see uploads.py. Seeded images keep pointing at web/public/,
+    #: which is why product_images.url survives alongside asset_id.
+    s3_bucket: str = ""
+    s3_region: str = "us-east-1"
+
+    #: The CloudFront domain, no scheme -- e.g. "d111111abcdef8.cloudfront.net".
+    #:
+    #: Load-bearing in two places that must agree: web/next.config.ts lists it in
+    #: images.remotePatterns, and AdminImageCreate widens its URL validator to
+    #: accept exactly this host. Both exist because defect 1 -- one external
+    #: image URL made next/image throw at RENDER time and took down the home
+    #: page, the product page and the admin edit page together, and the edit page
+    #: was the only place that could remove it.
+    #:
+    #: So this is an allow-list of one, not permission for https generally.
+    cdn_host: str = ""
+
     @model_validator(mode="after")
     def _assemble_database_url(self) -> "Settings":
         """Build database_url from the DB_* parts when it was not supplied whole.

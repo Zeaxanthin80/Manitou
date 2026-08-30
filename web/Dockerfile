@@ -48,6 +48,18 @@ COPY web/ ./
 ARG NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 
+# CDN_HOST is also build-time, for a different reason: next.config.ts turns it
+# into images.remotePatterns, and Next serialises the resolved config into
+# .next/required-server-files.json during the build. Setting it only at runtime
+# leaves remotePatterns EMPTY, and next/image then refuses every CDN image --
+# which is defect 1's failure mode reached from the opposite direction.
+#
+# Verified rather than assumed: the first build of this image omitted it, and
+#   node -e 'require(".next/required-server-files.json").config.images'
+# reported `remotePatterns: []`.
+ARG CDN_HOST
+ENV CDN_HOST=$CDN_HOST
+
 # API_URL is NOT set here on purpose. It is a plain server-side variable read at
 # module scope in lib/api.ts, so the built server reads the real process
 # environment at start -- which is what lets one image point at any environment.

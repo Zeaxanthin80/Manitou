@@ -1,0 +1,437 @@
+"""The presigned upload flow.
+
+Driven entirely by a stub S3 client. `uploads.py` takes the client as its first
+argument precisely so this is possible: the whole flow -- signing, refusing,
+confirming, moving -- is exercised with no AWS account, no network and no
+credentials, which is what makes it a test rather than an integration check.
+
+What a stub CANNOT prove is that S3 enforces the signed Content-Type and
+Content-Length. That is a claim about SigV4, not about this code, and it is
+verified against the real bucket in the task 9 walkthrough instead.
+"""
+
+import pytest
+
+from app.models.media import ALLOWED_CONTENT_TYPES, MAX_UPLOAD_BYTES
+from app.services.uploads import (
+    MEDIA_PREFIX,
+    PENDING_PREFIX,
+    UploadError,
+    confirm_upload,
+    confirmed_key,
+    new_pending_key,
+    presign_put,
+    public_url,
+)
+
+BUCKET = "test-bucket"
+
+
+class StubS3:
+    """Records what it was asked to sign, and pretends to hold objects."""
+
+    def __init__(self, objects: dict | None = None):
+        self.objects = objects or {}
+        self.signed: list[dict] = []
+        self.copied: list[tuple[str, str]] = []
+        self.deleted: list[str] = []
+
+    def generate_presigned_url(self, op, Params, ExpiresIn):  # noqa: N803
+        self.signed.append({"op": op, "params": Params, "expires": ExpiresIn})
+        return f"https://s3.example/{Params['Key']}?X-Amz-Signature=stub"
+
+    def head_object(self, Bucket, Key):  # noqa: N803
+        if Key not in self.objects:
+            raise KeyError(Key)          # botocore raises ClientError; shape differs, handling must not
+        return self.objects[Key]
+
+    def copy_object(self, Bucket, Key, CopySource, **kw):  # noqa: N803
+        self.copied.append((CopySource["Key"], Key))
+        self.objects[Key] = self.objects[CopySource["Key"]]
+
+    def delete_object(self, Bucket, Key):  # noqa: N803
+        self.deleted.append(Key)
+        self.objects.pop(Key, None)
+
+
+def _obj(content_type="image/jpeg", size=2048):
+    return {"ContentType": content_type, "ContentLength": size}
+
+
+# --- keys -------------------------------------------------------------------
+
+
+def test_a_pending_key_carries_no_part_of_the_uploaded_filename():
+    """A filename is attacker-controlled and `.jpg.html` is a filename.
+
+    The human-readable name is kept on the row, where it can be searched without
+    ever being part of a path.
+    """
+    key = new_pending_key("image/png")
+    assert key.startswith(PENDING_PREFIX)
+    assert key.endswith(".png")
+    assert "photo" not in key
+
+
+def test_two_uploads_of_the_same_filename_do_not_collide():
+    assert new_pending_key("image/jpeg") != new_pending_key("image/jpeg")
+
+
+def test_confirming_maps_pending_to_media_and_keeps_the_rest():
+    assert confirmed_key(f"{PENDING_PREFIX}2026/08/abc.jpg") == f"{MEDIA_PREFIX}2026/08/abc.jpg"
+
+
+def test_a_key_outside_pending_cannot_be_confirmed():
+    with pytest.raises(UploadError, match="Not a pending key"):
+        confirmed_key("media/someone-elses.jpg")
+
+
+# --- presigning: what is refused, and the control ---------------------------
+
+
+def test_presigning_signs_the_content_type_and_the_exact_size():
+    """The control for every refusal below, and the heart of the design.
+
+    A presigned PUT has no equivalent of the POST policy's content-length-range,
+    so the size is pinned by signing it: SigV4 covers every header it lists, and
+    S3 will not verify a request whose Content-Length differs. Assert both are in
+    Params, because dropping either would silently make the limit advisory.
+    """
+    s3 = StubS3()
+    key, url = presign_put(s3, BUCKET, "image/jpeg", 2048)
+
+    assert key.startswith(PENDING_PREFIX)
+    assert url.startswith("https://")
+    params = s3.signed[0]["params"]
+    assert params["ContentType"] == "image/jpeg"
+    assert params["ContentLength"] == 2048
+    assert params["Bucket"] == BUCKET
+    assert s3.signed[0]["expires"] > 0
+
+
+@pytest.mark.parametrize("content_type", ALLOWED_CONTENT_TYPES)
+def test_every_allowed_image_type_can_be_signed(content_type):
+    key, _ = presign_put(StubS3(), BUCKET, content_type, 1024)
+    assert key.startswith(PENDING_PREFIX)
+
+
+def test_svg_is_refused():
+    """An image to a user, a script to a browser.
+
+    One served from a host the site trusts -- which the CDN host is, by the
+    widened AdminImageCreate validator -- is stored XSS. Vector artwork is
+    store.logo, which is committed rather than uploaded.
+    """
+    with pytest.raises(UploadError, match="not an accepted image type"):
+        presign_put(StubS3(), BUCKET, "image/svg+xml", 1024)
+
+
+@pytest.mark.parametrize("content_type", ["text/html", "application/pdf", "image/gif"])
+def test_other_types_are_refused(content_type):
+    with pytest.raises(UploadError, match="not an accepted image type"):
+        presign_put(StubS3(), BUCKET, content_type, 1024)
+
+
+def test_a_file_over_the_limit_is_refused_before_anything_is_signed():
+    """Refused here, not at confirm.
+
+    Rejecting after the upload means paying for the transfer and still holding
+    the object. Asserting `signed == []` is the part that matters: it proves no
+    URL was handed out, rather than merely that an error was raised.
+    """
+    s3 = StubS3()
+    with pytest.raises(UploadError, match="The limit is"):
+        presign_put(s3, BUCKET, "image/jpeg", MAX_UPLOAD_BYTES + 1)
+    assert s3.signed == []
+
+
+def test_exactly_the_limit_is_allowed():
+    """The boundary, from the other side -- an off-by-one here is invisible."""
+    key, _ = presign_put(StubS3(), BUCKET, "image/jpeg", MAX_UPLOAD_BYTES)
+    assert key
+
+
+def test_an_empty_file_is_refused():
+    with pytest.raises(UploadError, match="not an image"):
+        presign_put(StubS3(), BUCKET, "image/jpeg", 0)
+
+
+def test_no_bucket_configured_refuses_with_an_actionable_message():
+    """Local development runs with no S3 at all, and must say so plainly."""
+    with pytest.raises(UploadError, match="No media bucket is configured"):
+        presign_put(StubS3(), "", "image/jpeg", 1024)
+
+
+# --- confirming -------------------------------------------------------------
+
+
+def test_confirm_moves_the_object_and_reports_s3s_view_of_it():
+    key = f"{PENDING_PREFIX}2026/08/abc.jpg"
+    s3 = StubS3({key: _obj(size=4096)})
+
+    result = confirm_upload(s3, BUCKET, key)
+
+    assert result == {
+        "key": f"{MEDIA_PREFIX}2026/08/abc.jpg",
+        "content_type": "image/jpeg",
+        "byte_size": 4096,
+    }
+    assert s3.copied == [(key, f"{MEDIA_PREFIX}2026/08/abc.jpg")]
+    assert s3.deleted == [key]
+
+
+def test_confirming_a_key_that_was_never_uploaded_is_refused():
+    """The refusal this endpoint exists for.
+
+    The browser PUTs straight to S3 and the API never sees it happen, so without
+    head_object a client could post any key and get a row for an object that does
+    not exist.
+    """
+    s3 = StubS3()
+    with pytest.raises(UploadError, match="was not found"):
+        confirm_upload(s3, BUCKET, f"{PENDING_PREFIX}2026/08/never.jpg")
+    assert s3.copied == []
+
+
+def test_confirming_a_key_outside_pending_is_refused_without_touching_s3():
+    """Otherwise a caller could name somebody else's live asset and claim it.
+
+    `copied == []` is the assertion that matters -- an error raised after the
+    copy would be far too late.
+    """
+    s3 = StubS3({f"{MEDIA_PREFIX}someone-elses.jpg": _obj()})
+    with pytest.raises(UploadError, match="Not a pending upload key"):
+        confirm_upload(s3, BUCKET, f"{MEDIA_PREFIX}someone-elses.jpg")
+    assert s3.copied == []
+
+
+def test_confirm_rechecks_the_type_against_s3_rather_than_the_presign():
+    """Belt and braces, at the last point before a row exists.
+
+    The signature makes a mismatch very hard; "hard" is not "cannot", and this
+    is cheap.
+    """
+    key = f"{PENDING_PREFIX}2026/08/x.jpg"
+    s3 = StubS3({key: _obj(content_type="text/html")})
+    with pytest.raises(UploadError, match="not an accepted image type"):
+        confirm_upload(s3, BUCKET, key)
+    assert s3.copied == []
+
+
+def test_a_failed_cleanup_does_not_fail_the_confirm():
+    """The object is already safely in media/ by then.
+
+    Failing here would refuse an upload that actually succeeded, and leave the
+    caller with no row for an object that exists. The duplicate left in pending/
+    is expired by the bucket's lifecycle rule within a day.
+    """
+    key = f"{PENDING_PREFIX}2026/08/x.jpg"
+
+    class Grumpy(StubS3):
+        def delete_object(self, Bucket, Key):  # noqa: N803
+            raise RuntimeError("permission denied")
+
+    result = confirm_upload(Grumpy({key: _obj()}), BUCKET, key)
+    assert result["key"] == f"{MEDIA_PREFIX}2026/08/x.jpg"
+
+
+# --- the public URL ---------------------------------------------------------
+
+
+def test_the_public_url_is_built_from_config_and_never_stored():
+    """So pointing a clone at its own distribution is config, not a migration."""
+    assert public_url("d111.cloudfront.net", "media/2026/08/a.jpg") == (
+        "https://d111.cloudfront.net/media/2026/08/a.jpg"
+    )
+
+
+def test_the_public_url_tolerates_a_trailing_slash_or_leading_slash():
+    assert public_url("d111.cloudfront.net/", "/media/a.jpg") == (
+        "https://d111.cloudfront.net/media/a.jpg"
+    )
+
+
+def test_no_cdn_host_configured_refuses():
+    with pytest.raises(UploadError, match="No CDN host"):
+        public_url("", "media/a.jpg")
+
+
+def test_a_bad_type_is_reported_before_a_bad_size():
+    """Pins the ORDER of two checks, which is otherwise untested behaviour.
+
+    Found by mutation: removing the content-type check from presign_put changed
+    nothing any test could see, because new_pending_key checks it too. The one
+    thing the earlier check does is decide which error a request failing BOTH
+    gets -- and "not an image type" is fixable while "too large" sends the vendor
+    off to compress a file that will be refused anyway.
+    """
+    with pytest.raises(UploadError, match="not an accepted image type"):
+        presign_put(StubS3(), BUCKET, "image/svg+xml", MAX_UPLOAD_BYTES * 2)
+
+
+# ============================================================================
+# The endpoints
+# ============================================================================
+#
+# Through the real app with a stubbed S3 client, because the service tests above
+# cannot see anything the ROUTES get wrong: the admin gate, the status codes, or
+# whether a row is actually written.
+#
+# A note on how these were nearly missed. Checking `app.routes` for the new paths
+# reported them absent three times running -- this FastAPI version keeps included
+# routers as `_IncludedRouter` objects rather than flattening them, so walking
+# app.routes finds nothing no matter how correct the code is. The OpenAPI schema
+# and an actual request are the instruments that reflect reality.
+
+
+@pytest.fixture
+def stub_s3(monkeypatch):
+    """Replace the client the routes build, for the duration of one test."""
+    s3 = StubS3()
+    monkeypatch.setattr("app.routers.admin._s3", lambda: s3)
+    return s3
+
+
+@pytest.fixture
+def media_configured(monkeypatch, stub_s3):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "s3_bucket", BUCKET)
+    monkeypatch.setattr(settings, "cdn_host", "d111abcdef8.cloudfront.net")
+    return stub_s3
+
+
+def test_presign_requires_an_admin(client, db, make_user, auth_headers):
+    """A signed URL carries this service's own S3 authority.
+
+    So the gate on this endpoint is not a formality: handing one to an
+    unauthenticated caller would hand them PutObject on the bucket.
+    """
+    customer = make_user(email="c@manitou.example", role="customer")
+    r = client.post(
+        "/admin/uploads",
+        headers=auth_headers(customer),
+        json={"filename": "a.jpg", "content_type": "image/jpeg", "byte_size": 100},
+    )
+    assert r.status_code == 403
+
+    assert client.post(
+        "/admin/uploads",
+        json={"filename": "a.jpg", "content_type": "image/jpeg", "byte_size": 100},
+    ).status_code == 401
+
+
+def test_presign_returns_a_url_and_the_headers_the_signature_covers(
+    client, db, make_user, auth_headers, media_configured
+):
+    admin = make_user(email="admin@manitou.example", role="admin")
+    r = client.post(
+        "/admin/uploads",
+        headers=auth_headers(admin),
+        json={"filename": "shirt.jpg", "content_type": "image/jpeg", "byte_size": 2048},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+
+    assert body["key"].startswith(PENDING_PREFIX)
+    assert body["url"].startswith("https://")
+    # Returned because the signature covers them: a browser that omits either
+    # gets a signature failure, which reads like a permissions problem.
+    assert body["headers"]["Content-Type"] == "image/jpeg"
+    assert body["headers"]["Content-Length"] == "2048"
+    assert body["expires_in"] > 0
+
+
+def test_presign_refuses_an_oversized_file_with_409_not_500(
+    client, db, make_user, auth_headers, media_configured
+):
+    """409 and a readable message. A 500 would tell the vendor nothing."""
+    admin = make_user(email="admin@manitou.example", role="admin")
+    r = client.post(
+        "/admin/uploads",
+        headers=auth_headers(admin),
+        json={"filename": "huge.jpg", "content_type": "image/jpeg",
+              "byte_size": MAX_UPLOAD_BYTES + 1},
+    )
+    assert r.status_code == 409
+    assert "limit" in r.json()["detail"].lower()
+
+
+def test_presign_says_so_when_no_bucket_is_configured(
+    client, db, make_user, auth_headers, stub_s3, monkeypatch
+):
+    """Local development, and it must name the variables to set."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "s3_bucket", "")
+    admin = make_user(email="admin@manitou.example", role="admin")
+    r = client.post(
+        "/admin/uploads",
+        headers=auth_headers(admin),
+        json={"filename": "a.jpg", "content_type": "image/jpeg", "byte_size": 100},
+    )
+    assert r.status_code == 409
+    assert "S3_BUCKET" in r.json()["detail"]
+
+
+def test_confirm_writes_a_row_describing_s3s_view_of_the_object(
+    client, db, make_user, auth_headers, media_configured
+):
+    from app.models import MediaAsset
+
+    admin = make_user(email="admin@manitou.example", role="admin")
+    key = f"{PENDING_PREFIX}2026/08/abc.jpg"
+    media_configured.objects[key] = _obj(size=4096)
+
+    r = client.post(
+        "/admin/uploads/confirm",
+        headers=auth_headers(admin),
+        json={"key": key, "width": 800, "height": 600},
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+
+    assert body["key"] == f"{MEDIA_PREFIX}2026/08/abc.jpg"
+    assert body["byte_size"] == 4096
+    assert body["url"] == f"https://d111abcdef8.cloudfront.net/{body['key']}"
+    assert body["width"] == 800
+
+    row = db.query(MediaAsset).one()
+    assert row.key == body["key"]
+    assert row.uploaded_by == admin.id
+    # Kept for the media library's search, and never part of the key.
+    assert row.original_filename == "abc.jpg"
+
+
+def test_confirming_a_key_that_was_never_uploaded_writes_no_row(
+    client, db, make_user, auth_headers, media_configured
+):
+    """The endpoint's reason for existing, and the assertion that matters is
+    the absence of a row -- a 409 with a row written would be worse than either."""
+    from app.models import MediaAsset
+
+    admin = make_user(email="admin@manitou.example", role="admin")
+    r = client.post(
+        "/admin/uploads/confirm",
+        headers=auth_headers(admin),
+        json={"key": f"{PENDING_PREFIX}2026/08/never.jpg"},
+    )
+    assert r.status_code == 409
+    assert db.query(MediaAsset).count() == 0
+
+
+def test_confirming_a_key_outside_pending_writes_no_row(
+    client, db, make_user, auth_headers, media_configured
+):
+    from app.models import MediaAsset
+
+    admin = make_user(email="admin@manitou.example", role="admin")
+    media_configured.objects[f"{MEDIA_PREFIX}someone-elses.jpg"] = _obj()
+
+    r = client.post(
+        "/admin/uploads/confirm",
+        headers=auth_headers(admin),
+        json={"key": f"{MEDIA_PREFIX}someone-elses.jpg"},
+    )
+    assert r.status_code == 409
+    assert db.query(MediaAsset).count() == 0

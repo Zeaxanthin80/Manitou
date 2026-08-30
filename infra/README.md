@@ -639,6 +639,125 @@ fault.
 
 ---
 
+## Product images — S3, CloudFront and presigned uploads (task 9)
+
+Until this, adding a product photo meant committing a file to `web/public/` and
+redeploying, and **the container filesystem is ephemeral** — anything written at
+runtime dies with the task. Now a vendor picks a file on the product edit page and
+it goes straight to S3.
+
+### The shape, and why it has three steps
+
+```
+browser ──► API            sign a PUT into pending/
+browser ──────────────────► S3       the bytes, direct (needs CORS)
+browser ──► API            confirm: head_object, copy to media/, write the row
+```
+
+**The bytes never pass through the API or the Next server.** No request-size
+ceiling anywhere in the chain, and no Fargate task sized for the largest
+photograph anyone might send.
+
+**The confirm step is not optional.** The browser uploads directly and the API
+never sees it happen, so without it there is no row and no evidence the upload
+completed. `head_object` is what turns "the client says it uploaded" into "the
+object exists and is this big" — size and content type come from S3's own view,
+never from what the client claims.
+
+**Two prefixes exist so the lifecycle rule can tell the difference.** Uploads are
+signed into `pending/`; confirming copies to `media/` and removes the source. So
+anything still in `pending/` is by definition abandoned, and expires after a day.
+Uploading straight to `media/` would make abandoned and live objects
+indistinguishable and the bucket would fill with orphans.
+
+### A presigned URL carries the signer's authority
+
+This is the fact that shapes the IAM policy. Whoever holds the URL can do what
+`manitou-api-task` can do, to that key, until it expires. So the role grants:
+
+| | |
+| --- | --- |
+| `s3:PutObject`, `s3:GetObject` | on `pending/*` and `media/*` only |
+| `s3:DeleteObject` | on **`pending/*` alone** |
+| everything else | not granted — no list, no delete on `media/` |
+
+Deleting a live asset is task 9b's, and it needs the "which products use this"
+check that does not exist yet. A role that could already do it would be handing
+that capability to every upload URL.
+
+This is also the project's **first task role**. Everything before it needed only
+an execution role — ECS pulling an image and injecting secrets. Now the
+application's own code calls an AWS API, which is a different thing and gets a
+different identity.
+
+### Enforcing the size limit on a PUT
+
+A presigned **POST** has `content-length-range` in its policy conditions. A
+presigned **PUT** has no equivalent. So the limit is enforced by signing the
+exact byte count: the client declares what it is about to send, the API decides
+whether that is allowed, and S3 holds it to the answer — SigV4 covers every
+header it lists, so a request whose `Content-Length` differs simply will not
+verify.
+
+A client that lies about the size gets a signature failure; one that tells the
+truth about too large a file is refused at presign, before any bytes move.
+Rejecting after the upload would mean paying for the transfer and still holding
+the object.
+
+**No SVG.** It is an image to a user and a script to a browser, and one served
+from a host the site trusts is stored XSS. Vector artwork is `store.logo`, which
+is committed rather than uploaded.
+
+### One trusted host, listed in two places that must agree
+
+`AdminImageCreate` refuses to **store** a URL on any host but the CloudFront
+distribution; `next.config.ts` `images.remotePatterns` refuses to **render** one.
+Either alone leaves the gap defect 1 fell through — a URL the form accepts that
+then makes `next/image` throw at render time, taking down the home page, the
+product page and the admin edit page together.
+
+The widening is an allow-list of **one**, and the trailing slash in
+`https://{host}/` is doing real work: without it,
+`https://d111….cloudfront.net.evil.example/` is a different host that merely
+starts with ours. Mutation-tested — removing that slash fails a test named for
+exactly that shape.
+
+**`CDN_HOST` must be set at BUILD time for the web image.** Next serialises the
+resolved config into `.next/required-server-files.json` during the build, so
+setting it only at runtime leaves `remotePatterns` empty and every CDN image is
+refused. Found by checking the built file rather than assuming: the first build
+of the image reported `remotePatterns: []`.
+
+### How it was verified
+
+- **The bucket is private, the CDN is not.** Direct S3 → **403**; through
+  CloudFront → **200** with the bytes. Either alone is consistent with a
+  world-readable bucket.
+- **A non-existent key returns 403, not 404** — OAC denies rather than confirming
+  what the bucket contains.
+- **CORS both ways.** A preflight from the web origin returns
+  `Access-Control-Allow-Methods: PUT`; the same preflight from an unlisted origin
+  returns **403**. (`curl` tests this fine, contrary to the plan's claim — you
+  just have to send an `Origin` header.)
+- **41 backend tests**, driving the whole flow against a stub client, plus 7
+  through the real app. Mutation-tested: dropping the size limit, unsigning
+  either header, or removing the pending-prefix guard each fail a test.
+
+### Two mutations that survived, and what they taught
+
+Both times the fix was to pin real behaviour, not to delete the code:
+
+- The content-type check in `presign_put` looked redundant with `new_pending_key`.
+  Its actual job is deciding which error a request failing *both* checks gets —
+  "not an image type" is fixable, "too large" sends the vendor off to compress a
+  file that will be refused anyway.
+- The `cdn and` guard on the host check. With an empty `CDN_HOST` the comparison
+  builds the prefix `https:///`, and a URL beginning with exactly that would
+  match it. Malformed, but defect 1 was precisely a URL the API accepted and
+  `next/image` then threw on.
+
+---
+
 ## Region
 
 Not yet fixed at time of writing. IAM is global, so nothing in task 3 depended on it.

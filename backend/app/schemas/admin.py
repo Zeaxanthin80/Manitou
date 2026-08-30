@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from typing import Any, Literal
 
+from app.config import settings
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.address import AddressRead
@@ -190,10 +191,36 @@ class AdminImageCreate(BaseModel):
         remove the image. Validating on the way in is what stops a single typo
         becoming an outage you cannot click your way out of.
 
-        Phase 6 moves images to S3 + CloudFront and this widens to allow that one
-        host. Until then, site-relative or nothing.
+        Phase 6 task 9 widened this to allow ONE additional host: the CloudFront
+        distribution in settings.cdn_host. That is an allow-list of one, not
+        permission for https generally -- the same host, and only that host, is
+        listed in web/next.config.ts images.remotePatterns. The two must agree, or
+        the original failure returns wearing different clothes.
         """
         url = value.strip()
+
+        # Rejected for BOTH forms, before either is considered. These are wrong
+        # in a CDN URL too, and a guard applying to only one branch is a guard
+        # with a hole in it.
+        if any(c.isspace() or ord(c) < 32 for c in url):
+            raise ValueError(_URL_ERROR)
+        if chr(92) in url:          # backslash; some parsers fold it to "/"
+            raise ValueError(_URL_ERROR)
+        if ".." in url:
+            raise ValueError(_URL_ERROR)
+
+        # The one trusted external host.
+        #
+        # The TRAILING SLASH is doing the work. Matching "https://" + host alone
+        # would also accept "https://d111.cloudfront.net.evil.example/x.png" -- a
+        # different host that merely starts with ours. Requiring the "/" pins the
+        # authority section to end exactly where the host does.
+        #
+        # Guarded on cdn_host being set, so an unconfigured install cannot match
+        # "https:///..." and wave everything through.
+        cdn = settings.cdn_host.strip().rstrip("/")
+        if cdn and url.startswith("https://" + cdn + "/"):
+            return url
 
         if not url.startswith("/"):
             raise ValueError(_URL_ERROR)
@@ -203,19 +230,72 @@ class AdminImageCreate(BaseModel):
         # misses this case is decorative.
         if url.startswith("//"):
             raise ValueError(_URL_ERROR)
-        # Backslashes because some parsers fold them to "/", which turns
-        # "/\host" back into "//host" after this check has already passed.
-        if "\\" in url:
-            raise ValueError(_URL_ERROR)
-        # Traversal out of web/public/.
-        if ".." in url:
-            raise ValueError(_URL_ERROR)
-        # Any internal whitespace or control character: never legitimate, and it
-        # produces a URL nobody can debug by looking at it.
-        if any(c.isspace() or ord(c) < 32 for c in url):
-            raise ValueError(_URL_ERROR)
+        # Backslash, traversal and whitespace are checked above, before the
+        # two forms diverge.
 
         return url
+
+
+class AdminUploadRequest(BaseModel):
+    """What the browser declares before it is given a URL to PUT to.
+
+    The size is here because a presigned PUT has no equivalent of the POST
+    policy's content-length-range: the only way to enforce a limit is to SIGN the
+    exact byte count, which means the client has to declare it first. It is not
+    trusted -- it is the number the service decides about, and then the number S3
+    holds the client to.
+    """
+
+    filename: str = Field(min_length=1, max_length=255)
+    content_type: str = Field(min_length=1)
+    byte_size: int = Field(gt=0)
+
+
+class AdminUploadTarget(BaseModel):
+    """Where to PUT, and what to send with it.
+
+    `headers` is returned rather than left for the client to reconstruct: the
+    signature covers Content-Type and Content-Length, so a browser that omits or
+    changes either gets a signature failure that reads like a permissions
+    problem. Sending them back makes the contract explicit.
+    """
+
+    key: str
+    url: str
+    headers: dict[str, str]
+    expires_in: int
+
+
+class AdminUploadConfirm(BaseModel):
+    """Posted after the PUT succeeds.
+
+    Dimensions come from the browser, which has already decoded the image, and
+    are the one field here not verified against S3. They drive layout hints in
+    the media library and nothing else -- a wrong pair is cosmetic, and reading
+    every upload back to measure it would cost a full download per image.
+    """
+
+    key: str
+    width: int | None = Field(default=None, gt=0)
+    height: int | None = Field(default=None, gt=0)
+
+
+class AdminAssetRead(BaseModel):
+    """An uploaded asset, as the portal sees it."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    key: str
+    #: Built from cdn_host + key at read time, never stored -- so pointing a
+    #: clone at its own distribution is configuration, not a data migration.
+    url: str
+    original_filename: str
+    content_type: str
+    byte_size: int
+    width: int | None
+    height: int | None
+    uploaded_at: datetime
 
 
 class AdminImageUpdate(BaseModel):

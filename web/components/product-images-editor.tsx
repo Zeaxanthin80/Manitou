@@ -5,6 +5,7 @@ import { useActionState } from "react";
 
 import { addImageAction, imageAction } from "@/app/actions/admin";
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/image-upload-field";
 import { Input } from "@/components/ui/input";
 import type { AdminProduct } from "@/lib/api";
 
@@ -173,8 +174,16 @@ export function ProductImagesEditor({
         <form action={addAction} className="mt-4 grid max-w-2xl gap-4">
           <input type="hidden" name="product_id" value={product.id} />
           <input type="hidden" name="slug" value={product.slug} />
+
+          {/* Uploading is the PRIMARY path, so it is first. The vendor's normal
+              action is "I photographed this shirt, attach it to this product" --
+              putting a library above that is what produces admin screens where
+              adding an image means first going somewhere else to put it. */}
+          <ImageUploadField name="uploaded_url" />
           <fieldset className="flex flex-col gap-1">
-            <legend className="font-body text-sm text-text">Image</legend>
+            <legend className="font-body text-sm text-text">
+              …or reuse a file already in the site
+            </legend>
             {available.length === 0 ? (
               <p className="mt-1 font-body text-sm text-muted">
                 No images found in <code>web/public/</code>. Add a file there and
@@ -187,15 +196,18 @@ export function ProductImagesEditor({
                     {/* The whole tile is the label, so the picture is the click
                         target rather than a radio dot beside it. */}
                     <label className="group flex cursor-pointer flex-col gap-1">
-                      {/* Nothing preselected on purpose. Alphabetical order is
-                          not a meaningful default, and this writes to the live
-                          storefront -- `required` making the admin choose beats
-                          a silent wrong pick. */}
+                      {/* Nothing preselected on purpose: alphabetical order is not a
+                          meaningful default and this writes to the live storefront.
+
+                          No longer `required` -- an upload above satisfies the form
+                          instead, and a required radio would make the upload path
+                          unsubmittable. The action checks that one of the two produced a
+                          URL, which is a rule about two fields at once and not one a
+                          browser can express. */}
                       <input
                         type="radio"
                         name="url"
                         value={url}
-                        required
                         className="peer sr-only"
                       />
                       <span className="relative block aspect-[4/5] overflow-hidden rounded-sm border border-border bg-background peer-checked:border-accent peer-focus-visible:outline peer-focus-visible:outline-2">
@@ -216,11 +228,11 @@ export function ProductImagesEditor({
               </ul>
             )}
             <span className="mt-2 font-body text-xs text-muted">
-              Only files in <code>web/public/</code>. There is no free-text field
-              on purpose: a link to another site is accepted by the form and then
-              fails when the page renders, which breaks the storefront for every
-              visitor. Drop a file in that folder to add to this list. Phase 6
-              replaces this with a real upload.
+              Files committed to <code>web/public/</code>, for reusing an image
+              across products. There is still no free-text field: a link to another
+              site is accepted by the form and then fails when the page renders,
+              breaking the storefront for every visitor. Uploaded photos are not
+              listed here yet — browsing them is the media library.
             </span>
           </fieldset>
           <label className="flex flex-col gap-1 font-body text-sm text-text">

@@ -741,6 +741,32 @@ export const updateProduct = (token: string, id: number, body: unknown) =>
 export const deactivateProduct = (token: string, id: number) =>
   request<void>(`/admin/products/${id}`, { token, method: "DELETE" });
 
+/** Ask the API to sign one PUT straight to S3.
+ *
+ *  The bytes never pass through either the API or this Next server -- no
+ *  request-size ceiling anywhere in the chain, and no task sized for the largest
+ *  photograph a vendor might send.
+ *
+ *  `headers` comes back because the signature COVERS Content-Type and
+ *  Content-Length. A browser that omits or alters either gets a signature
+ *  failure, which reads like a permissions problem and sends the search in
+ *  entirely the wrong direction. */
+export const requestUpload = (token: string, body: unknown) =>
+  request<{ key: string; url: string; headers: Record<string, string>; expires_in: number }>(
+    "/admin/uploads",
+    { token, body },
+  );
+
+/** Tell the API the PUT finished, so it can verify and record the object.
+ *
+ *  Not optional: the browser uploads directly and the API never sees it happen,
+ *  so without this there is no row and no proof the upload completed. */
+export const confirmUpload = (token: string, body: unknown) =>
+  request<{ id: number; key: string; url: string }>("/admin/uploads/confirm", {
+    token,
+    body,
+  });
+
 export const addProductImage = (token: string, productId: number, body: unknown) =>
   request<AdminProduct>(`/admin/products/${productId}/images`, { token, body });
 

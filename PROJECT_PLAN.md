@@ -1327,10 +1327,15 @@ column, or index) becomes a migration file committed to Git, applied identically
 and reversible if something goes wrong. Never edit the production database by hand — always through
 a migration.
 
-**Autogenerate does not detect CHECK constraints.** `alembic revision --autogenerate` compares
-models against the database and finds added tables, columns, indexes, and unique constraints — but
-it will not notice a `CheckConstraint` declared on a model, and will silently produce an empty
-migration. `alembic check` uses the same comparison logic, so it cannot catch the omission either.
+**Autogenerate does not DIFF CHECK constraints on an existing table.** `alembic revision
+--autogenerate` compares models against the database and finds added tables, columns, indexes, and
+unique constraints. It will not notice a `CheckConstraint` **added to a table that already exists**,
+and will silently produce an empty migration.
+
+The exception is worth knowing so you do not hand-write constraints unnecessarily: a **new** table
+emits its `CheckConstraint`s correctly, because `create_table` serialises every constraint on the
+table object rather than diffing anything. Migrations `be02c29a9f3c` and `8350f895449a` are both
+examples. `alembic check` uses the same comparison logic, so it cannot catch the omission either.
 Write them by hand with `op.create_check_constraint()`, with matching `op.drop_constraint(...,
 type_='check')` calls in `downgrade()`, and verify against `pg_constraint` rather than trusting
 `alembic check`.
