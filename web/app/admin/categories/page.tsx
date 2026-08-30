@@ -38,16 +38,21 @@ export default async function AdminCategoriesPage() {
   }
 
   return (
-    <div className="mt-10 flex flex-col gap-14">
-      <div>
-        <h1 className="font-display text-2xl text-text">Categories</h1>
-        <p className="mt-2 max-w-2xl font-body text-sm text-muted">
-          Every product belongs to a category, and the storefront navigates by
-          them. A category can only be removed once nothing is inside it.
-        </p>
-      </div>
+    // Same wrapper as every other admin page. Without it the content sits flush
+    // against the viewport edge with no gutter and no max width -- which is what
+    // it did on first deploy.
+    <main className="mx-auto max-w-6xl px-6 py-12">
+      <h1 className="font-display text-2xl uppercase leading-none tracking-tight text-text">
+        Categories
+      </h1>
+      <p className="mt-3 max-w-prose font-body text-sm text-muted">
+        Every product belongs to a category, and the storefront navigates by
+        them. A category can only be removed once nothing is inside it.
+      </p>
 
-      <CategoriesEditor categories={categories} />
-    </div>
+      <div className="mt-8">
+        <CategoriesEditor categories={categories} />
+      </div>
+    </main>
   );
 }

@@ -40,13 +40,17 @@ const SECTIONS: NavItem[] = [
  * at 1024 with no overflow, so the breakpoint held. Worth re-checking rather
  * than assuming if a seventh is ever added.
  *
- * **A seventh WAS added (Categories, defect 23) and has not been re-measured.**
- * Recorded rather than quietly assumed: the note above exists precisely because
- * this number was arrived at by looking, and "Categories" is one of the longer
- * labels here. If the bar wraps between 1024 and roughly 1140, raise this to
- * `xl` rather than shortening the label -- the nav says what the page is called,
- * and a nav that disagrees with its heading is worse than one that collapses
- * sooner.
+ * Re-measured again with a seventh (Categories, defect 23): seven links still fit
+ * at 1024, and 1023 still collapses. Confirmed in a browser rather than estimated
+ * -- the estimate from a screenshot said "about 25px to spare", which was right
+ * but is not the kind of margin to trust to arithmetic.
+ *
+ * That margin is now a budget. `View store` was given a border in the same
+ * change and deliberately uses the badge's px-2, not px-3, because the wider
+ * padding would have spent the whole 25px. **An eighth link, or any extra
+ * horizontal padding in this bar, needs re-measuring and will probably want
+ * `xl`** -- raise the breakpoint rather than shortening a label, since a nav that
+ * disagrees with its own page heading is worse than one that collapses sooner.
  */
 export function AdminNav({
   email,
@@ -111,9 +115,25 @@ export function AdminNav({
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-4">
+          {/* Bordered, because this is the one link in the bar that LEAVES the
+              portal -- everything else beside it navigates within it, and a
+              boxed target reads as "exit" rather than "another section".
+
+              border-border, not border-accent: the accent is spoken for. This
+              file's own rule is that the accent says "you are editing the live
+              store", and a second accent outline in the same bar would spend
+              that meaning on a link that carries no consequence at all.
+
+              inline-flex rather than inline so the vertical padding renders --
+              an inline box pads horizontally and lets the rest bleed.
+
+              px-2 py-1 matches the VENDOR PORTAL badge exactly, for two reasons:
+              two bordered elements in one bar should share a geometry, and the
+              seven-link row was measured at 1024 with roughly 25px to spare.
+              px-3 plus a border would have spent all of it. */}
           <Link
             href="/"
-            className="hidden font-body text-sm text-muted hover:text-text lg:inline"
+            className="hidden shrink-0 items-center rounded-sm border border-border px-2 py-1 font-body text-sm text-muted hover:border-text hover:text-text lg:inline-flex"
           >
             View store
           </Link>

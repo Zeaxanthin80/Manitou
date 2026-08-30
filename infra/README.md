@@ -986,6 +986,34 @@ service can be asked what it implements rather than inferred from which commit w
 The general habit: **a deploy is of an image, not of a feature**, and a feature that crosses two
 images is not deployed until both are.
 
+### Verify a rollout from the control plane, never by probing it
+
+**A verification loop once rolled back its own deployment.** Three requests every
+twenty seconds to a page that existed only in the new image returned 404 from every
+task still running the old one. Express Mode's `RollbackAlarm` counts 4xx, and on a
+store with no real traffic the probe *was* the traffic: 75% error rate against a 1%
+threshold. ECS reverted the deployment, correctly, on the evidence it had. The same
+image deployed cleanly minutes later when the watching was done differently.
+
+So while a rollout is in flight, watch it with:
+
+```
+aws ecs describe-tasks ...            # which image each RUNNING task carries
+aws ecs describe-express-gateway-service ...   # what the service points at
+aws cloudwatch describe-alarms --alarm-names .../RollbackAlarm
+```
+
+None of those touch the load balancer, so none of them can influence what they are
+measuring. **Save HTTP checks for after the rollout finishes**, keep them few, and
+prefer URLs that answer 2xx or 3xx — an unauthenticated admin page should give
+**307** to the login screen, and a 404 from that same URL is exactly the signal
+that must not be manufactured during a bake.
+
+The general rule, which is not specific to AWS: **on a low-traffic service, a probe
+that is expected to fail is indistinguishable from the service failing.** Usually
+that only misleads whoever is reading the graph; during a deployment it decides the
+outcome.
+
 ### Canary, and why the rollout is not instant
 
 Express Mode deploys the new revision alongside the old, shifts a slice of traffic, watches the

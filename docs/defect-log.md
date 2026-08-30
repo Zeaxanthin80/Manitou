@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [29](#29-a-verification-loop-rolled-back-its-own-deployment) | 2026-08-30 | A verification loop rolled back its own deployment | Fixed — uncommitted |
 | [28](#28-every-loggerinfo-line-is-discarded-in-production) | 2026-08-30 | Every `logger.info` line is discarded in production | Fixed — uncommitted |
 | [27](#27-password-reset-links-pointed-at-localhost-in-production) | 2026-08-30 | Password reset links pointed at localhost in production | Fixed — uncommitted |
 | [26](#26-the-media-library-shows-uuids-instead-of-filenames) | 2026-08-30 | The media library shows UUIDs instead of filenames | Fixed — uncommitted |
@@ -44,6 +45,58 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 29. A verification loop rolled back its own deployment
+
+**Status:** Fixed (procedure, not code). Self-inflicted, during the defect 23 deploy.
+
+**Seen.** `manitou-web:v6` was pushed and deployed. Fifteen minutes later the
+service was serving `v5` again, with no error anywhere in the build, the push or
+the update call -- all three reported success.
+
+**Cause.** The verification loop watching the rollout was polling
+`/admin/categories` three times every twenty seconds. That page exists only in
+`v6`; every request that landed on a `v5` task returned **404**. Express Mode\'s
+`RollbackAlarm` is metric math over the load balancer:
+
+```
+100 * (IF(4xx < 5, 0, 4xx) + 5xx) / FILL(RequestCount, 1)   threshold: 1%
+```
+
+**4xx counts.** On a store with no real traffic, the probe *was* the traffic, so
+the measured error rate was **75% and 72.7%** against a 1% threshold. ECS
+concluded the new revision was faulty and rolled it back -- correctly, on the
+evidence available to it.
+
+The alarm cannot distinguish "the new version is broken" from "something is
+requesting a URL the old version does not have". Both produce identical metrics.
+
+**Confirmed rather than assumed.** `DescribeAlarmHistory` shows
+`OK -> ALARM at 21:36 UTC` with exactly those datapoints, and the second deploy of
+the *same image* succeeded once the verification switched to reading ECS task
+state instead of sending HTTP requests. Same artefact, same command, different
+observation method -- which is what makes it the measurement and not the build.
+
+**Fixed.** Verify a rollout from the **control plane** -- `DescribeTasks`,
+`DescribeExpressGatewayService` -- which generates no load-balancer traffic and
+therefore cannot influence what it is watching. Save data-plane checks for after
+the rollout completes, keep them few, and prefer URLs that return 2xx or 3xx. An
+unauthenticated page check should expect the **307** to the login page; a 404 from
+the same URL is the signal that a task does not have the route yet, which is
+precisely the thing that must not be generated during a bake.
+
+**The shape to remember: on a low-traffic service, a probe that is expected to
+fail is indistinguishable from the service failing.** Usually that only misleads
+the person reading the graph. During a deployment bake it changes the outcome --
+the observation causes the rollback. Every earlier entry in this log about a
+measurement being wrong cost debugging time; this one moved production backwards.
+
+Worth noting what worked: the rollback itself. A bad deployment reverted on its own
+in under fifteen minutes with no human involved, which is exactly what the canary
+is for. The alarm was right about its inputs and wrong about the world, and it
+failed in the safe direction.
 
 ---
 
