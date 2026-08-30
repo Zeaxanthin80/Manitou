@@ -186,6 +186,30 @@ def confirm_upload(client, bucket: str, pending_key: str) -> dict:
     return {"key": final_key, "content_type": content_type, "byte_size": byte_size}
 
 
+def clean_filename(name: str) -> str:
+    """A vendor's filename, made safe to STORE and DISPLAY.
+
+    Never used to build a key -- that is what `new_pending_key` is for, and the
+    separation is the whole reason a filename can be kept at all. This only has
+    to survive being written to a column and rendered in a list.
+
+    Three things are removed, each for its own reason:
+
+    * **Directories.** A browser may send `C:\\Users\\jo\\shirt.jpg` or
+      `photos/shirt.jpg`. Only the last segment is the name of the file, and
+      keeping the rest would make the library's search match on folder names.
+    * **Non-printable characters.** They render as nothing, so two visibly
+      identical names could differ, and they are how log output gets forged.
+    * **Length.** Capped at 255, the same bound the presign request declares.
+
+    Falls back to "untitled" rather than raising: an odd filename is not a
+    reason to reject an upload that has already succeeded in S3.
+    """
+    name = name.replace("\\", "/").rsplit("/", 1)[-1]
+    name = "".join(ch for ch in name if ch.isprintable()).strip()
+    return (name or "untitled")[:255]
+
+
 def public_url(cdn_host: str, key: str) -> str:
     """Where the storefront fetches this object.
 

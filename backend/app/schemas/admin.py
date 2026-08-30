@@ -292,6 +292,11 @@ class AdminUploadConfirm(BaseModel):
     """
 
     key: str
+    #: The vendor's own filename, sent again here rather than carried across the
+    #: round trip. Presigning writes no row, so the name it receives has nowhere
+    #: to live; this is the first step that has a row to put it on. The browser
+    #: still holds the File, so re-sending costs nothing.
+    original_filename: str = Field(min_length=1, max_length=255)
     width: int | None = Field(default=None, gt=0)
     height: int | None = Field(default=None, gt=0)
 

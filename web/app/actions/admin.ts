@@ -347,6 +347,7 @@ export async function requestUploadAction(
 /** Step 3: the PUT succeeded, so record it and get the public URL back. */
 export async function confirmUploadAction(
   key: string,
+  originalFilename: string,
   width: number | null,
   height: number | null,
 ): Promise<{ url?: string; assetId?: number; error?: string }> {
@@ -354,7 +355,15 @@ export async function confirmUploadAction(
   if (!token) return { error };
 
   try {
-    const asset = await confirmUpload(token, { key, width, height });
+    // The filename is sent HERE, not at presign. Presigning writes no row, so
+    // the name it receives has nowhere to live -- and deriving one from the key
+    // stored the generated UUID instead (defect 26).
+    const asset = await confirmUpload(token, {
+      key,
+      original_filename: originalFilename,
+      width,
+      height,
+    });
     // The id travels with the url from here on. Without it the API cannot record
     // which asset an image came from, which is defect 24 -- the column existed
     // and the write path ignored it.

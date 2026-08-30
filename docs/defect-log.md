@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [26](#26-the-media-library-shows-uuids-instead-of-filenames) | 2026-08-30 | The media library shows UUIDs instead of filenames | Fixed — uncommitted |
 | [25](#25-clicking-blank-space-opened-the-file-manager) | 2026-08-30 | Clicking blank space opened the file manager | Fixed — uncommitted |
 | [24](#24-uploaded-images-never-recorded-which-asset-they-came-from) | 2026-08-30 | Uploaded images never recorded which asset they came from | Fixed — uncommitted |
 | [23](#23-the-vendor-portal-cannot-bootstrap-a-store) | 2026-08-30 | The vendor portal cannot bootstrap a store | Open — Phase 8 |
@@ -41,6 +42,61 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 26. The media library shows UUIDs instead of filenames
+
+**Status:** Fixed, uncommitted (Phase 6 task 9b).
+
+**Seen.** Every asset in the deployed media library was labelled with a hex string —
+`70eabec67c3c4d70b76dcf8…` — rather than the name of the file the vendor uploaded.
+Noticed by the owner on the first real use of the library.
+
+**Cause.** The filename is collected at the step that cannot store it, and absent
+from the step that can.
+
+`POST /admin/uploads` (presign) accepts `filename`, validates it at 1–255
+characters, and **never reads it** — correctly, because presigning writes no row.
+`POST /admin/uploads/confirm` writes the row and has no filename field at all, so
+it reconstructed one:
+
+```python
+original = payload.key.rsplit("/", 1)[-1]
+```
+
+The key is `media/YYYY/MM/{uuid4().hex}.jpg`, so that is the generated UUID. The
+docstring three lines above it says the original filename "is kept for the media
+library\'s search"; the code stored something that has nothing to do with the
+vendor\'s file.
+
+**Why the test did not catch it — the test encoded the bug.** One test asserts the
+stored filename, and it posts a hand-written key:
+
+```python
+key = "pending/2026/08/abc.jpg"
+assert row.original_filename == "abc.jpg"   # comment: "never part of the key"
+```
+
+Its basename was chosen to *look* like a filename, so the key-derived value and the
+real filename are the same string and the assertion cannot tell them apart. The
+comment on that line states the invariant the code violates, directly above an
+assertion that cannot detect the violation. **Fixture data that resembles the right
+answer will confirm the wrong implementation.**
+
+**Fixed.** `original_filename` moved onto `AdminUploadConfirm`, sent by the browser
+at confirm time — it still holds the `File`, so nothing needs to be carried across
+the round trip. The endpoint sanitises it for storage (basename only, printable
+characters, length-capped) and it remains barred from key construction, which is
+what the presign comment was always about. The test now posts a UUID-shaped key and
+a different filename, so the two are distinguishable and the assertion means
+something.
+
+**The shape to remember.** Same as defect 24: a value that crosses two endpoints,
+each individually correct, lost in the gap between them. Defect 24 was a column
+never written; this is a column written with the wrong source. **When a field exists
+to answer a question, test it with data that could only have come from the intended
+source** — here, a filename that appears nowhere in the key.
 
 ---
 

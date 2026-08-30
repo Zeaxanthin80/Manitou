@@ -74,7 +74,14 @@ export function ImageUploadField({
       }
 
       const size = await measure(file);
-      const confirmed = await confirmUploadAction(target.key, size.width, size.height);
+      // file.name, not target.key: the key is a generated UUID, and deriving the
+      // display name from it is what defect 26 was.
+      const confirmed = await confirmUploadAction(
+        target.key,
+        file.name,
+        size.width,
+        size.height,
+      );
       if (confirmed.error || !confirmed.url) {
         setError(confirmed.error ?? "The upload could not be confirmed.");
         return;

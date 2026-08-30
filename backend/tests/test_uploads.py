@@ -380,18 +380,28 @@ def test_confirm_writes_a_row_describing_s3s_view_of_the_object(
     from app.models import MediaAsset
 
     admin = make_user(email="admin@manitou.example", role="admin")
-    key = f"{PENDING_PREFIX}2026/08/abc.jpg"
+    # A UUID-shaped key, like the ones new_pending_key actually produces, and a
+    # filename that appears NOWHERE in it. The earlier version of this test used
+    # "abc.jpg" as the key's basename, which made a key-derived filename and the
+    # vendor's filename the same string -- so the assertion below could not tell
+    # them apart and passed against the implementation of defect 26.
+    key = f"{PENDING_PREFIX}2026/08/70eabec67c3c4d70b76dcf8a1b2c3d4e.jpg"
     media_configured.objects[key] = _obj(size=4096)
 
     r = client.post(
         "/admin/uploads/confirm",
         headers=auth_headers(admin),
-        json={"key": key, "width": 800, "height": 600},
+        json={
+            "key": key,
+            "original_filename": "Navy Crew Neck.jpg",
+            "width": 800,
+            "height": 600,
+        },
     )
     assert r.status_code == 201, r.text
     body = r.json()
 
-    assert body["key"] == f"{MEDIA_PREFIX}2026/08/abc.jpg"
+    assert body["key"] == f"{MEDIA_PREFIX}2026/08/70eabec67c3c4d70b76dcf8a1b2c3d4e.jpg"
     assert body["byte_size"] == 4096
     assert body["url"] == f"https://d111abcdef8.cloudfront.net/{body['key']}"
     assert body["width"] == 800
@@ -399,8 +409,10 @@ def test_confirm_writes_a_row_describing_s3s_view_of_the_object(
     row = db.query(MediaAsset).one()
     assert row.key == body["key"]
     assert row.uploaded_by == admin.id
-    # Kept for the media library's search, and never part of the key.
-    assert row.original_filename == "abc.jpg"
+    # Kept for the media library's search, and never part of the key. The value
+    # asserted here CANNOT have come from the key -- that is the whole point.
+    assert row.original_filename == "Navy Crew Neck.jpg"
+    assert row.original_filename not in row.key
 
 
 def test_confirming_a_key_that_was_never_uploaded_writes_no_row(
@@ -414,7 +426,7 @@ def test_confirming_a_key_that_was_never_uploaded_writes_no_row(
     r = client.post(
         "/admin/uploads/confirm",
         headers=auth_headers(admin),
-        json={"key": f"{PENDING_PREFIX}2026/08/never.jpg"},
+        json={"key": f"{PENDING_PREFIX}2026/08/never.jpg", "original_filename": "never.jpg"},
     )
     assert r.status_code == 409
     assert db.query(MediaAsset).count() == 0
@@ -431,7 +443,7 @@ def test_confirming_a_key_outside_pending_writes_no_row(
     r = client.post(
         "/admin/uploads/confirm",
         headers=auth_headers(admin),
-        json={"key": f"{MEDIA_PREFIX}someone-elses.jpg"},
+        json={"key": f"{MEDIA_PREFIX}someone-elses.jpg", "original_filename": "mine.jpg"},
     )
     assert r.status_code == 409
     assert db.query(MediaAsset).count() == 0
@@ -572,6 +584,89 @@ def test_a_committed_file_still_needs_no_asset(
     )
     assert r.status_code == 201
     assert db.query(ProductImage).one().asset_id is None
+
+
+# ============================================================================
+# The stored filename (defect 26)
+# ============================================================================
+
+
+@pytest.mark.parametrize(
+    "sent, stored",
+    [
+        ("shirt.jpg", "shirt.jpg"),
+        # A browser may send a path. Only the last segment names the file, and
+        # keeping the rest would make the library's search match folder names.
+        ("photos/summer/shirt.jpg", "shirt.jpg"),
+        (r"C:\Users\jo\shirt.jpg", "shirt.jpg"),
+        # Non-printables render as nothing, so two visibly identical names could
+        # differ -- and they are how log output gets forged.
+        ("shi\x00rt\x1b[31m.jpg", "shirt[31m.jpg"),
+        ("   spaced.jpg   ", "spaced.jpg"),
+        # Never empty: an odd name is not a reason to fail an upload S3 already
+        # accepted.
+        ("///", "untitled"),
+        ("\x00\x00", "untitled"),
+    ],
+)
+def test_a_filename_is_cleaned_for_storage(sent, stored):
+    from app.services.uploads import clean_filename
+
+    assert clean_filename(sent) == stored
+
+
+def test_a_very_long_filename_is_capped_rather_than_rejected():
+    from app.services.uploads import clean_filename
+
+    out = clean_filename("a" * 400 + ".jpg")
+    assert len(out) == 255
+
+
+def test_the_stored_filename_is_sanitised_end_to_end(
+    client, db, make_user, auth_headers, media_configured
+):
+    """A path sent by the browser must not reach the column.
+
+    The control is the test above that a plain name survives untouched -- without
+    it this would also pass if the endpoint stored a constant.
+    """
+    from app.models import MediaAsset
+
+    admin = make_user(email="admin@manitou.example", role="admin")
+    key = f"{PENDING_PREFIX}2026/08/aaaabbbbccccddddeeeeffff00001111.jpg"
+    media_configured.objects[key] = _obj(size=4096)
+
+    r = client.post(
+        "/admin/uploads/confirm",
+        headers=auth_headers(admin),
+        json={"key": key, "original_filename": "some/deep/path/shirt.jpg"},
+    )
+
+    assert r.status_code == 201, r.text
+    assert db.query(MediaAsset).one().original_filename == "shirt.jpg"
+
+
+def test_confirm_refuses_an_upload_with_no_filename(
+    client, db, make_user, auth_headers, media_configured
+):
+    """Paired with the permit case above, or it proves nothing.
+
+    Required rather than defaulted: the browser always holds the File, so a
+    missing name means a caller that is not our upload field, and silently
+    storing "untitled" would put a row in the library nobody can find.
+    """
+    from app.models import MediaAsset
+
+    admin = make_user(email="admin@manitou.example", role="admin")
+    key = f"{PENDING_PREFIX}2026/08/aaaabbbbccccddddeeeeffff00002222.jpg"
+    media_configured.objects[key] = _obj(size=4096)
+
+    r = client.post(
+        "/admin/uploads/confirm", headers=auth_headers(admin), json={"key": key}
+    )
+
+    assert r.status_code == 422
+    assert db.query(MediaAsset).count() == 0
 
 
 # ============================================================================

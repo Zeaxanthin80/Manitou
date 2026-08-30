@@ -758,6 +758,76 @@ Both times the fix was to pin real behaviour, not to delete the code:
 
 ---
 
+## Rolling out a new image (learned during task 9b)
+
+Tasks 7 and 8 recorded how these services were *created*. Neither recorded how a new image reaches
+one, which is the operation actually performed most often.
+
+The verb is **`aws ecs update-express-gateway-service`**, and the image lives inside
+`--primary-container`, which is a structure rather than a string.
+
+### Omitted top-level fields are preserved — measured, not assumed
+
+The API documentation for `primaryContainer` is one sentence and does not say whether an update
+merges with the running configuration or replaces it. The distinction is not academic: the API
+service carries a `taskRoleArn` granting its S3 access, and a replace that dropped it would leave a
+service that starts, passes its health check, and fails every upload.
+
+So it was measured on the web service first, which has less to lose. The update passed
+`--service-arn` and `--primary-container` and nothing else; afterwards `cpu`, `memory`,
+`healthCheckPath`, `scalingTarget`, the security groups and **`executionRoleArn`** were all
+unchanged. Omitted top-level fields survive.
+
+**What that check does NOT establish**: whether the fields *inside* `primaryContainer` merge or
+replace. The update sent a complete structure, so both semantics produce the same result and the
+comparison cannot tell them apart. Send that structure complete every time and the question stays
+harmless.
+
+### Derive the container spec, do not retype it
+
+The API's `primaryContainer` holds ten environment variables and three Secrets Manager ARNs. Typing
+those by hand to change one tag is how a secret reference acquires a typo.
+
+```
+aws ecs describe-express-gateway-service --region <region> --service-arn "$ARN" \
+  --query 'service.activeConfigurations[0].primaryContainer' \
+  | jq '.image = "<repo>:<new tag>"' > /tmp/container.json
+
+aws ecs update-express-gateway-service --region <region> \
+  --service-arn "$ARN" --primary-container file:///tmp/container.json
+```
+
+This round-trips because every field `describe` returns for that structure — `image`,
+`containerPort`, `environment`, `secrets`, `awsLogsConfiguration` — is also a field the update
+accepts. Confirmed against the service model rather than by trying it.
+
+### A feature spanning both services needs both deployed
+
+Task 9b's media library is a modal in the web image calling an endpoint in the API image. The web
+image was built, pushed and deployed first, and the library then failed — correctly, because
+`GET /admin/assets` did not exist on the running API.
+
+Cheap to detect, and worth doing *before* opening the browser to hunt for it:
+
+```
+curl -s <api-url>/openapi.json | jq -r '.paths | keys[] | select(startswith("/admin/assets"))'
+```
+
+Empty before the API deploy, the path after. FastAPI publishes its own schema, so the running
+service can be asked what it implements rather than inferred from which commit was last pushed.
+The general habit: **a deploy is of an image, not of a feature**, and a feature that crosses two
+images is not deployed until both are.
+
+### Canary, and why the rollout is not instant
+
+Express Mode deploys the new revision alongside the old, shifts a slice of traffic, watches the
+health check and the service alarms through a bake period, and only then completes. A failing
+revision rolls back on its own rather than waiting for someone to notice. That is the cost of the
+few minutes, and it is the reason a deployment that "returned successfully" is not yet a deployment
+that is serving — verify against the running service, not against the exit code.
+
+---
+
 ## The media library (task 9b)
 
 **No AWS resources were added.** This task is application work on top of task 9's bucket,

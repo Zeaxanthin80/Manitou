@@ -94,6 +94,7 @@ from app.services.two_factor import disable as disable_two_factor
 from app.services.uploads import (
     PRESIGN_EXPIRY_SECONDS,
     UploadError,
+    clean_filename,
     confirm_upload,
     presign_put,
     public_url,
@@ -819,9 +820,11 @@ def confirm_upload_target(
 
     The original filename is kept for the media library's search and is never
     part of the key: a filename is attacker-controlled, and `.jpg.html` is a
-    filename.
+    filename. It arrives on THIS request rather than being derived from the key
+    -- deriving it stored the generated UUID and made the column useless for the
+    one thing it exists for (defect 26).
     """
-    original = payload.key.rsplit("/", 1)[-1]
+    original = clean_filename(payload.original_filename)
 
     try:
         info = confirm_upload(_s3(), settings.s3_bucket, payload.key)
