@@ -844,6 +844,138 @@ call immediately preceding.
 
 ---
 
+## The application's own database role (Phase 7, defect 30)
+
+The API used to connect as the RDS **master** user. Two separate problems, one fix.
+
+### An injected secret is not a live secret
+
+The RDS-managed master secret rotates automatically every 7 days. **ECS resolves a `secrets`
+reference once, when a task starts, and never refreshes it.** A long-running service therefore keeps
+the password it read at boot, and the next rotation leaves it authenticating with a credential the
+database has stopped accepting.
+
+Injection and retrieval look interchangeable in a task definition. They are not, and this is where
+the difference shows: rotation only helps a consumer that re-reads.
+
+**One-off tasks are immune by construction** — `migrate.sh` and `run_in_vpc.sh` start a *new* task
+for every run, so ECS resolves the secret fresh each time. Only the long-running service was ever
+exposed. That asymmetry is the bug in one sentence.
+
+### The failure is invisible to every health signal
+
+Postgres authenticates at connect time and only at connect time. So after a rotation:
+
+- connections already open keep working;
+- new connections fail;
+- and `/health`, which runs `SELECT 1` every 30 seconds, keeps one connection permanently checked
+  out, valid and answering.
+
+**The one code path guaranteed to keep working is the one the load balancer uses to decide whether
+anything is working.** Reproduced deliberately: sequential requests all 200, 20 concurrent gave
+5 × 500, 40 concurrent gave 10 × 500 — a steady 25% failure rate — while both target groups read
+`healthy` and `UnHealthyHostCount` never moved.
+
+Two things that reproduction taught which the design did not predict:
+
+- **The alarms arrived after the incident ended.** `manitou-alb-target-5xx` evaluates a 300-second
+  period; first errors at 19:54, ALARM at 19:59:52, recovery already complete at 19:59:24.
+- **The first burst missed the threshold by one request** — 5 errors against *greater than* 5.
+
+### Least privilege applies to database roles too
+
+Separately from rotation, the master owns every table. Owning a table is enough to
+`ALTER TABLE ... DISABLE TRIGGER` — so the API could have switched off the trigger that makes
+`audit_events` append-only. **A guarantee the guarded party can disable is not a guarantee.**
+
+`manitou_app` now holds `SELECT, INSERT, UPDATE, DELETE` on the tables, `USAGE, SELECT` on the
+sequences, and nothing else. `ALTER DEFAULT PRIVILEGES` covers tables a future migration creates —
+without it, the next migration's table is invisible to the API and surfaces as a permission error on
+something just created. `UPDATE` and `DELETE` on `audit_events` are revoked as well as
+trigger-blocked, so the append-only claim holds at two layers.
+
+### Two credential sets, chosen by which task definition you run on
+
+Migrations need DDL; the API must not have it. Rather than branch in application code, the
+credentials live in different task definitions and the choice is made by *what you run*:
+
+| | database identity | used by |
+| --- | --- | --- |
+| the API service | `manitou_app`, password from the non-rotating application secret | serving traffic |
+| `manitou-dbadmin` | the master, from the RDS-managed secret | `migrate.sh`, `run_in_vpc.sh` |
+
+The alternative — both credential sets on the API's own task definition, selected at runtime — was
+rejected. It would leave the master password in the API container's environment, and **a variable
+the application never reads is still a variable it holds.**
+
+`manitou-dbadmin` registers a **fresh revision on every run**, deriving the image from the live
+service. A static definition would pin the image to whatever was current the day it was written,
+which is backwards for migrations: a migration must match the code being deployed. Same reasoning as
+`deploy.sh` — derive the container spec, do not retype it.
+
+### `pool_pre_ping` is not the fix, and it was worth proving that
+
+The obvious reach is `pool_pre_ping=True`. It does not help here: the replacement connection
+authenticates with the same stale password and fails identically. Measured on a disposable role
+before relying on it.
+
+It is enabled anyway, for the thing it *does* fix — an RDS reboot, failover or maintenance window
+closing idle connections. On a store sized at ~1 concurrent user, connections sit idle for hours, so
+those are exactly the connections a customer meets after a quiet night.
+
+### Recovery must not be a deployment
+
+The 500s feed `RollbackAlarm`, which ECS reads during a deployment bake — it went to ALARM during
+this test. **A forced deployment would have been reverted, and the post-mortem would have blamed the
+image.** Defect 29 with a different trigger.
+
+`stop-task` instead: the service floor is one task, so the scheduler launches a replacement, which
+resolves the secret fresh. No alarm is consulted. About 90 seconds, of which ~60 return 503.
+
+### Verified
+
+The control was the harder half. `stop-task` fixes the symptom either way, so "a rotation no longer
+breaks it" proves nothing unless a rotation *did* break it first — otherwise both measurements are
+zero and agree that nothing is nothing.
+
+1. **Mechanism first, on a disposable role, with no blast radius.** Warm connection survived a
+   password change; a new connection failed; `pool_pre_ping` did not rescue it; a fresh password
+   worked. This also measured the pool: 5 + 10 overflow = **15 per task, 30 across two** — which is
+   why `manitou-rds-connections-high`, set to fire above 50, could never fire.
+2. **Then on the live API**, then recovered, then re-confirmed at the concurrency that had been
+   failing: 40/40 × 200.
+3. **Paired permit and refusal on the new role.** Reads and inserts allowed; `CREATE TABLE`,
+   `DROP TABLE`, `DISABLE TRIGGER`, and `UPDATE`/`DELETE` on audit rows all denied. Owns 0 tables,
+   not a superuser.
+
+The refusal probe deliberately does **not** run the destructive statements as the master as a
+control. An earlier draft did, relying on Postgres DDL being transactional to roll back a
+`DROP TABLE products`. That is true and it was still wrong: it put a live table one missing rollback
+away from deletion to establish something the catalogue already knows. Ownership is a structural
+fact — `pg_tables.tableowner` answers "could the master disable that trigger?" without disabling
+anything.
+
+### Two alarms corrected on the way past
+
+Both were provable from arithmetic and 24 hours of existing metrics, without waiting for the load
+test.
+
+**`DatabaseConnections` was watching for a number the system cannot reach.** The threshold was 50;
+the API's ceiling is `pool_size` 5 + `max_overflow` 10 = 15 per task × `maxTaskCount` 2 = **30**.
+Measured, not inferred — the rotation probe printed the live pool's own configuration. Now 24, which
+is 80% of the real ceiling, against an observed baseline of 5–10. A concurrent one-off migration task
+can add up to 15 more and cross it briefly; that false positive is worth the alarm working at all.
+
+**Nothing watched CPU credits on a burstable instance.** `db.t4g.micro` accrues 12 credits/hour and
+caps at 288 — both confirmed from metrics, which show the balance pinned at 288 against ~0.45/hour of
+use. At zero the instance is throttled to its baseline and every query slows at once **while
+`CPUUtilization` looks unremarkable**, so the existing CPU alarm would not catch it. New alarm below
+50, roughly four hours of full-burst runway, far under the 184 low-water mark of the past day.
+
+That is 14 alarms against a free tier of 10, so roughly $0.40/month.
+
+---
+
 ## GitHub Actions deploys without AWS keys
 
 **No access keys anywhere.** The workflow assumes an IAM role through GitHub's OIDC provider, and
@@ -933,7 +1065,8 @@ Two related traps worth naming:
 | Alarm | Why this one |
 | --- | --- |
 | RDS `FreeStorageSpace` < 2 GiB | 20 GB with **storage autoscaling off**, so a full disk is a hard stop, not a slow degradation |
-| RDS `DatabaseConnections` > 50 | exhaustion on a `t4g.micro` looks like an application hang, not a database error |
+| RDS `DatabaseConnections` > ~~50~~ **24** | exhaustion looks like an application hang, not a database error. **50 was unreachable** — the API tops out at 30 (2 tasks × 15) — so the alarm could never fire. Corrected in Phase 7; see below |
+| RDS `CPUCreditBalance` < 50 | **added in Phase 7.** A burstable instance has a second capacity dimension, and this one had nothing watching it |
 | RDS `CPUUtilization` > 80% | the slow-burn precursor to timeouts |
 | ALB `HTTPCode_Target_5XX_Count` | the store is returning errors to customers |
 | ALB `UnHealthyHostCount` over 3 min | a task is failing health checks; three minutes so a deployment's normal churn does not page |

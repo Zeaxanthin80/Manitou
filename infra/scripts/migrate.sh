@@ -5,9 +5,10 @@
 # **Why this exists.** RDS is private: it has no public IP and its endpoint
 # resolves only inside the VPC, so `alembic upgrade head` from a laptop cannot
 # reach it and neither can a GitHub Actions runner. Something already inside the
-# VPC has to run it, and the API's own task definition is already exactly that --
-# same image, same subnets, same security group, same DB_PASSWORD from Secrets
-# Manager. Only the lifecycle differs: run once and exit, rather than serve.
+# VPC has to run it, on the same image, subnets and security group the API uses.
+# Only two things differ: the lifecycle (run once and exit, rather than serve)
+# and the database identity (the master user, because migrations need DDL and
+# the API deliberately no longer has it -- see below).
 #
 # No separate image is needed. `backend/Dockerfile.dockerignore` excludes
 # `backend/tests/` but not `backend/alembic/`, so the production image carries
@@ -29,19 +30,25 @@ set -euo pipefail
 
 REGION="${AWS_REGION:-us-east-1}"
 CLUSTER=default
-FAMILY=default-manitou-api
 CONTAINER=Main          # the task definition's only container; it has no
                         # entryPoint, so a plain command override is enough
 
 # Default to the operation that is almost always wanted.
 if [ "$#" -eq 0 ]; then set -- upgrade head; fi
 
-# The LATEST revision, resolved rather than pinned. Pinning would run migrations
-# with whatever image was current when this script was written -- which is the
-# opposite of what a migration wants, since it must match the code being deployed.
-TASK_DEF=$(aws ecs describe-task-definition --region "$REGION" \
-             --task-definition "$FAMILY" \
-             --query 'taskDefinition.taskDefinitionArn' --output text)
+# The ADMIN task definition, not the API's.
+#
+# Since defect 30 the API service runs as `manitou_app`, which has DML rights and
+# no DDL rights -- that is the point of it. Alembic needs DDL, so running
+# migrations on the API's task definition would now fail on the first CREATE
+# TABLE, and it would fail as a permission error rather than anything that
+# mentions credentials.
+#
+# dbadmin-taskdef.sh registers a fresh revision on every run, deriving the image
+# from the live service. The image is therefore always the one being deployed,
+# which is what a migration requires: pinning it would run migrations with
+# whatever image was current when this script was written.
+TASK_DEF=$("$(dirname "$0")/dbadmin-taskdef.sh")
 echo "  task definition: ${TASK_DEF##*/}"
 echo "  command:         alembic $*"
 

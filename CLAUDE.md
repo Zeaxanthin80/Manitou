@@ -134,4 +134,4 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
 
 <!-- Update this line as you progress, e.g. "Phase 1 — Database" -->
 
-Phase 6 — AWS Deployment
+Phase 7 — Hardening and Launch

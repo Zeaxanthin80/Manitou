@@ -969,8 +969,19 @@ object; deleting a used one is refused with the list of products holding it.
 1. **[You]** Size a real launch-tier concurrency target using the methodology in Section 10.1 —
    addressable market → realistic early-launch capture rate → visits → concurrent users. Don't
    skip this step in favor of a round number.
+   - **Done 2026-08-31.** Cold launch, no list: **~1 concurrent user** at launch-day peak, ~11 if a
+     post does 10× better than expected. Working shown in Section 10.1.
 2. **[You + Claude Code]** Load test against that sized target, not an assumed one. Adjust the RDS
    instance size and connection pool based on the results.
+   - Because the sized target is ~1, the test is a **ramp to failure** to find the headroom, not a
+     pass/fail against a number the infrastructure clears without noticing.
+
+2b. **[You + Claude Code]** Defect 30, found while planning task 2 and fixed first: the API
+   connected as the RDS **master** user, whose password rotates every 7 days, while ECS resolves an
+   injected secret only at task start. A rotation left the running task authenticating with a dead
+   password — failing ~25% of concurrent requests while `/health` stayed 200 on its one warm
+   connection and no alarm moved. The API now runs as `manitou_app` (DML only, cannot disable the
+   `audit_events` trigger); migrations use a separate `manitou-dbadmin` task definition.
 3. **[You + Claude Code]** Add rate limiting, review input validation, and do a security pass.
 4. **[You]** Verify backups by performing a test restore. An untested backup is not a backup.
 5. **[You + Claude Code]** Confirm logging, alerts, and error tracking are in place, then launch.
@@ -1596,6 +1607,35 @@ not the method.
 whatever store you're actually building. Treat the higher tiers as documented future milestones to
 revisit once real usage data exists — don't architect Phase 6/8 around a number with no grounding
 in an actual addressable market and capture rate.
+
+### The actual number for ImprimaPress (Phase 7 task 1, done 2026-08-31)
+
+Cold launch: no mailing list, no existing following. So step 1's input is **reach**, not a
+population — the method is unchanged, the inputs are what differ per store type.
+
+| Step | Input | Result |
+| --- | --- | --- |
+| 1. Reachable in the first 6 months | personal network ~200, onward sharing ×2, organic search ≈ 0 on a domain with no history or backlinks | **~500 people** |
+| 2. Visits and conversion | ~20% ever click through; ~2% of visitors buy, with no reviews and no brand yet | ~100 visitors, **~2–5 customers** |
+| 3. Visits per month | ~100 uniques × ~1.8 visits, over 6 months | **~30/month** |
+| 4. Peak-hour concurrency | launch day ~90 visits, ~25% in the peak hour, ~3-minute sessions → 22 × 3 ÷ 60 | **≈ 1** |
+
+| Scenario | Peak-hour concurrent users |
+| --- | --- |
+| Ordinary day, first months | **< 1** |
+| Launch day | **~1** |
+| A post that unexpectedly does 10× | **~11** |
+| The mature-statewide milestone above, for contrast | ~1,250–1,400 |
+
+**The sized target is about one concurrent user** — three orders of magnitude below the round
+number this section exists to argue against, and roughly 100× below what the deployed
+infrastructure already serves.
+
+**This changes what the load test is for.** "Can it handle the target" would return green and mean
+nothing. The question worth asking is **where it breaks**, so the answer is a headroom figure — it
+degrades at N, launch needs 1, a viral day needs 11 — which is what makes later capacity decisions
+evidence rather than nerves. Re-run this whole exercise for any store cloned from this repo; a
+grocery clone's write-heavy traffic changes the answer even at the same concurrency.
 
 ---
 

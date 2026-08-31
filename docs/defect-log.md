@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [30](#30-a-rotating-password-broke-the-api-while-every-health-check-passed) | 2026-08-31 | A rotating password broke the API while every health check passed | Fixed — uncommitted |
 | [29](#29-a-verification-loop-rolled-back-its-own-deployment) | 2026-08-30 | A verification loop rolled back its own deployment | Fixed — uncommitted |
 | [28](#28-every-loggerinfo-line-is-discarded-in-production) | 2026-08-30 | Every `logger.info` line is discarded in production | Fixed — uncommitted |
 | [27](#27-password-reset-links-pointed-at-localhost-in-production) | 2026-08-30 | Password reset links pointed at localhost in production | Fixed — uncommitted |
@@ -45,6 +46,103 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 30. A rotating password broke the API while every health check passed
+
+**Status:** Fixed. Found by reading the system to plan Phase 7's load test, five
+days before it would have happened on its own.
+
+**Seen.** Nothing, which is the point. It had not happened yet: the RDS-managed
+master secret rotates every 7 days and the next rotation was due 2026-09-05.
+Reproducing it deliberately produced this, on the live API:
+
+| probe | result |
+| --- | --- |
+| `/health`, one request at a time | **200** |
+| `/products`, one request at a time | **200** |
+| `/products`, 20 concurrent | **15 × 200, 5 × 500** |
+| `/products`, 40 concurrent | **30 × 200, 10 × 500** |
+| ALB target health | **healthy** |
+| `manitou-alb-unhealthy-targets` | never fired |
+
+A consistent 25% of concurrent requests failing, and not one health signal
+moving.
+
+**Cause.** Three things that are each reasonable alone.
+
+1. **ECS resolves a `secrets` reference once, when a task starts**, and never
+   refreshes it. Injection is not live retrieval. A task that keeps running
+   across a rotation holds the password it read at boot.
+2. **Postgres authenticates at connect time and only at connect time.** Open
+   connections are unaffected by a password change; new ones fail. So the failure
+   is invisible until something makes the pool open a connection -- which is
+   concurrency, not traffic volume.
+3. **`/health` runs `SELECT 1` every 30 seconds**, which keeps a connection
+   permanently checked out, valid and answering. The one code path guaranteed to
+   keep working is the one the load balancer uses to decide whether anything is
+   working.
+
+The application log said exactly what was wrong the whole time --
+`FATAL: password authentication failed for user "manitou"` -- but no metric did.
+
+**Two further findings from the same reproduction.**
+
+- **The alarms fired after the incident was over.** First errors at 19:54;
+  `manitou-alb-target-5xx` reached ALARM at 19:59:52, about six minutes later,
+  because it evaluates a 300-second period. Recovery had completed at 19:59:24.
+  An alert that arrives after the outage ends is a record, not a warning.
+- **The first burst missed the alarm threshold by one request.** Five errors
+  against a threshold of *greater than* five. A quarter of requests failing and
+  the alarm stayed OK.
+
+**Fix.** The API no longer connects as the master user. A dedicated `manitou_app`
+role holds DML rights and nothing else, with a password in `manitou/api`, which
+does not rotate. The master credentials moved to a separate `manitou-dbadmin`
+task definition used only by migrations and one-off tasks -- which are immune by
+construction, because a fresh task resolves the secret at start.
+
+Putting both credential sets on the API's own task definition would have avoided
+the second task definition, and was rejected: it would leave the master password
+in the API container's environment. A variable the application never reads is
+still a variable it holds.
+
+This also closed something that had nothing to do with rotation. The API used to
+connect as the owner of every table, and **owning a table is enough to
+`ALTER TABLE ... DISABLE TRIGGER`.** `CLAUDE.md` describes `audit_events` as
+append-only *because a trigger rejects UPDATE and DELETE* — but the API could
+have switched that trigger off. A guarantee the guarded party can disable is not
+a guarantee. `manitou_app` is now denied it, and `UPDATE`/`DELETE` on that table
+are revoked as well, so the claim holds at the privilege layer too.
+
+`pool_pre_ping=True` was added at the same time, and deliberately **not** as the
+fix for this: a probe confirmed that pre-ping's replacement connection
+authenticates with the same stale password and fails identically. It is there for
+reboots, failovers and maintenance windows, which close idle connections on a
+low-traffic store.
+
+**Verified.** The control mattered more than the test. `stop-task` recovery
+restored the service, so "a rotation no longer breaks it" needed a demonstration
+that a rotation *did* break it first — otherwise both measurements are zero and
+agree that nothing is nothing, which the Recurring Shapes section below already
+warns about.
+
+- Mechanism proven first on a disposable role, with no blast radius: the warm
+  connection survived, a new connection failed, `pool_pre_ping` did not help, and
+  a fresh password worked.
+- Then reproduced on the live API, then recovered, then confirmed at the same
+  concurrency that had been failing: **40/40 × 200**.
+- Paired permit/refusal on the new role: reads and inserts ALLOWED; `CREATE
+  TABLE`, `DROP TABLE products`, `ALTER TABLE audit_events DISABLE TRIGGER`,
+  `UPDATE` and `DELETE` on audit rows all DENIED. Owns 0 tables, not a superuser.
+
+**Recovery is not a deployment, and that is not a detail.** The 500s feed
+`RollbackAlarm`, which ECS reads during a deployment bake — it went to ALARM at
+19:59:14 during this test. A forced deployment would have been reverted and the
+post-mortem would have blamed the image. Defect 29 with a different trigger.
+`stop-task` lets the service scheduler replace the task without consulting any
+alarm.
 
 ---
 
