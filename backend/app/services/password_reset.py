@@ -35,7 +35,7 @@ TOKEN_TTL = timedelta(minutes=30)
 NO_SUCH_USER = -1
 
 #: Suppress a second email if one was issued this recently. Blunts email-bombing
-#: a single address; it is not general rate limiting, which is Phase 8's job.
+#: a single address; it is not general rate limiting, which is Phase 7's job.
 RESEND_COOLDOWN = timedelta(seconds=60)
 
 
@@ -109,7 +109,7 @@ def request_reset(db: Session, email: str) -> tuple[User, str] | None:
     # depend on today's timings -- one indexed query returning nothing -- and
     # because the alternative is a branch that gets slower the moment someone adds
     # work inside it. NOT because a leak was observed. The real defence against
-    # timing enumeration is rate limiting, which is Phase 8.
+    # timing enumeration is rate limiting, which is Phase 7.
     #
     # NO_SUCH_USER can never be a real id, so the query is valid and matches
     # nothing.

@@ -447,7 +447,7 @@ through it. Seven mutations were applied to the guards and all seven were caught
 instance: *can a brand-new install of this store be set up entirely through its
 own interface?* Every clone of this repo starts with an empty database, and the
 Section 1.1 reusability seams promise a store can be adapted by editing config
-and content. A setup step that requires `psql` breaks that promise. Phase 8 is
+and content. A setup step that requires `psql` breaks that promise. Phase 7 is
 launch readiness, and this is exactly a launch-readiness question.
 
 ---

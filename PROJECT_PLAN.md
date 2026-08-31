@@ -42,7 +42,7 @@ configuration and content, not by rewriting the architecture.
 
 - One shared database so products, users, inventory, and orders are managed once and reflected everywhere.
 - Support the concurrency the business actually warrants — **sized via the methodology in Section
-  10.1**, not assumed. Design and Phase 8 load-test against the early-launch tier for whatever
+  10.1**, not assumed. Design and Phase 7 load-test against the early-launch tier for whatever
   store this becomes; treat higher figures (including the commonly-assumed "~1,000 concurrent") as
   earned scale milestones, not day-one requirements.
 - Payments via **Stripe**.
@@ -206,8 +206,8 @@ Manitou/
 │   ├── app/admin/         # vendor portal (role-gated). Its own nav, deliberately no footer
 │   ├── components/        # shared UI — ui/ holds the primitives Phase 4 reuses
 │   └── ...
-├── mobile-android/        # Kotlin app (Phase 7)
-├── mobile-ios/            # Swift app (Phase 7)
+├── mobile-android/        # Kotlin app (Phase 8)
+├── mobile-ios/            # Swift app (Phase 8)
 └── infra/                 # AWS notes and deployment scripts
 ```
 
@@ -481,7 +481,7 @@ and 7 unless deliberately revised.
 
 ## 5. Build Phases (with tasks)
 
-Do the phases in order. Do not start mobile (Phase 7) until the website works end to end.
+Do the phases in order. Do not start mobile (Phase 8) until the website works end to end.
 
 ### Phase 0 — Foundations
 
@@ -893,6 +893,11 @@ because that is when it starts mattering.
 3. **[You]** Create an **IAM user** for your daily work and stop using the root account for
    everyday tasks. (This is a security best practice and appears on the Cloud Practitioner exam.)
 4. **[You + Claude Code]** Provision **RDS PostgreSQL**. Keep it private so only the API reaches it.
+   - **Not fully met.** The instance is `PubliclyAccessible: true`; only the security
+     group keeps it reachable by the API and one developer IP. Deferred to Phase 7 by
+     decision, because moving it to private subnets also removes direct `psql` access
+     used for migrations, which needs its own answer (bastion, or running Alembic as a
+     task inside the VPC).
 5. **[You + Claude Code]** Point Alembic at RDS and apply your migrations there, producing the
    same schema you have locally.
 6. **[You + Claude Code]** Containerize the API with Docker. Push the image to **ECR** (Elastic
@@ -958,7 +963,17 @@ object; deleting a used one is refused with the list of products holding it.
 10. **[You]** Register a domain in **Route 53** and issue an **ACM** certificate for HTTPS.
 11. **[You + Claude Code]** Move secrets into **Secrets Manager** and set up **CloudWatch** logs and alarms.
 
-### Phase 7 — Mobile Apps
+### Phase 7 — Hardening and Launch
+
+1. **[You]** Size a real launch-tier concurrency target using the methodology in Section 10.1 —
+   addressable market → realistic early-launch capture rate → visits → concurrent users. Don't
+   skip this step in favor of a round number.
+2. **[You + Claude Code]** Load test against that sized target, not an assumed one. Adjust the RDS
+   instance size and connection pool based on the results.
+3. **[You + Claude Code]** Add rate limiting, review input validation, and do a security pass.
+4. **[You]** Verify backups by performing a test restore. An untested backup is not a backup.
+5. **[You + Claude Code]** Confirm logging, alerts, and error tracking are in place, then launch.
+### Phase 8 — Mobile Apps
 
 **Frameworks: Kotlin with Jetpack Compose (Android), Swift with SwiftUI (iOS).** Both consume the
 existing API and mirror `design-tokens.json` per Section 4.3.
@@ -975,16 +990,6 @@ existing API and mirror `design-tokens.json` per Section 4.3.
    same colors, type hierarchy, spacing rhythm, and button wording.
 6. **[You]** Test both apps end to end against your deployed backend.
 
-### Phase 8 — Hardening and Launch
-
-1. **[You]** Size a real launch-tier concurrency target using the methodology in Section 10.1 —
-   addressable market → realistic early-launch capture rate → visits → concurrent users. Don't
-   skip this step in favor of a round number.
-2. **[You + Claude Code]** Load test against that sized target, not an assumed one. Adjust the RDS
-   instance size and connection pool based on the results.
-3. **[You + Claude Code]** Add rate limiting, review input validation, and do a security pass.
-4. **[You]** Verify backups by performing a test restore. An untested backup is not a backup.
-5. **[You + Claude Code]** Confirm logging, alerts, and error tracking are in place, then launch.
 
 ---
 
@@ -1070,7 +1075,7 @@ reference to another table's PK).
 **Append-only is enforced by the database**, with a trigger that raises on `UPDATE` and `DELETE`.
 A log an application can quietly rewrite is not evidence of anything, and the whole point of this
 table is that it can be trusted after something has gone wrong. Retention and archiving are a
-Phase 8 concern; nothing prunes it in v1.
+Phase 7 concern; nothing prunes it in v1.
 
 **shipments** (Phase 5.5)
 | Column | Type | Notes |
@@ -1422,7 +1427,7 @@ which is why Phase 6 now has an explicit "push to ECR" step before deployment.
 
 **Defined upgrade path:** deploy the API with **ECS Express Mode**. Because Express Mode already
 runs on Fargate underneath its simplified interface, there's no service migration if you outgrow
-it — if the Phase 8 load test shows you need finer control (custom task placement, advanced ALB
+it — if the Phase 7 load test shows you need finer control (custom task placement, advanced ALB
 rules) than Express Mode's automation allows, you configure standard **ECS Fargate** directly,
 same service, training wheels off. Do not add that complexity earlier.
 
@@ -1574,7 +1579,7 @@ busy window), not spread evenly across 24 hours.
 
 The finding worth internalizing: **1,000+ concurrent is roughly what a genuinely successful,
 multi-year, statewide-recognized business sees at peak — not a reasonable day-one target.** A real
-launch for a store like this is closer to 80–100 concurrent, and that number should drive Phase 8's
+launch for a store like this is closer to 80–100 concurrent, and that number should drive Phase 7's
 load test and RDS sizing, not the round-number milestone.
 
 **Why this matters more for grocery-type stores than the default T-shirt build:** real-time
@@ -1627,7 +1632,7 @@ Version 1 — the target for your first live store — is exactly this:
    follow-on — for the same reason password reset was.
 7. Deployed on AWS.
 
-After v1 launches, add reviews, richer search, sales reporting, and the mobile apps (Phase 7).
+After v1 launches, add reviews, richer search, sales reporting, and the mobile apps (Phase 8).
 
 **Deliberately not in v1:**
 

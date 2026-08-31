@@ -41,7 +41,7 @@ from app.security import hash_password
 # Product images point at a file the web app serves from web/public/. A
 # root-relative URL is fine for local development and needs no external host
 # allowlisted in next.config.ts. Phase 6 moves product images to S3 + CloudFront
-# and these become absolute URLs -- which is also what a mobile client in Phase 7
+# and these become absolute URLs -- which is also what a mobile client in Phase 8
 # would need, since it cannot resolve a path relative to the web app.
 PLACEHOLDER_IMAGE = "/product-placeholder.png"
 

@@ -51,7 +51,7 @@ apps all go through the backend API. Only the API connects to PostgreSQL.
 - `backend/` — FastAPI app (`models/`, `schemas/`, `routers/`, `services/`, `db.py`)
 - `backend/alembic/` — migrations
 - `web/` — Next.js storefront + vendor portal
-- `mobile-android/`, `mobile-ios/` — added in Phase 7
+- `mobile-android/`, `mobile-ios/` — added in Phase 8
 - `infra/` — deployment notes/scripts
 
 ## Conventions

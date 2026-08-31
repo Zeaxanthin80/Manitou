@@ -17,7 +17,7 @@ import { storeConfig } from "@/lib/store-config";
  *
  * There are deliberately no Terms/Privacy/Returns links: those pages do not
  * exist, and a footer full of dead links is worse than a short honest one. They
- * belong with the Phase 8 pre-launch pass.
+ * belong with the Phase 7 pre-launch pass.
  */
 
 /**

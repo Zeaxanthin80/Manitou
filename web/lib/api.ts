@@ -397,7 +397,7 @@ async function request<T>(path: string, options: Options = {}): Promise<T> {
 
   // Not cached. Next.js does not cache fetch by default without Cache
   // Components, which is what a store wants: prices and stock must be live.
-  // Caching is a Phase 8 decision once load testing shows it is needed.
+  // Caching is a Phase 7 decision once load testing shows it is needed.
   const res = await fetch(`${API_URL}${path}`, {
     method,
     cache: "no-store",

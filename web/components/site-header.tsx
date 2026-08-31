@@ -11,7 +11,7 @@ import { Wordmark } from "@/components/ui/wordmark";
 import { listCategories } from "@/lib/api";
 
 /** Persistent top nav -- Section 4.3: the web expects one. Mobile gets native
- *  patterns in Phase 7, not a copy of this. */
+ *  patterns in Phase 8, not a copy of this. */
 export async function SiteHeader() {
   // Every category, not just top-level. The seeded tree is Apparel ->
   // {T-Shirts, Accessories}, so filtering to parent_id === null left a nav with

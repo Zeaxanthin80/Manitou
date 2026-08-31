@@ -182,7 +182,7 @@ is ~$32/month (more than the database), a bastion adds an EC2 to patch plus a tu
 every migration, and running migrations from inside the VPC makes task 5 depend on task 6 while a
 private subnet has no internet for `pip install`.
 
-**Open item, Phase 8:** flip `publicly_accessible` to No and replace the IP rule with the API's
+**Open item, Phase 7:** flip `publicly_accessible` to No and replace the IP rule with the API's
 security group, once ECS can apply migrations itself. The `/32` also needs re-editing whenever the
 ISP reassigns the laptop's address.
 
@@ -191,7 +191,7 @@ ISP reassigns the laptop's address.
 | Setting | Value | Reason |
 | --- | --- | --- |
 | Instance class | `db.t4g.micro` | Graviton, cheaper than t3. Section 10.1 sizes to the early-launch tier. |
-| Availability | Single-AZ | Multi-AZ is ~2×. Section 6.10 puts it before launch — Phase 8. |
+| Availability | Single-AZ | Multi-AZ is ~2×. Section 6.10 puts it before launch — Phase 7. |
 | Storage autoscaling | **Off** | On by default with a 1,000 GB ceiling. Storage never scales back down, so it is a bill that only grows. |
 | Master username | `manitou` | Not `postgres`; the default is what scanners try first. |
 | Master password | RDS-managed in Secrets Manager | Never exists in plaintext outside an explicit retrieval. Rotation is built in. |
@@ -238,7 +238,7 @@ differ. It printed no server line, so the server is 16.x.
 - A **stopped instance still bills for storage, and RDS restarts it after 7 days.** Stopping
   between sessions is worth doing; it is not a way to park the instance.
 - **RDS Proxy** (Section 6.11, connection pooling) bills per vCPU-hour and solves a problem this
-  project does not have yet. Phase 8, if the load test says so.
+  project does not have yet. Phase 7, if the load test says so.
 
 ---
 
@@ -389,7 +389,7 @@ snapshot, and an image that never upgrades accumulates CVEs by standing still.
 **The 4 CRITICALs are carried deliberately** — 3 in `perl`, 1 in `glibc`, with no Debian fix
 available. `perl-base` is `Essential: yes, Priority: required`, and nothing in this application
 invokes perl. Removing an Essential package to move a scanner number is a worse trade than an
-unreachable CVE. A distroless base would remove perl entirely; that is a Phase 8 question, not a
+unreachable CVE. A distroless base would remove perl entirely; that is a Phase 7 question, not a
 reason to break dpkg now.
 
 ### Access keys now exist

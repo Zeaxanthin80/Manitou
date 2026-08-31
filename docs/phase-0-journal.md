@@ -1,5 +1,8 @@
 # Phase 0 Journal — Foundations
 
+> **Note added 2026-08-30:** phases 7 and 8 were swapped after this was written, so that the mobile apps come last and the website can go live first. The Phase 8 references below were updated to match; they said Phase 7 at the time.
+
+
 A complete record of Phase 0: every command run, every file and directory created, and the reason
 each one exists. This is written to be **replayable** — someone starting from an empty repo can
 follow it top to bottom and end up exactly where we ended up.
@@ -204,7 +207,7 @@ separately and use different toolchains:
   outside it ever will. That is the project's golden rule made structural.
 - **`web/`** — the Next.js app, holding both the storefront and the `/admin` vendor portal. Kept
   separate because it is a different language and runtime with its own dependency file.
-- **`mobile-android/`, `mobile-ios/`** — reserved now, populated in Phase 7.
+- **`mobile-android/`, `mobile-ios/`** — reserved now, populated in Phase 8.
 - **`infra/`** — AWS notes and deployment scripts (Phase 6).
 
 Inside `backend/app/`, the four subfolders mirror the layers of a FastAPI application:
@@ -241,8 +244,8 @@ touch backend/app/models/.gitkeep backend/app/schemas/.gitkeep backend/app/route
 | `backend/alembic/` | Database migrations (Phase 1) |
 | `backend/tests/` | Backend tests (Phase 2, step 8) |
 | `web/` | Next.js storefront + `/admin` portal (Phase 3) |
-| `mobile-android/` | Kotlin / Jetpack Compose app (Phase 7) |
-| `mobile-ios/` | Swift / SwiftUI app (Phase 7) |
+| `mobile-android/` | Kotlin / Jetpack Compose app (Phase 8) |
+| `mobile-ios/` | Swift / SwiftUI app (Phase 8) |
 | `infra/` | AWS deployment notes and scripts (Phase 6) |
 
 ### Verification *(Claude Code)*
