@@ -81,6 +81,32 @@ _DB_PARTS = dict(
 )
 
 
+#: Every setting the assembly logic reads. Cleared before each test below.
+_DB_ENV = ("DATABASE_URL", "DB_HOST", "DB_PORT", "DB_USER", "DB_NAME", "DB_PASSWORD")
+
+
+@pytest.fixture(autouse=True)
+def _no_ambient_database_config(monkeypatch):
+    """Hide the process environment from these tests.
+
+    `_env_file=None` below stops pydantic-settings reading `.env` -- but NOT the
+    environment, which it always consults. On a developer's machine DATABASE_URL
+    lives in `.env` and is never exported, so the tests looked hermetic and were
+    not: every one of them silently depended on the absence of a variable.
+
+    CI is where that came due. The workflow exports DATABASE_URL so conftest can
+    find the Postgres service, pydantic read it, `database_url` arrived already
+    set, and the validator returned before assembling anything -- five failures
+    that no local run could reproduce.
+
+    **A test of "what does this class do with these inputs" must not be able to
+    read anything else.** Clearing the variables is what makes that true, rather
+    than trusting that nobody exports them.
+    """
+    for name in _DB_ENV:
+        monkeypatch.delenv(name, raising=False)
+
+
 def _settings(**kw) -> Settings:
     return Settings(_env_file=None, **_REQUIRED, **kw)
 

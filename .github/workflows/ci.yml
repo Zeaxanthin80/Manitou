@@ -110,6 +110,18 @@ jobs:
         # package.json disagrees, rather than resolving something nobody tested.
         run: npm ci
 
+      - name: Generate tokens and store config
+        # app/tokens.css, lib/design-tokens.ts and lib/store-config.ts are BUILT
+        # from design-tokens.json and store-config.json, and are git-ignored --
+        # so a fresh checkout does not have them. `prebuild` runs this
+        # automatically, but tsc and eslint run before the build and would
+        # otherwise typecheck a tree with three missing modules.
+        #
+        # That is exactly how this failed the first time: 9 "Cannot find module
+        # '@/lib/store-config'" errors, none of them reproducible locally, where
+        # the files have existed since the first `npm run dev`.
+        run: npm run tokens
+
       - name: Types
         run: npx tsc --noEmit
 
