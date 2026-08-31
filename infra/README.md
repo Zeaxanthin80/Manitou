@@ -758,6 +758,58 @@ Both times the fix was to pin real behaviour, not to delete the code:
 
 ---
 
+## GitHub Actions deploys without AWS keys
+
+**No access keys anywhere.** The workflow assumes an IAM role through GitHub's OIDC provider, and
+the role's trust policy names this repository and this branch. A stored access key would have none
+of those properties and would still work after it leaked.
+
+### Thumbprints are not required
+
+`CreateOpenIDConnectProvider` accepts a `ThumbprintList`, and most guides supply one. AWS verifies
+the provider's JWKS endpoint against its own library of trusted CAs, so the field can be omitted --
+and should be, because a hardcoded thumbprint is a value that silently rots when GitHub rotates its
+certificate.
+
+### The subject claim was not the shape the examples show
+
+The first deploy failed with `Not authorized to perform sts:AssumeRoleWithWebIdentity`, twelve times.
+CloudTrail held the answer:
+
+```
+errorCode:  AccessDenied
+sub claim:  repo:OWNER@163702382/REPO@1335310859:ref:refs/heads/main
+trust policy: repo:OWNER/REPO:ref:refs/heads/main
+```
+
+**Repositories created after 15 July 2026 use GitHub's immutable subject claim**, which embeds the
+numeric owner and repository IDs. Every example in circulation shows the older name-only form. It is
+not a setting; it depends on when the repository was created.
+
+Pinning the ID form is *better*, and that is worth understanding rather than treating as a
+workaround: a repository rename changes the name and keeps the ID, and a repository deleted and
+recreated under the same name gets a new one. Trust follows the actual repository rather than a
+string someone else could later claim.
+
+**The fix was the right string, not a looser comparison.** `StringEquals` stayed; relaxing it to
+`StringLike` with wildcards would also have made it pass, by trusting repositories nobody intended.
+
+### Read CloudTrail's event, not a projection of it
+
+The diagnosis was nearly missed. `aws cloudtrail lookup-events --query '...ErrorCode' --output text`
+printed `None` for all four events, which reads as "no error" and is actually "that field is not in
+this projection" -- the AWS CLI prints `None` for an absent key. Parsing the full `CloudTrailEvent`
+JSON showed `errorCode: AccessDenied` on every one.
+
+`--output text` cannot distinguish an absent field from a null one, and both look like good news.
+
+### `iam:PassRole` is scoped to three exact roles
+
+Not `Resource: "*"`. Combined with ECS task-definition permissions, a wildcard `PassRole` is a
+privilege-escalation path to every passable role in the account, Administrator included.
+
+---
+
 ## Logs and alarms (task 11)
 
 ### The secrets half was already done
