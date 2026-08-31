@@ -16,11 +16,16 @@ import type { AdminCategory } from "@/lib/api";
  * product was closed and the only way out was a database client. Five phases
  * missed it because every environment anyone developed against had been seeded.
  *
- * **Rendered as a flat list with indentation, not a nested tree.** The API
- * returns parents before children and the depth is one in practice; a recursive
- * component would be more code to express the same two levels, and would make the
- * "move to" select — which needs every category as a flat option list — harder to
- * build, not easier.
+ * **A flat, aligned list — not an indented tree.** Children were indented at
+ * first, and it was wrong twice over: the hierarchy is already stated explicitly
+ * by each row's "Inside" select, so the indent repeated it; and shifting rows
+ * sideways broke the column alignment, so no two Name fields, Save buttons or
+ * Remove buttons shared an x position. A list whose columns line up is easier to
+ * scan than one that redraws the same fact geometrically.
+ *
+ * The widths are fixed for the same reason. "— top level —" is wider than
+ * "Apparel", so an auto-width select would make every row's Save button land
+ * somewhere different.
  *
  * Each row is its own form. One form for the whole page would mean a single
  * submit rewriting every category at once, so a validation failure on one row
@@ -31,7 +36,6 @@ export function CategoriesEditor({ categories }: { categories: AdminCategory[] }
   const [rowState, rowAction, busy] = useActionState(categoryAction, {});
 
   const byId = new Map(categories.map((c) => [c.id, c]));
-  const depth = (c: AdminCategory) => (c.parent_id === null ? 0 : 1);
 
   return (
     <section className="flex flex-col gap-8">
@@ -48,11 +52,7 @@ export function CategoriesEditor({ categories }: { categories: AdminCategory[] }
         ) : (
           <ul className="mt-4 flex max-w-3xl flex-col divide-y divide-border border-y border-border">
             {categories.map((category) => (
-              <li
-                key={category.id}
-                className="flex flex-wrap items-end gap-3 py-3"
-                style={{ paddingLeft: `${depth(category) * 1.5}rem` }}
-              >
+              <li key={category.id} className="flex flex-wrap items-end gap-3 py-3">
                 <form action={rowAction} className="flex flex-wrap items-end gap-3">
                   <input type="hidden" name="category_id" value={category.id} />
 
@@ -71,7 +71,7 @@ export function CategoriesEditor({ categories }: { categories: AdminCategory[] }
                     <select
                       name="parent_id"
                       defaultValue={category.parent_id ?? ""}
-                      className="rounded-md border border-border bg-surface px-3 py-2 font-body text-sm text-text"
+                      className="w-44 rounded-md border border-border bg-surface px-3 py-2 font-body text-sm text-text"
                     >
                       <option value="">— top level —</option>
                       {categories
@@ -99,7 +99,7 @@ export function CategoriesEditor({ categories }: { categories: AdminCategory[] }
                   /{category.slug} · {describeUse(category)}
                 </span>
 
-                <form action={rowAction}>
+                <form action={rowAction} className="ml-auto">
                   <input type="hidden" name="category_id" value={category.id} />
                   <input type="hidden" name="intent" value="delete" />
                   <Button
