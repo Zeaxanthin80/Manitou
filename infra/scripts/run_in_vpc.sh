@@ -107,14 +107,35 @@ NET=$(aws ecs describe-express-gateway-service --region "$REGION" \
         --query 'service.activeConfigurations[0].networkConfiguration' \
         | jq '{awsvpcConfiguration: (. + {assignPublicIp: "ENABLED"})}')
 
+# Extra environment for the payload, opted into one variable at a time:
+#
+#     TASK_ENV_REMOVE=1 run_in_vpc.sh infra/tasks/seed_loadtest_catalog.py
+#
+# arrives in the container as REMOVE=1. The prefix is a deliberate allowlist --
+# the caller's environment is never forwarded wholesale, because these values go
+# into a container override, and overrides are returned by DescribeTasks and
+# recorded by CloudTrail for 90 days. Never put a credential here.
+#
+# This exists because it was missing: a REMOVE=1 in the caller's shell silently
+# did nothing, and the script it was driving took the other branch and reported
+# success. An env var that is ignored rather than rejected is the worst kind.
+EXTRA_ENV=$(jq -nc '
+  [env | to_entries[]
+   | select(.key | startswith("TASK_ENV_"))
+   | {name: (.key | ltrimstr("TASK_ENV_")), value: .value}]')
+
+FORWARDED=$(echo "$EXTRA_ENV" | jq -r 'map(.name) | join(", ")')
+[ -n "$FORWARDED" ] && echo "  forwarding env:  $FORWARDED"
+
 OVERRIDES=$(jq -nc \
   --arg name "$CONTAINER" \
   --arg runner "$RUNNER" \
-  --arg payload "$(cat "$FILE")" '
+  --arg payload "$(cat "$FILE")" \
+  --argjson extra "$EXTRA_ENV" '
   {containerOverrides: [{
      name: $name,
      command: ["python", "-c", $runner],
-     environment: [{name: "PAYLOAD", value: $payload}]
+     environment: ([{name: "PAYLOAD", value: $payload}] + $extra)
    }]}')
 
 TASK_ARN=$(aws ecs run-task --region "$REGION" \

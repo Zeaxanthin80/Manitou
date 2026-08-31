@@ -10,12 +10,17 @@ from app.config import settings
 # load-bearing in two places outside this file:
 #
 #   * The ceiling is pool_size + max_overflow = 15 per task, and Express Mode
-#     runs at most 2 tasks, so the API can hold at most 30 connections. The
-#     `manitou-rds-connections-high` alarm was set to fire above 50 -- a number
-#     this application cannot reach, which made it an alarm that could never
-#     fire. Measured, not assumed (infra/probes/rotation_mechanism.py).
-#   * db.t4g.micro allows ~112 connections, so 30 is comfortable. Revisit both
-#     numbers from the load test rather than by guessing upward.
+#     runs at most 2 tasks, so steady state tops out around 30 connections. The
+#     `manitou-rds-connections-high` alarm was set to fire above 50 -- which the
+#     load test never came close to, making it an alarm that could not fire. Now
+#     24, and it fired correctly on its first real saturation event.
+#   * **30 is the steady-state bound, not a hard one.** The load test peaked at
+#     35: a scale-out or task replacement briefly runs more than maxTaskCount
+#     while the old task drains, and each new task brings its own pool. Worth
+#     stating because the tidy 2 x 15 arithmetic invites treating it as a limit.
+#   * db.t4g.micro allows ~112 connections, so even 35 is comfortable. The load
+#     test confirmed the database is nowhere near being the bottleneck: RDS CPU
+#     peaked at 24% while the API container sat at 93%.
 #
 # pool_pre_ping issues a cheap SELECT 1 when a connection is taken out of the
 # pool and transparently replaces it if the check fails. This store is

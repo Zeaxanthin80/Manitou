@@ -53,12 +53,15 @@ for svc in manitou-api manitou-web; do
 done
 echo "  no deployment in flight"
 
-EXTRA=()
+# The profile is selected by an env var the script reads, NOT by --vus/--duration:
+# k6 ignores those once `scenarios` is defined, so a CLI smoke flag would silently
+# run the full ramp instead of a short one.
+SMOKE=0
 if [ "${1:-}" = "--smoke" ]; then
   # Proves the script runs and the slug discovery works, before committing to
   # thirteen minutes. Same discipline as proving migrate.sh before relying on it.
-  EXTRA=(--vus 5 --duration 1m --stage "")
-  echo "  SMOKE: 5 VUs for 1 minute"
+  SMOKE=1
+  echo "  SMOKE: 5 VUs for ~1 minute"
 fi
 
 START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -66,9 +69,10 @@ echo "  started: $START"
 echo
 
 docker run --rm -i \
+  -e SMOKE="$SMOKE" \
   -e WEB_URL="${WEB_URL:-https://imprimapress.com}" \
   -e API_URL="${API_URL:-https://api.imprimapress.com}" \
-  grafana/k6 run "${EXTRA[@]}" - < "$SCRIPT"
+  grafana/k6 run - < "$SCRIPT"
 
 END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 

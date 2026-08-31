@@ -975,6 +975,14 @@ object; deleting a used one is refused with the list of products holding it.
    instance size and connection pool based on the results.
    - Because the sized target is ~1, the test is a **ramp to failure** to find the headroom, not a
      pass/fail against a number the infrastructure clears without noticing.
+   - **Done 2026-08-31.** Comfortable to 50 concurrent, degraded at 100, collapse between 100 and
+     200 — roughly **50× headroom** against the sized target. Run twice, at 1 product and at 25, so
+     catalogue size was isolated as a variable; `/health` p50 was unchanged across both and is the
+     control that makes the comparison mean something.
+   - **The RDS size and the pool were not changed, on the evidence.** At collapse the database sat
+     at 24% CPU with its burst credits untouched and 25–35 of ~112 connections used, while the API
+     and web containers were at 95% and 97%. **The bottleneck is Fargate CPU at `maxTaskCount: 2`,
+     not the database** — the opposite of what this task assumed. Full numbers in `infra/README.md`.
 
 2b. **[You + Claude Code]** Defect 30, found while planning task 2 and fixed first: the API
    connected as the RDS **master** user, whose password rotates every 7 days, while ECS resolves an

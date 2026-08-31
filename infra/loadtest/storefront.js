@@ -28,26 +28,39 @@ const API = __ENV.API_URL || "https://api.imprimapress.com";
 
 const errors = new Counter("page_errors");
 
+// The profile is chosen HERE, not on the command line. Once `scenarios` is
+// defined, k6 ignores --vus and --duration entirely -- they are silently
+// overridden rather than rejected, so a CLI "smoke test" would quietly run the
+// full thirteen-minute ramp instead.
+const SMOKE = __ENV.SMOKE === "1";
+
+// Each level is HELD, not just touched. A ramp that only passes through a
+// concurrency level cannot show a burstable instance exhausting its CPU credits,
+// which is the slowest-moving failure here and the one with no alarm watching it.
+const FULL_STAGES = [
+  { duration: "1m", target: 10 },
+  { duration: "2m", target: 10 },
+  { duration: "1m", target: 50 },
+  { duration: "2m", target: 50 },
+  { duration: "1m", target: 100 },
+  { duration: "2m", target: 100 },
+  { duration: "1m", target: 200 },
+  { duration: "2m", target: 200 },
+  { duration: "1m", target: 0 },
+];
+
+const SMOKE_STAGES = [
+  { duration: "15s", target: 5 },
+  { duration: "30s", target: 5 },
+  { duration: "10s", target: 0 },
+];
+
 export const options = {
   scenarios: {
     browse: {
       executor: "ramping-vus",
       startVUs: 0,
-      // Each level is HELD, not just touched. A ramp that only passes through a
-      // concurrency level cannot show a burstable instance exhausting its CPU
-      // credits, which is the slowest-moving failure here and the one with no
-      // alarm watching it.
-      stages: [
-        { duration: "1m", target: 10 },
-        { duration: "2m", target: 10 },
-        { duration: "1m", target: 50 },
-        { duration: "2m", target: 50 },
-        { duration: "1m", target: 100 },
-        { duration: "2m", target: 100 },
-        { duration: "1m", target: 200 },
-        { duration: "2m", target: 200 },
-        { duration: "1m", target: 0 },
-      ],
+      stages: SMOKE ? SMOKE_STAGES : FULL_STAGES,
       gracefulRampDown: "30s",
     },
   },

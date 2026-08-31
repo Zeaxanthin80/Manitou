@@ -961,10 +961,17 @@ Both were provable from arithmetic and 24 hours of existing metrics, without wai
 test.
 
 **`DatabaseConnections` was watching for a number the system cannot reach.** The threshold was 50;
-the API's ceiling is `pool_size` 5 + `max_overflow` 10 = 15 per task × `maxTaskCount` 2 = **30**.
-Measured, not inferred — the rotation probe printed the live pool's own configuration. Now 24, which
-is 80% of the real ceiling, against an observed baseline of 5–10. A concurrent one-off migration task
-can add up to 15 more and cross it briefly; that false positive is worth the alarm working at all.
+the API's steady-state ceiling is `pool_size` 5 + `max_overflow` 10 = 15 per task × `maxTaskCount` 2
+= **30**. Measured, not inferred — the rotation probe printed the live pool's own configuration. Now
+24, against an observed idle baseline of 5–10.
+
+**It fired correctly on its first real event**, during the load test, at a peak of 35 connections. At
+the old threshold of 50 it would have stayed silent through a saturation event severe enough to
+return 859 load-balancer 503s.
+
+That peak of 35 also corrects the arithmetic above: **30 is the steady-state bound, not a hard
+limit.** A scale-out or a task replacement briefly runs more tasks than `maxTaskCount` while the old
+one drains, and each brings its own pool. The tidy 2 × 15 invites treating it as a ceiling; it isn't.
 
 **Nothing watched CPU credits on a burstable instance.** `db.t4g.micro` accrues 12 credits/hour and
 caps at 288 — both confirmed from metrics, which show the balance pinned at 288 against ~0.45/hour of
@@ -973,6 +980,89 @@ use. At zero the instance is throttled to its baseline and every query slows at 
 50, roughly four hours of full-burst runway, far under the 184 low-water mark of the past day.
 
 That is 14 alarms against a free tier of 10, so roughly $0.40/month.
+
+---
+
+## The load test (Phase 7 task 2)
+
+Section 10.1 sizes ImprimaPress at **~1 concurrent user** at launch-day peak. So the test was never
+"can it handle the target" — that would return green and mean nothing. It was a **ramp to failure**
+to find the headroom: 0 → 10 → 50 → 100 → 200 VUs over 13 minutes, each level held, k6 in Docker from
+the laptop, read-only.
+
+### Run it twice, because the catalogue was a variable
+
+The first run discovered **one product**. That measures the infrastructure but flatters the
+application: one row is hot in every cache and renders one card. So 24 products (289 variants) were
+seeded and the identical profile re-run.
+
+| | 1 product | 25 products | |
+| --- | --- | --- | --- |
+| `/health` p50 | 46.6 ms | 46.2 ms | **unchanged — the control** |
+| catalog p50 | 91 ms | 180 ms | +97% |
+| product p50 | 89 ms | 143 ms | +61% |
+| catalog p95 | 1.01 s | 2.09 s | +107% |
+| failed | 3.48% | 4.40% | |
+| data received | 227 MB | 614 MB | 2.7× |
+| RDS CPU max | 24.5% | 24.3% | unchanged |
+| API container CPU max | 93.5% | 95.1% | |
+| web container CPU max | 67.4% | **96.8%** | +44% |
+
+**`/health` is what makes this a comparison rather than two numbers.** It does one `SELECT 1` and
+never touches the catalogue; it did not move. So the doubling elsewhere is catalogue work, not
+ambient load, not the network, and not the time of day.
+
+### Where it breaks, and what breaks
+
+Both runs behave the same way: comfortable to 50, degraded but serving at 100, collapse between 100
+and 200. Server-side `TargetResponseTime` p95, by stage:
+
+| concurrent | server p95 |
+| --- | --- |
+| 10 | ~35 ms |
+| 50 | 40–80 ms |
+| 100 | 0.7–1.3 s |
+| 200 | **59 s** |
+
+**Against a sized target of ~1 (launch day) and ~11 (a post doing 10× better than expected), that is
+roughly 50× headroom to the comfortable limit and ~100× to the point of degradation.**
+
+### The bottleneck is not the database, which is the opposite of what the plan assumed
+
+Phase 7 task 2 says "adjust the RDS instance size and connection pool based on the results." The
+result is: **don't.**
+
+| | at collapse |
+| --- | --- |
+| RDS CPU | **24%** of a `db.t4g.micro` |
+| RDS CPU credits | 287.9 of 288 — untouched |
+| RDS connections | 25–35 of ~112 available |
+| RDS IOPS | read 2.3, write 9.7 — the working set is in RAM |
+| **API container CPU** | **95%** |
+| **web container CPU** | **97%** |
+| API / web memory | **12% / 25%** |
+
+The constraint is **Fargate CPU at `maxTaskCount: 2`**, not the database. Two further readings:
+
+- **The failure is capacity, not errors.** 849 load-balancer 5xx against 77 *target* 5xx. The
+  application was not throwing; the ALB had nowhere to put the work. A 503 from the balancer and a
+  500 from the app look identical in a browser and mean opposite things.
+- **Memory is not the lever it looks like.** 12% and 25% used looks like waste, but 1024 MB is the
+  *minimum* Fargate allows at 512 CPU units. Buying CPU means moving to 1024 units, which forces
+  2048 MB. The over-provisioning is a consequence of the CPU choice, not a separate mistake.
+
+**With a real catalogue the web tier saturates as hard as the API** (67% → 97%), so scaling only the
+API would move the queue rather than shorten it. Both services would need raising together.
+
+### Nothing was changed as a result, and that is the finding
+
+Raising `maxTaskCount` is the cheap lever — Fargate bills per running task, so a higher cap costs
+nothing until it is used. It is not being raised, because ~50× headroom against a derived target is
+not a capacity problem, and autoscaling already reaches 2 tasks at the 60% CPU target.
+
+Worth knowing for later: **scale-out takes 60–90 seconds and the collapse from 100 to 200 took less
+than one minute.** Autoscaling does not save a service from a sharp spike; it saves it from a slow
+climb.
 
 ---
 
