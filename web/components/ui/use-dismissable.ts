@@ -27,9 +27,17 @@ export function useDismissable<T extends HTMLElement>() {
 
   // Close on navigation. Depending on pathname rather than listening to clicks
   // means it also covers back/forward and programmatic navigation.
-  useEffect(() => {
+  //
+  // Adjusted DURING RENDER rather than in an effect. React documents this as the
+  // way to reset state when a value changes, and it is better here in two ways:
+  // React re-runs this component immediately without painting the intermediate
+  // state, so the menu never flashes open on the new page -- which an effect
+  // allows, since effects run after paint. It also drops a render pass.
+  const [lastPath, setLastPath] = useState(pathname);
+  if (lastPath !== pathname) {
+    setLastPath(pathname);
     setOpen(false);
-  }, [pathname]);
+  }
 
   useEffect(() => {
     if (!open) return;

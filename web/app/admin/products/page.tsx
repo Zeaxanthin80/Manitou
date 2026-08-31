@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { Pagination } from "@/components/pagination";
-import { SortableTH, Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { SortableTH, Table, TBody, TD, THead, TR } from "@/components/ui/table";
 import { buttonClasses } from "@/components/ui/button";
 import {
   ApiError,
