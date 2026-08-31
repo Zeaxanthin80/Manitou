@@ -1,0 +1,117 @@
+# Build, push and deploy both services on every merge to main.
+#
+# Runs only after CI passes. Splitting the two means a branch or a fork can run
+# the tests without AWS credentials existing at all.
+#
+# **No AWS access keys anywhere.** The job assumes an IAM role through GitHub's
+# OIDC provider, and that role's trust policy names this repository and this
+# branch exactly -- so a token minted for any other repo, or for a branch, or for
+# a pull request from a fork, cannot assume it. A stored access key would have
+# none of those properties and would still be valid after it leaked.
+
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+# Never deploy two commits at once. cancel-in-progress is deliberately FALSE
+# here, unlike in CI: cancelling a half-finished deployment leaves the service
+# mid-rollout, and the second run would then race the first one's canary.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  REGISTRY: 739275454344.dkr.ecr.us-east-1.amazonaws.com
+
+jobs:
+  deploy:
+    # workflow_run fires whatever the outcome, so the conclusion has to be
+    # checked explicitly. Without this, a red CI run would still deploy.
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write   # required to request the OIDC token
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Build the commit CI actually tested, not whatever main points at by
+          # the time this starts. They differ whenever two merges land close
+          # together, and the difference is a deploy of untested code.
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Short SHA
+        id: sha
+        run: echo "tag=sha-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::739275454344:role/manitou-github-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      # ---------------------------------------------------------------- build --
+      # Both images are tagged with the commit SHA, never a moving tag and never
+      # a hand-incremented v-number. "Which commit is running in production?"
+      # becomes a question with an answer, and a rollback is a tag you can look
+      # up rather than one you have to remember.
+      #
+      # --provenance=false --sbom=false: buildx otherwise pushes an OCI image
+      # index with attestation manifests beside the image, and Fargate can fail
+      # to resolve one. The untagged 0 MB artifacts in manitou-api are what that
+      # looks like when it happens.
+      - name: Build API
+        run: |
+          docker build --platform linux/amd64 --provenance=false --sbom=false \
+            -f backend/Dockerfile \
+            -t "$REGISTRY/manitou-api:${{ steps.sha.outputs.tag }}" .
+
+      - name: Build web
+        # CDN_HOST and NEXT_PUBLIC_* must be present at BUILD time, not runtime:
+        # the compiler inlines NEXT_PUBLIC_* into the client bundle, and Next
+        # serialises CDN_HOST into required-server-files.json as
+        # images.remotePatterns. Supplied at runtime instead, the browser gets an
+        # empty Stripe key and next/image refuses every CDN image.
+        #
+        # Repository VARIABLES, not secrets -- a Stripe publishable key is
+        # designed to be public and a CDN hostname is in every page's HTML.
+        # Putting non-secrets in secrets makes the real secrets harder to audit.
+        run: |
+          docker build --platform linux/amd64 --provenance=false --sbom=false \
+            -f web/Dockerfile \
+            --build-arg CDN_HOST="${{ vars.CDN_HOST }}" \
+            --build-arg NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="${{ vars.STRIPE_PUBLISHABLE_KEY }}" \
+            -t "$REGISTRY/manitou-web:${{ steps.sha.outputs.tag }}" .
+
+      - name: Verify the web image was built with a real CDN host
+        # Cheap, and it catches the one build-arg mistake that produces a working
+        # container serving broken images. An empty CDN_HOST yields
+        # remotePatterns: [] and every product photo 404s through next/image.
+        run: |
+          patterns=$(docker run --rm --entrypoint node \
+            "$REGISTRY/manitou-web:${{ steps.sha.outputs.tag }}" \
+            -e 'console.log(JSON.stringify(require("/app/web/.next/required-server-files.json").config.images.remotePatterns))')
+          echo "remotePatterns: $patterns"
+          if [ "$patterns" = "[]" ]; then
+            echo "CDN_HOST did not reach the build -- is the repository variable set?"
+            exit 1
+          fi
+
+      - name: Push
+        run: |
+          docker push "$REGISTRY/manitou-api:${{ steps.sha.outputs.tag }}"
+          docker push "$REGISTRY/manitou-web:${{ steps.sha.outputs.tag }}"
+
+      # --------------------------------------------------------------- deploy --
+      - name: Deploy both services
+        env:
+          TAG: ${{ steps.sha.outputs.tag }}
+        run: bash .github/scripts/deploy.sh "$TAG"

@@ -1,0 +1,130 @@
+# Tests and static checks on every push and pull request.
+#
+# Deployment lives in deploy.yml and depends on this passing. Splitting them
+# keeps this file runnable on a branch and on a fork, where no AWS credentials
+# exist and none are needed.
+#
+# Two jobs rather than one. They bill the same minutes either way -- Actions
+# charges per job-minute -- but they finish in about half the wall time, and a
+# failure names which half broke without reading a log.
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# A second push to the same branch cancels the first. Without this, pushing
+# three times in a minute runs three full suites on a 2000-minute monthly
+# budget, and only the last answer was ever going to be read.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    services:
+      # postgres:16-alpine, matching docker-compose.yml and the RDS engine
+      # (16.15). The point of pinning is that a migration accepted here behaves
+      # the same in production; testing on 17 would make CI a different question
+      # from the one being asked.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: manitou
+          POSTGRES_PASSWORD: devpassword
+          POSTGRES_DB: manitou
+        ports: ["5432:5432"]
+        # Without a health check the job races the database and fails on the
+        # first connection roughly one run in three.
+        options: >-
+          --health-cmd "pg_isready -U manitou"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # conftest.py derives manitou_test from this by replacing the last path
+      # segment, and connects to /postgres to CREATE DATABASE. Set directly so
+      # config.py's assembly path is skipped -- that path appends
+      # sslmode=require, which a local service container does not offer.
+      DATABASE_URL: postgresql://manitou:devpassword@localhost:5432/manitou
+      # Required fields on Settings, so app.config cannot even be imported
+      # without them. Values are irrelevant: no test reaches Stripe, and the
+      # JWTs these sign are verified by the same process that signed them.
+      JWT_SECRET: ci-not-a-real-secret
+      STRIPE_SECRET_KEY: sk_test_ci
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"   # matches python:3.12-slim in backend/Dockerfile
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+
+      - name: Check requirements files for drift
+        working-directory: backend
+        # The rule CLAUDE.md states: every dependency is committed to one of the
+        # two files. Easy to break by installing something and forgetting, and
+        # invisible until a fresh environment fails to build.
+        run: |
+          comm -23 <(pip freeze | cut -d= -f1 | sort) \
+                   <(cat requirements*.txt | cut -d= -f1 | sort) > /tmp/drift
+          if [ -s /tmp/drift ]; then
+            echo "Installed but not in requirements*.txt:"; cat /tmp/drift; exit 1
+          fi
+
+      - name: Tests
+        working-directory: backend
+        # conftest drops and recreates manitou_test and builds its schema with
+        # Alembic, so every run also proves the migrations apply from nothing.
+        run: pytest
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"       # matches node:24-slim in web/Dockerfile
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        # npm ci, not npm install: it installs exactly the lockfile and fails if
+        # package.json disagrees, rather than resolving something nobody tested.
+        run: npm ci
+
+      - name: Types
+        run: npx tsc --noEmit
+
+      - name: Lint
+        # --max-warnings 0 because the rule severities are the project's choice
+        # and CI's job is that the count stays at zero. The baseline was cleared
+        # to make this possible; without the flag, warnings accumulate unread.
+        run: npx eslint . --max-warnings 0
+
+      - name: Build
+        # Placeholder values: this step asks "does it compile", not "is it
+        # configured". The real ones are supplied at image build time in
+        # deploy.yml, because NEXT_PUBLIC_* is inlined into the client bundle
+        # and CDN_HOST is serialised into required-server-files.json.
+        env:
+          CDN_HOST: example.cloudfront.net
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_ci
+        run: npm run build
