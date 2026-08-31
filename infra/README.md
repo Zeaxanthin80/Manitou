@@ -182,9 +182,9 @@ is ~$32/month (more than the database), a bastion adds an EC2 to patch plus a tu
 every migration, and running migrations from inside the VPC makes task 5 depend on task 6 while a
 private subnet has no internet for `pip install`.
 
-**Open item, Phase 7:** flip `publicly_accessible` to No and replace the IP rule with the API's
-security group, once ECS can apply migrations itself. The `/32` also needs re-editing whenever the
-ISP reassigns the laptop's address.
+**Closed 2026-08-31.** `publicly_accessible` is now No and the developer-IP rule is gone;
+the only inbound rule is sourced from the API's security group. See "Making RDS private"
+below for why this needed no new subnets.
 
 ### Settings that were chosen rather than defaulted
 
@@ -755,6 +755,92 @@ Both times the fix was to pin real behaviour, not to delete the code:
   builds the prefix `https:///`, and a URL beginning with exactly that would
   match it. Malformed, but defect 1 was precisely a URL the API accepted and
   `next/image` then threw on.
+
+---
+
+## Making RDS private (Phase 7)
+
+Phase 6 task 4 asked for a private database and did not get one. Closed 2026-08-31.
+
+### It needed no new subnets, and that is the part worth understanding
+
+The instinct is that "private" means private subnets, which in a default VPC means new subnets and
+usually a **NAT gateway at roughly $32/month**. None of that was necessary.
+
+**`PubliclyAccessible` and subnet routing are different controls.** The flag decides whether the
+instance gets a public IP and how its endpoint resolves from outside the VPC. The route table decides
+whether things in the subnet can reach the internet *outbound*. A database with no public IP sitting
+in a public subnet is not reachable from the internet — there is no address to reach it at.
+
+AWS states it directly: *"Even if an instance is launched in a public subnet... disabling public
+access [means] the RDS endpoint resolves to a private IP address only."*
+
+So the change was one `ModifyDBInstance --no-publicly-accessible --apply-immediately`, and the real
+work was everything that depended on the old behaviour.
+
+### The API never noticed, and that was predictable
+
+From inside the VPC the endpoint **already** resolved to the private address; the flag only removes
+the public one, and the private IP does not change. Verified rather than assumed: `/categories`
+returned real data from the database throughout.
+
+Measured from a laptop afterwards:
+
+```
+manitou-db.…rds.amazonaws.com  ->  172.31.36.22     (private, was a public IP)
+TCP :5432                      ->  timed out
+```
+
+**Both halves matter.** "The database is unreachable" and "the database is unreachable *from the
+internet*" look identical unless the API is confirmed working at the same moment.
+
+### Migrations now run inside the VPC
+
+`infra/scripts/migrate.sh` runs `alembic` as a **one-off ECS task on the API's own task definition** —
+same image, same subnets, same security group, same `DB_PASSWORD` from Secrets Manager. Only the
+lifecycle differs: run once and exit rather than serve.
+
+No new image was needed. `backend/Dockerfile.dockerignore` excludes `backend/tests/` but not
+`backend/alembic/`, so the production image already carries the CLI and every migration.
+
+Three details that are easy to get wrong:
+
+- **`assignPublicIp: ENABLED`.** This VPC has no NAT gateway and no VPC endpoints, so a task's public
+  IP is its only route to ECR to pull the image and to Secrets Manager to read the password. Without
+  it the task never starts, and the failure reads as a mysterious timeout.
+- **The task definition is resolved, not pinned.** Migrations must run the code being deployed, so
+  hardcoding a revision would be exactly backwards.
+- **The script waits for `STOPPED` and returns the container's exit code as its own.** `run-task`
+  returns as soon as the task is *accepted*, well before it has connected to anything. Verified by
+  running a deliberately bad revision: alembic exited 255, the script exited 1, and the error came
+  through from CloudWatch. A success signal never tested against failure is worth nothing.
+
+### The ordering was the design
+
+The replacement path was proven **while the old one still worked** — `alembic current` and
+`upgrade head` both ran green before the flag was touched. Flipping first would have removed the only
+route to the database and then asked whether its replacement worked.
+
+### Two things given up, deliberately
+
+**Ad-hoc `psql` from a laptop.** Affordable now only because defect 23 is fixed: the portal can
+create categories, so the SQL workaround it once forced is unnecessary. If it is missed, a stopped
+`t4g.nano` with SSM port-forwarding costs about $0.80/month for its volume and needs no open ports.
+
+**Private subnets as a second control.** The stronger form of this: a subnet with no route to an
+internet gateway survives someone flipping `PubliclyAccessible` back. Not worth $32/month here, and
+worth revisiting if the account ever holds regulated data.
+
+### A near miss worth recording
+
+The security-group cleanup nearly revoked rules from the wrong group. `sg-0765ba8bd1c0e6c51` was
+taken from an earlier query and is the **API's** security group, not the database's — revoking its
+rules would have cut the API off from the very database this task was securing. An
+`assert GroupName == "manitou-db-sg"` before the revoke caught it, and the correct group was then
+found by looking it up from the RDS instance rather than from memory.
+
+**Assert what a resource IS before mutating it**, whenever the identifier came from anywhere but the
+call immediately preceding.
 
 ---
 

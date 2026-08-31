@@ -893,11 +893,12 @@ because that is when it starts mattering.
 3. **[You]** Create an **IAM user** for your daily work and stop using the root account for
    everyday tasks. (This is a security best practice and appears on the Cloud Practitioner exam.)
 4. **[You + Claude Code]** Provision **RDS PostgreSQL**. Keep it private so only the API reaches it.
-   - **Not fully met.** The instance is `PubliclyAccessible: true`; only the security
-     group keeps it reachable by the API and one developer IP. Deferred to Phase 7 by
-     decision, because moving it to private subnets also removes direct `psql` access
-     used for migrations, which needs its own answer (bastion, or running Alembic as a
-     task inside the VPC).
+   - **Met, in Phase 7 (2026-08-31).** `PubliclyAccessible` is now false and
+     `manitou-db-sg` has exactly one inbound rule, sourced from the API's security
+     group. No private subnets or NAT gateway were needed: a DB instance with no
+     public IP is unreachable from the internet even in a public subnet. Direct
+     `psql` is gone by design; migrations run as one-off ECS tasks via
+     `infra/scripts/migrate.sh`.
 5. **[You + Claude Code]** Point Alembic at RDS and apply your migrations there, producing the
    same schema you have locally.
 6. **[You + Claude Code]** Containerize the API with Docker. Push the image to **ECR** (Elastic
