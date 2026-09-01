@@ -1198,9 +1198,15 @@ cross-origin connection the policy must permit. No part of checkout touches it, 
 successful purchases would have revealed it. It was found by asking which *other* pages make
 external requests.
 
-The host is `<bucket>.s3.<region>.amazonaws.com`, virtual-hosted with the region. Measured by signing
-a real URL rather than assumed: the path-style and regionless forms both exist and neither would have
-matched.
+**Both hostname forms are listed, after getting it wrong once.** The first version carried only
+`<bucket>.s3.<region>.amazonaws.com`, taken from a URL signed to check the shape — but signed with a
+*different boto3 session than the application's*. us-east-1 resolves to the legacy global endpoint
+`<bucket>.s3.amazonaws.com`, and the application's client produces that. Two clients, same bucket,
+different hostnames; the check confirmed the shape of the wrong one.
+
+**Signing a URL is not the same as signing it the way the application does.** The fix lists both:
+they are two names for one bucket, not two grants, and AWS has been steering clients toward the
+regional form, so which appears can change without any edit here.
 
 It is built from `S3_BUCKET` rather than written down, because the name is account-specific and a
 clone has its own — the same treatment as `CDN_HOST`, and needed at **build** time for the same

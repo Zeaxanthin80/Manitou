@@ -20,16 +20,28 @@ import type { NextConfig } from "next";
  * because a CSP with unsafe-inline stops far less XSS than it appears to.
  */
 /**
- * Where presigned uploads go.
+ * Where presigned uploads go. **Both hostname forms, deliberately.**
  *
- * boto3 signs virtual-hosted style with the region in the host --
- * `<bucket>.s3.<region>.amazonaws.com` -- measured against the real bucket
- * rather than assumed, because the path-style and regionless forms both exist
- * and neither would match.
+ * boto3 signs virtual-hosted style, but the host it picks depends on the region:
+ * us-east-1 resolves to the legacy global endpoint `<bucket>.s3.amazonaws.com`,
+ * while every other region gives `<bucket>.s3.<region>.amazonaws.com`. AWS has
+ * been steering clients toward the regional form, so which one appears can
+ * change under us without any change here.
+ *
+ * The regional form alone was written first, from a URL signed with a DIFFERENT
+ * boto3 session than the application's -- which produced the regional host and
+ * looked like confirmation. The application's own client produced the regionless
+ * one, and the mismatch only surfaced in the browser. Listing both costs
+ * nothing: they are two names for the same bucket, not two grants.
  */
-const s3Origin = process.env.S3_BUCKET
-  ? `https://${process.env.S3_BUCKET}.s3.${process.env.S3_REGION || "us-east-1"}.amazonaws.com`
-  : "";
+const s3Bucket = process.env.S3_BUCKET;
+const s3Region = process.env.S3_REGION || "us-east-1";
+const s3Origins = s3Bucket
+  ? [
+      `https://${s3Bucket}.s3.amazonaws.com`,
+      `https://${s3Bucket}.s3.${s3Region}.amazonaws.com`,
+    ]
+  : [];
 
 const csp = [
   "default-src 'self'",
@@ -69,7 +81,7 @@ const csp = [
   // account-specific and a clone has its own. Absent at build time, the entry is
   // simply omitted -- the same shape as CDN_HOST above, and the reason
   // deploy.yml verifies the built image really carries both.
-  `connect-src 'self' https://api.stripe.com https://fonts.googleapis.com${s3Origin ? ` ${s3Origin}` : ""}`,
+  `connect-src 'self' https://api.stripe.com https://fonts.googleapis.com${s3Origins.length ? ` ${s3Origins.join(" ")}` : ""}`,
 
   // hooks.stripe.com is for the 3D Secure redirect. Link's hosts are absent on
   // purpose: payment-form.tsx sets `wallets: { link: "never" }`, so there is no

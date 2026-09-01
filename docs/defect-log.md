@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [33](#33-admin-image-upload-broke-the-day-the-domain-was-added) | 2026-09-01 | Admin image upload broke the day the domain was added | Fixed — uncommitted |
 | [32](#32-the-audit-trail-recorded-the-load-balancer-not-the-customer) | 2026-08-31 | The audit trail recorded the load balancer, not the customer | Fixed — uncommitted |
 | [31](#31-a-password-one-byte-too-long-returned-500-from-an-unauthenticated-endpoint) | 2026-08-31 | A password one byte too long returned 500 from an unauthenticated endpoint | Fixed — uncommitted |
 | [30](#30-a-rotating-password-broke-the-api-while-every-health-check-passed) | 2026-08-31 | A rotating password broke the API while every health check passed | Fixed — uncommitted |
@@ -48,6 +49,50 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 33. Admin image upload broke the day the domain was added
+
+**Status:** Fixed (bucket CORS). Found while testing something else.
+
+**Seen.** "The upload failed. Check your connection and try again." Console:
+
+    Access to fetch at 'https://manitou-media-….s3.amazonaws.com/pending/…'
+    from origin 'https://imprimapress.com' has been blocked by CORS policy:
+    No 'Access-Control-Allow-Origin' header is present on the requested resource.
+
+**Cause.** The bucket's CORS allowed exactly two origins:
+
+    https://ma-a02aaed4….ecs.us-east-1.on.aws     <- the Express Mode URL
+    http://localhost:3000
+
+Task 9 built presigned uploads and tested them from the Express Mode URL, which was the site's only
+address at the time. **Task 10 gave the site a domain, and nothing connected the two.** The browser
+PUTs straight to S3, so the origin it sends is the site's — and the bucket had never heard of it.
+
+**It broke silently and stayed broken.** Nothing uploads an image except a person deciding to, so
+there was no test, no alarm and no log line: the API is not in the path at all, which is the whole
+point of presigning. It was found only because the CSP work asked "what else makes external requests
+from the browser?" — the checkout test that preceded it could never have touched this page.
+
+**The class of bug is the interesting part.** Adding a domain changes the `Origin` header on every
+browser-initiated cross-origin request, and each destination has its own allowlist. Anything
+allow-listing the old address kept working right up until someone used the feature.
+
+**Fix.** Added `https://imprimapress.com` and `https://www.imprimapress.com` to the bucket's
+`AllowedOrigins`, additively — `PutBucketCors` replaces the whole configuration, so dropping
+`localhost:3000` would have broken every developer's upload and looked like a fresh CORS bug months
+later. `AllowedMethods` stays `PUT` only: images are read through CloudFront, never from the bucket.
+
+**A second, unrelated mistake surfaced in the same console.** The Content-Security-Policy had been
+given `<bucket>.s3.us-east-1.amazonaws.com`, from a URL signed to check the shape — but signed with a
+different boto3 session than the application's. **us-east-1 resolves to the legacy global endpoint**
+`<bucket>.s3.amazonaws.com`, which is what the application actually produces. The check confirmed the
+shape of the wrong client's URL. Both forms are now listed; they are two names for one bucket.
+
+It caused no outage only because the policy was Report-Only. Enforced, it would have been a second
+independent reason the upload failed — and fixing the CORS would have appeared not to work.
 
 ---
 
