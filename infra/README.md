@@ -1172,6 +1172,46 @@ The defect log already records two headless-Chrome probes built for defect 16 in
 Element never got past its skeleton state** — so a headless run would report no violations for a form
 that never rendered, which is indistinguishable from success and worse than not testing at all.
 
+### The checkout test, and what it confirmed
+
+Run in Incognito, on the deployed site, through a real test-mode purchase.
+
+**Exactly the predicted violation appeared and nothing else**: four reports of
+`connect-src` against `https://fonts.googleapis.com/css2?family=Inter…`, **sourced to `stripe.js`**.
+That attribution is the part worth keeping — it confirms Stripe.js fetches the `cssSrc` itself,
+which is why the font belongs in `connect-src` and not `style-src`. Enforcing the policy as it stood
+would have dropped the payment form to `system-ui`: defect 16, silently, because a blocked font does
+not error.
+
+After the fix, a second purchase completed with **zero violations**. Everything left in the console
+came from inside Stripe's own frames — a `web-vitals` TypeError in a `VM…` script with no source
+URL, three `[Stripe.js]` advisories, and an `hcaptcha.html` passive-listener note. None of it ours;
+`web-vitals` is not a dependency of this project.
+
+### A clean checkout was not enough to enforce
+
+The policy applies to every page, and the purchase path exercises one of them.
+
+**`components/image-upload-field.tsx` PUTs uploads straight from the browser to a presigned S3 URL.**
+The API never sees the bytes — that is the point of presigning — and it also makes the upload a
+cross-origin connection the policy must permit. No part of checkout touches it, so no number of
+successful purchases would have revealed it. It was found by asking which *other* pages make
+external requests.
+
+The host is `<bucket>.s3.<region>.amazonaws.com`, virtual-hosted with the region. Measured by signing
+a real URL rather than assumed: the path-style and regionless forms both exist and neither would have
+matched.
+
+It is built from `S3_BUCKET` rather than written down, because the name is account-specific and a
+clone has its own — the same treatment as `CDN_HOST`, and needed at **build** time for the same
+reason, since Next bakes the config into `routes-manifest.json` rather than reading it per request.
+
+`deploy.yml` now verifies both. An absent `CDN_HOST` yields `remotePatterns: []` and every product
+photo 404s; an absent `S3_BUCKET` drops the bucket from `connect-src` and, once enforcing, silently
+refuses every admin image upload. Both are the same class of mistake: **a container that serves the
+site perfectly and is broken somewhere nobody was looking.** Checked in both directions — a build
+with the variable carries the host, a build without it fails the guard.
+
 ### Two things found and deliberately not changed
 
 **CORS is absent, and that is correct.** The browser never calls the API — the web app reaches it

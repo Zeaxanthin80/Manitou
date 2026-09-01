@@ -19,6 +19,18 @@ import type { NextConfig } from "next";
  * improvement and a separate piece of work — noted rather than pretended away,
  * because a CSP with unsafe-inline stops far less XSS than it appears to.
  */
+/**
+ * Where presigned uploads go.
+ *
+ * boto3 signs virtual-hosted style with the region in the host --
+ * `<bucket>.s3.<region>.amazonaws.com` -- measured against the real bucket
+ * rather than assumed, because the path-style and regionless forms both exist
+ * and neither would match.
+ */
+const s3Origin = process.env.S3_BUCKET
+  ? `https://${process.env.S3_BUCKET}.s3.${process.env.S3_REGION || "us-east-1"}.amazonaws.com`
+  : "";
+
 const csp = [
   "default-src 'self'",
 
@@ -39,12 +51,25 @@ const csp = [
   // know why: it is not a stylesheet OUR document loads. components/
   // payment-form.tsx passes a `cssSrc` to <Elements/>, and Stripe.js fetches
   // that URL itself to inject Inter into its iframe -- so it is a connection,
-  // not a style. Stripe's CSP guide says exactly this.
+  // not a style. Stripe's CSP guide says exactly this. Confirmed in the browser:
+  // the violation was reported against connect-src, sourced to stripe.js.
   //
   // Blocking it would not error. It would fall back to system-ui and render the
   // payment step in a different typeface from every other page, which is
   // defect 16 precisely.
-  "connect-src 'self' https://api.stripe.com https://fonts.googleapis.com",
+  //
+  // The S3 bucket is here because components/image-upload-field.tsx PUTs the
+  // file straight from the browser to a presigned URL -- the API never sees the
+  // bytes, which is the whole point of presigning, and which also means the
+  // upload is a cross-origin connection this policy has to permit. Nothing on
+  // the checkout path touches it, so testing a purchase could never have found
+  // it; it was found by asking which other pages make external requests.
+  //
+  // Built from the bucket name rather than written out: the name is
+  // account-specific and a clone has its own. Absent at build time, the entry is
+  // simply omitted -- the same shape as CDN_HOST above, and the reason
+  // deploy.yml verifies the built image really carries both.
+  `connect-src 'self' https://api.stripe.com https://fonts.googleapis.com${s3Origin ? ` ${s3Origin}` : ""}`,
 
   // hooks.stripe.com is for the 3D Secure redirect. Link's hosts are absent on
   // purpose: payment-form.tsx sets `wallets: { link: "never" }`, so there is no

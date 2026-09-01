@@ -60,6 +60,22 @@ ENV NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 ARG CDN_HOST
 ENV CDN_HOST=$CDN_HOST
 
+# The media bucket, for the SAME reason CDN_HOST is here and not at runtime:
+# next.config.ts turns it into a Content-Security-Policy directive, and Next
+# bakes that config into the build rather than reading it per request.
+#
+# It is needed because the browser PUTs uploads straight to a presigned S3 URL,
+# so the bucket is a cross-origin connection the policy has to permit. Missing
+# it produces an image that serves the site perfectly and refuses every admin
+# image upload -- which is exactly the shape of mistake the CDN_HOST verification
+# step in deploy.yml exists to catch, so that step checks this too.
+#
+# S3_REGION has a default in next.config.ts, so only S3_BUCKET must be supplied.
+ARG S3_BUCKET
+ENV S3_BUCKET=$S3_BUCKET
+ARG S3_REGION
+ENV S3_REGION=$S3_REGION
+
 # API_URL is NOT set here on purpose. It is a plain server-side variable read at
 # module scope in lib/api.ts, so the built server reads the real process
 # environment at start -- which is what lets one image point at any environment.

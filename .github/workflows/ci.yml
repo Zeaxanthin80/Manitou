@@ -138,5 +138,11 @@ jobs:
         # and CDN_HOST is serialised into required-server-files.json.
         env:
           CDN_HOST: example.cloudfront.net
+          # Placeholders, like CDN_HOST above. next.config.ts builds the
+          # Content-Security-Policy from these, so leaving them unset would let a
+          # config change that breaks the policy compile cleanly here and fail
+          # only in deploy.yml's verification step.
+          S3_BUCKET: example-bucket
+          S3_REGION: us-east-1
           NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_ci
         run: npm run build
