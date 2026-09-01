@@ -39,7 +39,7 @@ export default async function SecurityPage() {
           <h2 className="mb-4 font-body text-sm uppercase tracking-tight text-muted">
             Password
           </h2>
-          <ChangePasswordForm />
+          <ChangePasswordForm email={user.email} />
         </section>
 
         <section>
@@ -53,14 +53,14 @@ export default async function SecurityPage() {
           <h2 className="mb-4 font-body text-sm uppercase tracking-tight text-muted">
             Two-factor authentication
           </h2>
-          <TwoFactorSection enabled={user.totp_enabled} />
+          <TwoFactorSection enabled={user.totp_enabled} email={user.email} />
         </section>
 
         <section className="border-t border-border pt-10">
           <h2 className="mb-4 font-body text-sm uppercase tracking-tight text-muted">
             Close account
           </h2>
-          <CloseAccountForm />
+          <CloseAccountForm email={user.email} />
         </section>
       </div>
     </main>

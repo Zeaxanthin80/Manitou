@@ -148,6 +148,28 @@ was forced: fix the address, then limit by it.
 `chain[-hops]` to `chain[0]` — the shortcut above — makes four of them fail with
 the forged `1.2.3.4`, which is the outcome the tests exist to catch.
 
+Then against production, where one table held both sides of the change::
+
+    2026-09-01 04:28  product.created     3.237.180.180     public
+    2026-09-01 03:48  payment.confirmed   54.187.174.169    public
+    2026-08-30 01:21  product.created     172.31.28.86      the load balancer
+
+**What it also revealed, and this is the part worth keeping.** The fix records the
+true immediate client — but for anything done through the web UI, **the immediate
+client is the web service, not the customer.** `lib/api.ts` is called from Server
+Components, so the browser talks to the web tier and the web tier talks to the
+API; the customer's packets never reach the API at all. `3.237.180.180` was a
+Fargate task, not a person. The Stripe webhook rows are the ones that are
+genuinely a third party's address, because Stripe really does call us directly.
+
+So the column now says *which tier acted*, which is at least true, where before it
+said "the load balancer" for everything. Recording the customer would mean the web
+tier forwarding the browser's address — and because web→API goes over the
+**public** load balancer, the API cannot tell the web service from anyone else, so
+that header would need authenticating before it could be believed. Deliberately
+not built: `actor_email` is the identity that matters here, and a forged-IP field
+is worse than an honest one. **Do not read that column as the customer's address.**
+
 ---
 
 ## 31. A password one byte too long returned 500 from an unauthenticated endpoint

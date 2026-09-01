@@ -34,11 +34,34 @@ function Feedback({ error, ok }: { error?: string; ok?: string }) {
   );
 }
 
-export function ChangePasswordForm() {
+/**
+ * The account this form's password belongs to, for password managers only.
+ *
+ * Chrome logs "[DOM] Password forms should have (optionally hidden) username
+ * fields for accessibility" on any form with a password field and no username,
+ * and the consequence is not cosmetic: with nothing to key on, a manager cannot
+ * tell WHICH stored credential a new password replaces. It may save a second
+ * entry for the same site, or offer the wrong one back.
+ *
+ * `type="hidden"` is what Chromium's own guidance specifies -- not a CSS-hidden
+ * text input. It conveys "not user-editable" to the browser rather than merely
+ * putting it out of sight, and it cannot be tabbed into.
+ *
+ * The name is inert: every action here reads its own fields out of the FormData
+ * by name, so an extra key changes nothing server-side.
+ */
+function AccountHint({ email }: { email: string }) {
+  return (
+    <input type="hidden" name="username" autoComplete="username" value={email} />
+  );
+}
+
+export function ChangePasswordForm({ email }: { email: string }) {
   const [state, action, pending] = useActionState(changePasswordAction, {});
 
   return (
     <form action={action} className="flex max-w-md flex-col gap-4">
+      <AccountHint email={email} />
       <FormField id="current_password" label="Current password" required>
         {(c) => (
           <PasswordInput
@@ -82,6 +105,7 @@ export function ChangeEmailForm({ current }: { current: string }) {
 
   return (
     <form action={action} className="flex max-w-md flex-col gap-4">
+      <AccountHint email={current} />
       <p className="font-body text-sm text-muted">
         Currently <span className="text-text">{current}</span>
       </p>
@@ -111,7 +135,13 @@ export function ChangeEmailForm({ current }: { current: string }) {
   );
 }
 
-export function TwoFactorSection({ enabled }: { enabled: boolean }) {
+export function TwoFactorSection({
+  enabled,
+  email,
+}: {
+  enabled: boolean;
+  email: string;
+}) {
   const [setupState, startSetup, starting] = useActionState(startTwoFactorAction, {});
   const [enableState, enable, enabling] = useActionState(enableTwoFactorAction, {});
   const [offState, disable, disabling] = useActionState(disableTwoFactorAction, {});
@@ -143,6 +173,7 @@ export function TwoFactorSection({ enabled }: { enabled: boolean }) {
   if (enabled) {
     return (
       <form action={disable} className="flex max-w-md flex-col gap-4">
+        <AccountHint email={email} />
         <p className="font-body text-sm text-text">
           Two-factor authentication is <strong>on</strong>. You are asked for a
           code each time you sign in.
@@ -234,7 +265,7 @@ export function TwoFactorSection({ enabled }: { enabled: boolean }) {
   );
 }
 
-export function CloseAccountForm() {
+export function CloseAccountForm({ email }: { email: string }) {
   const [state, action, pending] = useActionState(closeAccountAction, {});
   // Both fields must be filled before the button arms. The API already demands
   // the password; this is the UI refusing to make something irreversible a
@@ -249,6 +280,7 @@ export function CloseAccountForm() {
         Close my account
       </summary>
       <form action={action} className="mt-4 flex max-w-md flex-col gap-4">
+        <AccountHint email={email} />
         <p className="font-body text-sm text-muted">
           This cannot be undone. Your name, email and phone number are removed.
           Past orders are kept, without your details attached, because tax rules
