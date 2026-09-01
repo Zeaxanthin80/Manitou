@@ -4,9 +4,18 @@ Deliberately free of FastAPI imports so it stays testable on its own. The
 request-handling side -- extracting the token from a header, returning 401 or 403
 -- lives in app/dependencies.py.
 
-bcrypt rejects passwords longer than 72 bytes with a ValueError (it does not
-truncate silently). UserCreate caps the length at the API boundary so callers get
-a validation error rather than a 500.
+bcrypt rejects inputs longer than 72 bytes with a ValueError -- from `checkpw` as
+well as `hashpw`, which is the half that was missed. **Setting** a password and
+**verifying** one therefore need different answers to an over-length input, and
+defect 31 was the result of applying only the first:
+
+* Setting one is a mistake the caller should hear about, so the schemas cap it
+  and return 422 naming the limit.
+* Verifying one is simply wrong, and `verify_password` returns False. It cannot
+  match: every stored hash was produced from an input that already passed the
+  cap. Refusing here rather than at the schema keeps a failed login
+  indistinguishable from every other failed login, which is what LoginRequest
+  exists to preserve.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -16,10 +25,21 @@ import jwt
 
 from app.config import settings
 
+#: bcrypt's hard limit, in BYTES rather than characters -- 72 accented characters
+#: are 144 bytes. Defined here rather than in the schemas because it is a fact
+#: about bcrypt, and both the schema layer and this module have to agree on it.
+BCRYPT_MAX_BYTES = 72
+
 
 def hash_password(plain_password: str) -> str:
     """Hash a plaintext password. Each call generates a fresh random salt, so the
-    same input produces a different hash every time."""
+    same input produces a different hash every time.
+
+    Deliberately unguarded: an over-length password reaching here is a bug in the
+    schema that should have caught it, and a loud ValueError is the right way to
+    find out. Silently truncating would store a hash of something the customer
+    never typed.
+    """
     return bcrypt.hashpw(plain_password.encode(), bcrypt.gensalt()).decode()
 
 
@@ -29,7 +49,17 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     The hash carries its own version, cost factor, and salt, so no parameters need
     to be supplied or kept in sync with hash_password.
     """
-    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+    encoded = plain_password.encode()
+    if len(encoded) > BCRYPT_MAX_BYTES:
+        # Not an error -- a wrong answer. No stored hash can have come from an
+        # input this long, so this is a failed comparison like any other.
+        #
+        # Before this guard, `checkpw` raised and /auth/login answered 500 to an
+        # unauthenticated request one byte over the limit (defect 31). That gave
+        # anyone on the internet a switch for producing 5xx, which feeds the
+        # rollback alarm ECS consults during a deployment bake.
+        return False
+    return bcrypt.checkpw(encoded, hashed_password.encode())
 
 
 #: How long a half-finished sign-in stays redeemable. Short: it exists only to

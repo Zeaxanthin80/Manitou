@@ -1066,6 +1066,105 @@ climb.
 
 ---
 
+## Rate limiting and the security pass (Phase 7 task 3)
+
+### Knowing who is asking had to come first
+
+Rate limiting keys on the client's address, and the application did not have it:
+`request.client.host` behind an ALB is the ALB, so every audit row held one VPC address
+(defect 32). Shipping limits against that value would have put the entire internet in one bucket,
+and the tenth failed login anywhere would have locked the store.
+
+The fix is `X-Forwarded-For`, read **from the right-hand end**. That header is appended to rather
+than replaced, so a client can send its own and the balancer adds the address it saw after it. The
+trustworthy entries are the ones our proxies appended; the leftmost is whatever the client chose.
+Hence a **count** of trusted proxies rather than a boolean — `TRUSTED_PROXY_COUNT`, 1 in production,
+**0 by default** so a laptop ignores a header that nothing has validated.
+
+**Set the environment variable before deploying the code that reads it**, never after. Unknown
+variables are ignored by the settings model (verified rather than assumed), so the old image
+tolerates it; the reverse order would run the new limiter for one canary with every customer sharing
+a bucket.
+
+### Where the limits live, and what that costs
+
+In-process, in-memory. The alternatives were AWS WAF at the load balancer and shared counters in
+Postgres.
+
+The threat here is not volumetric. It is credential stuffing, TOTP guessing and password-reset mail
+bombing — low-rate, targeted, and stopped by counters that cost nothing. Two consequences are worth
+stating rather than discovering:
+
+- **Counters are per task**, so the real allowance is the limit times the running task count — two
+  today. The numbers were chosen knowing that.
+- **A restart forgets everything.**
+
+**WAF is the documented upgrade, and the load test is the argument for it**: the ceiling is Fargate
+CPU, not the database, so work rejected at the balancer costs a task nothing while work rejected in
+the application has already been paid for. Worth buying when there is traffic to shape; ~$6/month to
+solve a problem this store does not yet have.
+
+| rule | allowance | why that number |
+| --- | --- | --- |
+| login | 10 / 5 min | someone who forgot tries three or four times, then uses the reset link |
+| 2FA verify | 5 / 5 min | the tightest, because the search space is smallest — a six-digit code |
+| forgot-password | 5 / hour | abuse is paid for by a stranger's inbox and our sending quota |
+| reset-password | 10 / hour | guards the guessing rate; the tokens are already hashed and single-use |
+| register | 5 / hour | generous, because one address may be a household |
+
+None is tighter than that, for one reason: **office NAT and mobile carrier-grade NAT put many
+customers behind one address.** A limit a busy household could reach generates support mail, not
+security.
+
+Forgot-password carries a **second key on the email address**, because it is the one endpoint whose
+abuse lands somewhere we do not own. It is unreachable from a single address — the per-IP rule bites
+first — so it exists for the distributed case. The trade taken deliberately: an attacker can spend a
+victim's hourly allowance and delay their reset by an hour, against unbounded mail to that inbox. The
+victim can still sign in normally throughout; this limits the reset path, not the account.
+
+The limit is a **route dependency, not a check inside the handler**, so it runs before the bcrypt
+comparison — the expensive step, and the one an attacker wants to make you perform.
+
+**The counter map is bounded.** Its keys are attacker-controlled, so an unbounded dictionary is a
+memory-exhaustion bug wearing a security feature's clothes, and Fargate kills a task that exceeds its
+memory. Eviction can only ever forgive a client early, never refuse one who is inside their
+allowance.
+
+### The rest of the pass
+
+**A password one byte too long returned 500 from an unauthenticated endpoint** (defect 31), which
+handed anyone a switch for producing 5xx — and those feed the alarm ECS consults during a deployment
+bake.
+
+**The interactive schema is no longer served in production.** 108 KB naming all 62 routes, every
+admin path and the shape of every request body. The endpoints were authenticated throughout; what
+this removes is free reconnaissance. The flag **defaults to off**, so an environment configured
+without thinking about it is the safe one.
+
+**Security headers on the storefront**, which had none: HSTS (a year, no `preload` — that commitment
+deserves its own decision), `nosniff`, `X-Frame-Options: DENY`, a referrer policy, and a permissions
+policy. `x-powered-by` no longer announces the framework. Verified against a real response from the
+built image rather than trusted to configuration.
+
+**CSP ships in Report-Only**, deliberately. Stripe Elements mounts an iframe from `js.stripe.com`; a
+policy that gets that wrong does not degrade, it stops customers paying at the last step of the
+funnel. To finish it: one test-mode purchase with the console open, then rename the header. Its
+`script-src` still needs `'unsafe-inline'` because the App Router injects inline bootstrap scripts —
+removing that needs nonce middleware, and until then the policy stops less than it looks like it
+does.
+
+### Two things found and deliberately not changed
+
+**CORS is absent, and that is correct.** The browser never calls the API — the web app reaches it
+from Server Components — so no `Access-Control-Allow-Origin` means browsers refuse cross-origin reads
+by default. Adding a CORS middleware would only widen it.
+
+**Port 80 is closed**, so `http://` fails to connect rather than redirecting. Safe, but a customer
+typing the bare domain into an older browser gets an error instead of the shop. Adding a redirect
+listener is a UX fix worth making before launch, and HSTS now covers every visit after the first.
+
+---
+
 ## GitHub Actions deploys without AWS keys
 
 **No access keys anywhere.** The workflow assumes an IAM role through GitHub's OIDC provider, and

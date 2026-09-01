@@ -5,7 +5,10 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 # bcrypt refuses passwords longer than 72 *bytes*. Pydantic's max_length counts
 # characters, which is not the same thing -- 72 accented characters is 144 bytes --
 # so the limit is enforced on the encoded length instead.
-BCRYPT_MAX_BYTES = 72
+#
+# Imported rather than redeclared: app.security enforces the same number on the
+# verifying side, and two copies of a constant are two things that can drift.
+from app.security import BCRYPT_MAX_BYTES
 
 
 class UserCreate(BaseModel):
@@ -68,12 +71,23 @@ class Token(BaseModel):
 
 
 def _fits_bcrypt(value: str) -> str:
-    """Shared by every schema that accepts a new password.
+    """Shared by every schema that accepts a NEW password.
 
     Extracted rather than repeated: registration already proved that a
     character-based cap lets 72 accented characters (144 bytes) through and turns
     into a 500 at hashing time. Every future password field must inherit that
     lesson, not re-learn it.
+
+    **Deliberately not applied to `current_password` or to LoginRequest**, and
+    that asymmetry is the point rather than an omission. Those fields verify an
+    existing password, where an over-length value is not a validation error but
+    an answer that happens to be wrong -- `app.security.verify_password` returns
+    False for it. A 422 here would make one flavour of wrong password look
+    different from every other, which is precisely what LoginRequest's plain-str
+    `email` exists to avoid.
+
+    Reading the rule as "new passwords only" is what left `checkpw` unguarded and
+    produced defect 31: a 500 from an unauthenticated endpoint, one byte over.
     """
     if len(value.encode()) > BCRYPT_MAX_BYTES:
         raise ValueError(

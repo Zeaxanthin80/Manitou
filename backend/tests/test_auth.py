@@ -46,6 +46,73 @@ def test_login_failures_are_indistinguishable(client, make_user):
     assert wrong.json() == unknown.json(), "differing bodies would enumerate accounts"
 
 
+def test_over_length_password_is_a_failed_login_not_a_500(client, make_user):
+    """Defect 31. bcrypt's `checkpw` raises above 72 bytes exactly as `hashpw`
+    does, and only the hashing side had been capped -- so /auth/login answered
+    500 to an unauthenticated request one byte over the limit.
+
+    72 and 73 bytes are the control and the case: one byte apart, and before the
+    fix they returned 401 and 500."""
+    user = make_user(email="len@manitou.example", password="testpassword")
+
+    at_limit = client.post("/auth/login",
+                           json={"email": user.email, "password": "a" * 72})
+    over_limit = client.post("/auth/login",
+                             json={"email": user.email, "password": "a" * 73})
+    far_over = client.post("/auth/login",
+                           json={"email": user.email, "password": "a" * 5000})
+
+    assert at_limit.status_code == 401
+    assert over_limit.status_code == 401, "an over-length password must not 500"
+    assert far_over.status_code == 401
+
+    # And it must look like every other failed login, not merely avoid the 500.
+    # A 422 here would tell an attacker something a wrong password does not.
+    ordinary = client.post("/auth/login",
+                           json={"email": user.email, "password": "WRONG"})
+    assert over_limit.json() == ordinary.json()
+
+    # The control that keeps this test honest: the guard must not reject
+    # everything. A `return False` with no length check would pass every
+    # assertion above.
+    good = client.post("/auth/login",
+                       json={"email": user.email, "password": "testpassword"})
+    assert good.status_code == 200
+
+
+def test_over_length_current_password_is_refused_not_500(
+        client, make_user, auth_headers):
+    """The same gap on the authenticated paths that re-check a password.
+
+    /auth/change-password takes both a current and a new password; only the NEW
+    one carried the byte cap."""
+    user = make_user(email="len2@manitou.example", password="testpassword")
+    r = client.post("/auth/change-password",
+                    headers=auth_headers(user),
+                    json={"current_password": "a" * 200,
+                          "new_password": "anotherpassword"})
+    assert r.status_code == 401, "a too-long current password is wrong, not fatal"
+
+    # Control: the endpoint still works when the current password is right.
+    ok = client.post("/auth/change-password",
+                     headers=auth_headers(user),
+                     json={"current_password": "testpassword",
+                           "new_password": "anotherpassword"})
+    assert ok.status_code == 200
+
+
+def test_setting_an_over_length_password_still_says_so(client, make_user, auth_headers):
+    """The asymmetry is deliberate: VERIFYING an over-length password is a failed
+    comparison (401), but SETTING one is a mistake the caller should hear about
+    (422 naming the limit). Removing the schema validator would make this 500."""
+    user = make_user(email="len3@manitou.example", password="testpassword")
+    r = client.post("/auth/change-password",
+                    headers=auth_headers(user),
+                    json={"current_password": "testpassword",
+                          "new_password": "é" * 72})
+    assert r.status_code == 422
+
+
 def test_me_requires_a_valid_token(client, make_user, auth_headers):
     user = make_user()
     assert client.get("/auth/me", headers=auth_headers(user)).status_code == 200

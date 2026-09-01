@@ -29,7 +29,17 @@ validate_gateway_name(settings.payment_gateway)
 # component -- and this was the ONLY place the name had leaked into application
 # code. Not a display string the storefront reads; it names the API to whoever
 # opens its schema.
-app = FastAPI(title=f"{store_config.store.name} API")
+#
+# The interactive docs are off unless switched on (see Settings.api_docs_enabled).
+# Passing None for all three is what actually removes the routes -- hiding the
+# links while leaving /openapi.json served would be decoration, since that URL is
+# the one worth fetching.
+app = FastAPI(
+    title=f"{store_config.store.name} API",
+    docs_url="/docs" if settings.api_docs_enabled else None,
+    redoc_url="/redoc" if settings.api_docs_enabled else None,
+    openapi_url="/openapi.json" if settings.api_docs_enabled else None,
+)
 
 # Makes the client IP available to the audit trail without every audited endpoint
 # having to accept a Request. See app/middleware.py.

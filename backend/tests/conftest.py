@@ -21,6 +21,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings
+from app.rate_limit import limiter
 
 TEST_DB = "manitou_test"
 TEST_URL = settings.database_url.rsplit("/", 1)[0] + f"/{TEST_DB}"
@@ -81,6 +82,22 @@ def clean_tables(engine):
             conn.execute(
                 text(f"TRUNCATE {', '.join(names)} RESTART IDENTITY CASCADE")
             )
+    yield
+
+
+@pytest.fixture(autouse=True)
+def clean_rate_limits():
+    """Forget rate-limit counters before each test.
+
+    The limiter is process-global and every test client presents the same
+    address, so without this the suite accumulates hits across tests and starts
+    returning 429 partway through -- at a point that depends on execution order,
+    which is the worst kind of failure to debug.
+
+    Same reasoning as clean_tables above: shared mutable state between tests is
+    a dependency between tests.
+    """
+    limiter.reset()
     yield
 
 

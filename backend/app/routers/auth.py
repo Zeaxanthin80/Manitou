@@ -16,6 +16,15 @@ from app.dependencies import (
     get_email_sender,
 )
 from app.models import RecoveryCode, User
+from app.rate_limit import (
+    FORGOT_PASSWORD,
+    LOGIN,
+    MFA_VERIFY,
+    REGISTER,
+    RESET_PASSWORD,
+    by_ip,
+    enforce,
+)
 from app.schemas import (
     AccountDelete,
     EmailChange,
@@ -72,7 +81,12 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 _DUMMY_HASH = hash_password("dummy-password-for-constant-time-login")
 
 
-@router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register",
+    response_model=UserRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[by_ip(REGISTER)],
+)
 def register(payload: UserCreate, db: Session = Depends(get_db)) -> User:
     """Create a customer account.
 
@@ -105,7 +119,11 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> User:
     return user
 
 
-@router.post("/login", response_model=Token | MfaChallenge)
+@router.post(
+    "/login",
+    response_model=Token | MfaChallenge,
+    dependencies=[by_ip(LOGIN)],
+)
 def login(
     payload: LoginRequest, db: Session = Depends(get_db)
 ) -> Token | MfaChallenge:
@@ -329,7 +347,11 @@ def delete_account(
     db.commit()
 
 
-@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/forgot-password",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[by_ip(FORGOT_PASSWORD)],
+)
 def forgot_password(
     payload: ForgotPasswordRequest,
     db: Session = Depends(get_db),
@@ -350,6 +372,23 @@ def forgot_password(
     microseconds, and the send is the same order of magnitude as everything else
     the request already does. Measured rather than assumed; see the timing test.
     """
+    # A second dimension, because this is the one endpoint whose abuse is paid
+    # for by somebody else: every call puts mail in a stranger's inbox and spends
+    # our sending quota. The per-IP limit above stops one attacker; this stops a
+    # distributed one from bombing a single address.
+    #
+    # It does mean an attacker can spend a victim's hourly allowance and delay
+    # their reset. That trade is taken deliberately: an hour of "try again
+    # shortly" against unbounded mail to an inbox we do not own. The victim can
+    # still sign in normally throughout -- this blocks the reset path, not the
+    # account.
+    #
+    # Applied to the address as given, before any lookup, so a known and an
+    # unknown address are refused identically. Doing it after the lookup would
+    # have made this endpoint the enumeration oracle its docstring exists to
+    # prevent.
+    enforce(FORGOT_PASSWORD, f"email:{payload.email.strip().lower()}")
+
     issued = request_reset(db, payload.email)
 
     if issued is not None:
@@ -386,7 +425,11 @@ def forgot_password(
     return {"detail": "If that address has an account, a reset link is on its way."}
 
 
-@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/reset-password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[by_ip(RESET_PASSWORD)],
+)
 def reset_password(
     payload: ResetPasswordRequest,
     db: Session = Depends(get_db),
@@ -561,7 +604,11 @@ def two_factor_disable(
     db.commit()
 
 
-@router.post("/2fa/verify", response_model=Token)
+@router.post(
+    "/2fa/verify",
+    response_model=Token,
+    dependencies=[by_ip(MFA_VERIFY)],
+)
 def two_factor_verify(
     payload: TwoFactorVerifyRequest,
     db: Session = Depends(get_db),

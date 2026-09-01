@@ -16,6 +16,8 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [32](#32-the-audit-trail-recorded-the-load-balancer-not-the-customer) | 2026-08-31 | The audit trail recorded the load balancer, not the customer | Fixed — uncommitted |
+| [31](#31-a-password-one-byte-too-long-returned-500-from-an-unauthenticated-endpoint) | 2026-08-31 | A password one byte too long returned 500 from an unauthenticated endpoint | Fixed — uncommitted |
 | [30](#30-a-rotating-password-broke-the-api-while-every-health-check-passed) | 2026-08-31 | A rotating password broke the API while every health check passed | Fixed — uncommitted |
 | [29](#29-a-verification-loop-rolled-back-its-own-deployment) | 2026-08-30 | A verification loop rolled back its own deployment | Fixed — uncommitted |
 | [28](#28-every-loggerinfo-line-is-discarded-in-production) | 2026-08-30 | Every `logger.info` line is discarded in production | Fixed — uncommitted |
@@ -46,6 +48,110 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 32. The audit trail recorded the load balancer, not the customer
+
+**Status:** Fixed. Found while planning rate limiting, which needs the same
+answer.
+
+**Seen.** Every `audit_events` row written since the Phase 6 deployment held
+`172.31.28.86` — one RFC1918 address inside the VPC, belonging to the load
+balancer. Not one customer's address was recorded.
+
+**Cause.** `RequestContextMiddleware` read `request.client.host`, which is
+whoever opened the TCP connection. Behind an ALB that is the ALB.
+
+This was known and deferred, in the middleware's own docstring:
+
+> *"Behind the load balancer in Phase 6 it is the ALB... That is a Phase 6
+> decision, made when the topology exists; until then this records the direct
+> peer and says so."*
+
+Phase 6 ended and nothing came back to it. **A deferral written into a comment is
+not a reminder** — the comment is only read by someone already editing the file,
+which is exactly the person who does not need telling.
+
+**Fix.** Read `X-Forwarded-For`, from the correct end, and only when a proxy is
+actually in front.
+
+**The direction is the whole subtlety, and the obvious version is wrong.** That
+header is *appended to*, not replaced. A client may send its own, and the ALB adds
+what it saw to the end::
+
+    X-Forwarded-For: 1.2.3.4, 203.0.113.9
+                     ^^^^^^^  ^^^^^^^^^^^
+                     forged   added by our load balancer
+
+`forwarded.split(",")[0]` — the form nearly every snippet shows — returns the
+attacker's value. Every entry that can be trusted was appended by a proxy we run,
+so they are at the right-hand end, and the client is the Nth from the end where N
+is how many proxies there are.
+
+Hence `TRUSTED_PROXY_COUNT`, a count rather than a boolean, defaulting to **0**.
+At 0 the header is ignored entirely: with nothing in front, it is wholly
+attacker-supplied, and trusting it would let anyone choose the address written to
+the audit trail and counted against rate limits.
+
+**Why it blocked the rest of task 3.** Rate limiting keys on this value. Shipped
+against the old one, every request on earth would have shared a single bucket and
+the tenth failed login anywhere would have locked out the entire store. The order
+was forced: fix the address, then limit by it.
+
+**Verified.** Eleven unit tests, including the two-proxy case. Mutating
+`chain[-hops]` to `chain[0]` — the shortcut above — makes four of them fail with
+the forged `1.2.3.4`, which is the outcome the tests exist to catch.
+
+---
+
+## 31. A password one byte too long returned 500 from an unauthenticated endpoint
+
+**Status:** Fixed.
+
+**Seen.** On production, one byte apart::
+
+    72-byte password -> 401
+    73-byte password -> 500
+
+**Cause.** bcrypt refuses inputs over 72 bytes with a `ValueError`, and it does so
+from **`checkpw` as well as `hashpw`**. Only the hashing side had been guarded.
+
+The schemas carry a `_fits_bcrypt` validator whose docstring says it belongs on
+*"every schema that accepts a **new** password"* — and by that rule, correctly
+applied, `UserCreate`, `PasswordChange.new_password` and
+`ResetPasswordRequest.new_password` all have it.
+
+**The rule itself was the defect.** Five fields verify an *existing* password and
+none was covered: `LoginRequest.password`, and `current_password` on
+password-change, email-change, account-delete and 2FA-disable. A rule written
+about one direction of a symmetric API leaves the other silently unguarded.
+
+**Consequence beyond the status code.** `/auth/login` is unauthenticated, so
+anyone could produce 5xx on demand. Those feed `manitou-alb-target-5xx`, which
+emails, and `RollbackAlarm`, **which ECS reads during a deployment bake** — so a
+stranger could cause a deploying release to be reverted, and the post-mortem would
+blame the image. Defect 29's mechanism, remotely triggerable.
+
+**Fix.** In `verify_password`, not in the schemas — and the asymmetry is
+deliberate:
+
+* **Setting** a password over the limit is a mistake the caller should hear
+  about: 422, naming the limit.
+* **Verifying** one is not an error but an answer that happens to be wrong. No
+  stored hash can have come from an input that long, because every one of them
+  passed the cap when it was set. So it returns False, and a failed login stays
+  indistinguishable from every other failed login — which is what `LoginRequest`
+  exists to preserve, and what a 422 here would have broken.
+
+One guard covers all five call sites, including any future endpoint that verifies
+a password.
+
+**Verified.** Three tests, with 72 and 73 bytes as control and case. Removing the
+guard makes two of them fail with the exact `ValueError`; the third keeps passing,
+correctly, because it exercises the schema validator instead. A `return False`
+with no length check would satisfy every refusal assertion, so each test also
+asserts the correct password still succeeds.
 
 ---
 

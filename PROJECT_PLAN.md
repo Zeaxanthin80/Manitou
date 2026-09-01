@@ -991,6 +991,20 @@ object; deleting a used one is refused with the list of products holding it.
    connection and no alarm moved. The API now runs as `manitou_app` (DML only, cannot disable the
    `audit_events` trigger); migrations use a separate `manitou-dbadmin` task definition.
 3. **[You + Claude Code]** Add rate limiting, review input validation, and do a security pass.
+   - **Done 2026-08-31.** Per-IP limits on login, 2FA verify, forgot-password, reset-password and
+     register, in-process and in-memory; forgot-password carries a second key on the email address.
+     Limits are route dependencies, so they run before the bcrypt comparison.
+   - **Two defects found first, and the order was forced.** Defect 32: the audit trail recorded the
+     load balancer, because `request.client.host` behind an ALB is the ALB — and rate limiting keys
+     on that value, so limits shipped against it would have put the whole internet in one bucket.
+     Defect 31: a password one byte over bcrypt's 72-byte limit returned **500 from an
+     unauthenticated endpoint**, handing anyone a way to feed the alarm ECS reads during a
+     deployment bake.
+   - Also: the interactive API schema is no longer served in production (defaults to off), the
+     storefront gained security headers it had none of, and CSP ships Report-Only until one
+     test-mode checkout confirms it does not break Stripe Elements.
+   - **CORS was reviewed and deliberately left absent** — the browser never calls the API, so no
+     CORS headers means deny-by-default. See `infra/README.md`.
 4. **[You]** Verify backups by performing a test restore. An untested backup is not a backup.
 5. **[You + Claude Code]** Confirm logging, alerts, and error tracking are in place, then launch.
 ### Phase 8 — Mobile Apps

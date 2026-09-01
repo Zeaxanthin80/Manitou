@@ -1,6 +1,90 @@
 import type { NextConfig } from "next";
 
+/**
+ * Content Security Policy, shipped in REPORT-ONLY mode.
+ *
+ * Stripe Elements mounts an iframe from js.stripe.com and talks to
+ * api.stripe.com. A policy that gets those wrong does not degrade — it stops
+ * customers paying, and it does so at the last step of the funnel. Report-Only
+ * makes the browser evaluate the policy and complain in its console without
+ * blocking anything, so the rules can be checked against a real checkout before
+ * they are given teeth.
+ *
+ * **To finish this**: complete one test-mode purchase with the console open. If
+ * nothing is reported, rename the header to `Content-Security-Policy`.
+ *
+ * `'unsafe-inline'` in script-src is not an oversight. The App Router injects
+ * inline bootstrap scripts, and the alternative is per-request nonces, which
+ * need middleware and a dynamic rendering path. Removing it is a real
+ * improvement and a separate piece of work — noted rather than pretended away,
+ * because a CSP with unsafe-inline stops far less XSS than it appears to.
+ */
+const csp = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+  "style-src 'self' 'unsafe-inline'",
+  `img-src 'self' data: blob:${process.env.CDN_HOST ? ` https://${process.env.CDN_HOST}` : ""}`,
+  "font-src 'self' data:",
+  "connect-src 'self' https://api.stripe.com",
+  "frame-src https://js.stripe.com https://hooks.stripe.com",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join("; ");
+
+const securityHeaders = [
+  /**
+   * Tell the browser never to speak plain HTTP to this host again.
+   *
+   * Port 80 is not open on the load balancer, so an http:// request currently
+   * fails to connect rather than being redirected. This closes the window
+   * before that: the browser upgrades on its own after the first visit.
+   *
+   * Deliberately no `preload`. Submitting to the preload list is a commitment
+   * that is slow and awkward to undo, and it belongs to a considered decision
+   * rather than a config edit.
+   */
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+
+  /** Stop the browser guessing a content type. An uploaded file that sniffs as
+   * HTML is how an image becomes a script. */
+  { key: "X-Content-Type-Options", value: "nosniff" },
+
+  /** No framing, so the storefront cannot be put inside someone else's page and
+   * clicked through. Duplicated by frame-ancestors in the CSP above, which is
+   * the modern form — this covers browsers that read only the old header. */
+  { key: "X-Frame-Options", value: "DENY" },
+
+  /** Send the full URL only to ourselves. Order confirmation and reset-password
+   * URLs should not travel in a Referer header to a third party. */
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+
+  /** This store needs none of these. Denying them means an injected script
+   * cannot ask for them either.
+   *
+   * `payment` is deliberately absent from the list. Denying it would block the
+   * Payment Request API, which is how Stripe Elements offers Apple Pay and
+   * Google Pay — a wallet button that quietly stops appearing is a poor trade
+   * for closing off an injected script's ability to open a payment sheet. Its
+   * default of `self` already keeps it away from third-party frames. */
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+
+  { key: "Content-Security-Policy-Report-Only", value: csp },
+];
+
 const nextConfig: NextConfig = {
+  /**
+   * Do not announce the framework and its presence in every response. Minor —
+   * it narrows nobody's options for long — but it is free and there is no reason
+   * to volunteer it.
+   */
+  poweredByHeader: false,
+
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders }];
+  },
+
   /**
    * Build a self-contained server bundle for the container image.
    *

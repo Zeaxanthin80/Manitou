@@ -110,6 +110,39 @@ class Settings(BaseSettings):
     #: So this is an allow-list of one, not permission for https generally.
     cdn_host: str = ""
 
+    # --- how many proxies sit in front of this app (Phase 7 task 3) ----------
+    #: 0 on a laptop, 1 behind the Application Load Balancer.
+    #:
+    #: `request.client.host` is whoever opened the TCP connection. Behind the ALB
+    #: that is the ALB, which is how every audit row came to record a VPC address
+    #: instead of a customer (defect 32). The real client is in
+    #: `X-Forwarded-For` -- but that header is **partly attacker-controlled**: a
+    #: client can send one and the ALB appends to it rather than replacing it, so
+    #: a request arriving with `X-Forwarded-For: 1.2.3.4` is forwarded as
+    #: `1.2.3.4, <real client>`.
+    #:
+    #: **The trustworthy entries are at the RIGHT**, added by proxies we operate;
+    #: everything to the left is whatever the client chose to send. So this is a
+    #: count, not a boolean: with N proxies in front, the client is the Nth entry
+    #: from the end. Defaulting to 0 means a laptop ignores the header entirely,
+    #: rather than trusting a value anyone can set.
+    trusted_proxy_count: int = 0
+
+    # --- interactive API documentation (Phase 7 task 3) ---------------------
+    #: Whether /docs, /redoc and /openapi.json are served.
+    #:
+    #: **Defaults to False, and that direction is the point.** Production takes
+    #: its configuration from the task definition and has no `.env`, so the safe
+    #: value is the one you get by not thinking about it; a default of True would
+    #: mean every future environment ships the schema until someone remembers.
+    #: `.env.example` turns it on for local development, where it is genuinely
+    #: useful.
+    #:
+    #: The schema is not a secret and the endpoints stay authenticated either
+    #: way. What it removes is free reconnaissance: 108 KB naming all 62 routes,
+    #: every `/admin/*` path, and the exact shape of each request body.
+    api_docs_enabled: bool = False
+
     @model_validator(mode="after")
     def _assemble_database_url(self) -> "Settings":
         """Build database_url from the DB_* parts when it was not supplied whole.
