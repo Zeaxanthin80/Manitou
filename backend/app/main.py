@@ -31,9 +31,18 @@ validate_gateway_name(settings.payment_gateway)
 # opens its schema.
 #
 # The interactive docs are off unless switched on (see Settings.api_docs_enabled).
-# Passing None for all three is what actually removes the routes -- hiding the
-# links while leaving /openapi.json served would be decoration, since that URL is
-# the one worth fetching.
+# Passing None removes the routes rather than hiding links.
+#
+# **The three are not equal partners: `openapi_url` is the load-bearing one.**
+# FastAPI only registers /docs and /redoc if there is a schema URL for them to
+# read, so setting `openapi_url=None` alone disables all three -- and setting
+# only the other two would leave the schema itself served, which is the URL
+# actually worth fetching.
+#
+# Measured, not assumed: a mutation hardcoding `docs_url="/docs"` while
+# `openapi_url` stayed None changed no behaviour at all and no test could have
+# caught it, because there was nothing to catch. All three are still written out
+# so the intent survives a future FastAPI that decouples them.
 app = FastAPI(
     title=f"{store_config.store.name} API",
     docs_url="/docs" if settings.api_docs_enabled else None,

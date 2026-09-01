@@ -30,14 +30,29 @@ def test_docs_are_off_by_default(monkeypatch):
     assert fresh.api_docs_enabled is False
 
 
-def test_the_schema_is_not_served_when_disabled(client):
-    """Removing the routes, not merely hiding the links.
+def test_the_schema_routes_follow_the_setting(client):
+    """The routes are added or removed, not merely linked or unlinked.
 
-    /openapi.json is the URL actually worth fetching -- leaving it served while
-    dropping /docs would be decoration."""
-    assert settings.api_docs_enabled is False, "this test assumes the suite's config"
+    /openapi.json is the URL actually worth fetching, so serving it while
+    dropping /docs would be decoration -- all three are checked.
+
+    **Expressed relative to the setting rather than asserting 404.** An earlier
+    version asserted the flag was False and then required 404, which made the
+    test depend on the developer's own git-ignored `.env`: it passed in CI and
+    for anyone who had not enabled the docs, and failed for anyone following
+    `.env.example`. A test that only holds under one local configuration is a
+    trap for whoever changes that configuration next.
+
+    The security-relevant invariant -- that the DEFAULT is off -- is hermetic and
+    lives in the test above. This one checks the wiring: whatever the flag says,
+    the routes agree with it. Hardcoding `docs_url="/docs"` and ignoring the
+    setting fails this in any environment where the flag is off."""
+    expected = 200 if settings.api_docs_enabled else 404
     for path in ("/docs", "/redoc", "/openapi.json"):
-        assert client.get(path).status_code == 404, f"{path} should not exist"
+        assert client.get(path).status_code == expected, (
+            f"{path} should be {expected} when api_docs_enabled is "
+            f"{settings.api_docs_enabled}"
+        )
 
 
 def test_health_is_still_served(client):
