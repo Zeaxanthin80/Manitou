@@ -1159,9 +1159,66 @@ does.
 from Server Components — so no `Access-Control-Allow-Origin` means browsers refuse cross-origin reads
 by default. Adding a CORS middleware would only widen it.
 
-**Port 80 is closed**, so `http://` fails to connect rather than redirecting. Safe, but a customer
-typing the bare domain into an older browser gets an error instead of the shop. Adding a redirect
-listener is a UX fix worth making before launch, and HSTS now covers every visit after the first.
+**CORS is absent, and that is correct** — see above. **Port 80** was closed; it now redirects, below.
+
+---
+
+## Redirecting port 80 (Phase 7 follow-up)
+
+`http://imprimapress.com` used to fail to connect. Safe — there was nothing to intercept — but a
+customer typing the bare domain got a connection error instead of the shop, and HSTS only helps
+from the *second* visit onward.
+
+**The security group already allowed port 80 from anywhere.** Nothing was listening, which is the
+entire reason it failed. So this was one listener and no security-group change — worth checking
+before assuming a firewall is the cause, because the two failures look identical from outside.
+
+One HTTP listener, default action `redirect`:
+
+| field | value | why |
+| --- | --- | --- |
+| `Host` | `#{host}` | one listener serves both names — the storefront apex and the API subdomain each keep their own host instead of being pinned to one |
+| `Path` | `/#{path}` | `#{path}` **excludes** the leading slash, so the literal `/` is required. Omitting it yields no slash; adding two yields `//` |
+| `Query` | `#{query}` | preserved, so a filtered catalogue link survives the hop |
+| `StatusCode` | `HTTP_301` | permanent and cacheable, so a browser stops asking over plain HTTP at all |
+| `Port` | **`443`, explicitly** | see below |
+
+### `Port` must be written out, and the default reads like a trap
+
+Omitting `Port` does not mean "no port". It defaults to **`#{port}` — the *original* port** — so an
+HTTP request on 80 redirects to `https://host:80/`, which never connects. The field that looks
+optional is load-bearing.
+
+### A measurement mistake worth recording
+
+Testing the omitted-`Port` variant appeared to show it producing an identical `:443` — which would
+have meant the default was harmless. **It was a stale read: ALB listener changes take tens of
+seconds to propagate, so each measurement returned the PREVIOUS configuration.** The `:80` arrived a
+minute later, by which time the config had already been changed back, making the broken version look
+like the working one and vice versa.
+
+Both readings were of a real load balancer and both were wrong about the thing being tested. **After
+changing a listener, wait for the value to stop moving before believing it** — the same discipline as
+verifying a rollout from the control plane rather than the first response that comes back.
+
+### `:443` in the Location header is unavoidable
+
+Every ALB redirect emits an explicit port: `https://imprimapress.com:443/`. Browsers strip a default
+port, so nobody sees it, and search engines normalise it. It cannot be configured away. If a
+canonical URL matters for search, that belongs in the Next.js metadata as a `rel="canonical"` link —
+the load balancer is the wrong layer to fix it at.
+
+### Verified
+
+Apex, `www`, and the API subdomain; a path with a query string; and end to end following the hop —
+301 then 200, one hop, host and path and query intact. HTTPS timings unchanged as the control, since
+"HTTP now redirects" is only good news if HTTPS still works.
+
+### Watch for this on the next deploy
+
+Express Mode created and manages this load balancer. **This listener was added outside it**, so a
+future Express Mode operation could in principle reconcile it away. A deployment happens on every
+push to main, so the check is cheap: `curl -sI http://imprimapress.com/ | grep -i location`.
 
 ---
 

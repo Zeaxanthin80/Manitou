@@ -1005,6 +1005,10 @@ object; deleting a used one is refused with the list of products holding it.
      test-mode checkout confirms it does not break Stripe Elements.
    - **CORS was reviewed and deliberately left absent** — the browser never calls the API, so no
      CORS headers means deny-by-default. See `infra/README.md`.
+   - **Port 80 now redirects to HTTPS** (2026-09-01). It was closed, so `http://imprimapress.com`
+     failed to connect rather than reaching the shop. The security group already allowed port 80 —
+     nothing was listening — so this was one ALB listener and no firewall change. 301, preserving
+     host, path and query, covering the apex, `www` and the API subdomain.
 4. **[You]** Verify backups by performing a test restore. An untested backup is not a backup.
 5. **[You + Claude Code]** Confirm logging, alerts, and error tracking are in place, then launch.
 ### Phase 8 — Mobile Apps
