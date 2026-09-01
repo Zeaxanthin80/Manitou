@@ -1146,11 +1146,17 @@ deserves its own decision), `nosniff`, `X-Frame-Options: DENY`, a referrer polic
 policy. `x-powered-by` no longer announces the framework. Verified against a real response from the
 built image rather than trusted to configuration.
 
-**CSP ships in Report-Only**, deliberately. Stripe Elements mounts an iframe from `js.stripe.com`; a
-policy that gets that wrong does not degrade, it stops customers paying at the last step of the
-funnel. Its `script-src` still needs `'unsafe-inline'` because the App Router injects inline
-bootstrap scripts — removing that needs nonce middleware, and until then the policy stops less than
-it looks like it does.
+**CSP shipped in Report-Only and is enforcing from 2026-09-01.** Stripe Elements mounts an iframe
+from `js.stripe.com`; a policy that gets that wrong does not degrade, it stops customers paying at
+the last step of the funnel. Its `script-src` still needs `'unsafe-inline'` because the App Router
+injects inline bootstrap scripts — removing that needs nonce middleware, and until then the policy
+stops less than it looks like it does.
+
+**Report-Only earned its keep.** It caught two origins that no amount of reading the code would have
+produced — one on the checkout path, one nowhere near it — and both would have been silent failures
+rather than errors. **If a resource is blocked now, add the origin and redeploy; do not switch back
+to Report-Only**, which would hide the next one as well. The console names the directive and the
+blocked URL exactly.
 
 **Three gaps were found by reading rather than by testing**, before anyone opened a browser —
 against Stripe's own CSP guide and this repository's checkout code:

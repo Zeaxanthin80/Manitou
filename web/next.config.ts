@@ -1,17 +1,28 @@
 import type { NextConfig } from "next";
 
 /**
- * Content Security Policy, shipped in REPORT-ONLY mode.
+ * Content Security Policy. **Enforcing since 2026-09-01.**
  *
- * Stripe Elements mounts an iframe from js.stripe.com and talks to
- * api.stripe.com. A policy that gets those wrong does not degrade — it stops
- * customers paying, and it does so at the last step of the funnel. Report-Only
- * makes the browser evaluate the policy and complain in its console without
- * blocking anything, so the rules can be checked against a real checkout before
- * they are given teeth.
+ * It shipped in Report-Only first, and that was not ceremony — the browser
+ * evaluated the real policy against real traffic and reported two things no
+ * amount of reading would have caught:
  *
- * **To finish this**: complete one test-mode purchase with the console open. If
- * nothing is reported, rename the header to `Content-Security-Policy`.
+ *  1. `fonts.googleapis.com` missing from connect-src. Stripe.js fetches the
+ *     `cssSrc` passed to <Elements/> itself, so the font is a CONNECTION, not a
+ *     style. Enforced without it, the payment form falls back to system-ui and
+ *     renders in a different typeface from every other page -- silently,
+ *     because a blocked font does not error. That is defect 16 returning.
+ *  2. The presigned-upload bucket missing from connect-src, found only by
+ *     asking which pages OTHER than checkout make external requests. A clean
+ *     purchase says nothing about the admin upload path.
+ *
+ * Verified before enforcing: a completed test-mode purchase, then a sweep of
+ * account, orders, the admin product list, the media library modal (eight
+ * CloudFront images) and the audit log. Zero violations on any of them.
+ *
+ * **If something breaks, the fix is to add the origin here and redeploy** --
+ * not to revert to Report-Only, which would hide the next one too. The console
+ * names the directive and the blocked URL exactly.
  *
  * `'unsafe-inline'` in script-src is not an oversight. The App Router injects
  * inline bootstrap scripts, and the alternative is per-request nonces, which
@@ -132,7 +143,7 @@ const securityHeaders = [
    * default of `self` already keeps it away from third-party frames. */
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 
-  { key: "Content-Security-Policy-Report-Only", value: csp },
+  { key: "Content-Security-Policy", value: csp },
 ];
 
 const nextConfig: NextConfig = {

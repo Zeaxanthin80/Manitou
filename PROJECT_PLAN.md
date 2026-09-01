@@ -1000,9 +1000,13 @@ object; deleting a used one is refused with the list of products holding it.
      Defect 31: a password one byte over bcrypt's 72-byte limit returned **500 from an
      unauthenticated endpoint**, handing anyone a way to feed the alarm ECS reads during a
      deployment bake.
-   - Also: the interactive API schema is no longer served in production (defaults to off), the
-     storefront gained security headers it had none of, and CSP ships Report-Only until one
-     test-mode checkout confirms it does not break Stripe Elements.
+   - Also: the interactive API schema is no longer served in production (defaults to off), and the
+     storefront gained security headers it had none of.
+   - **CSP is enforcing from 2026-09-01**, after shipping Report-Only first. That order was not
+     ceremony: it caught two missing origins that reading the code did not — `fonts.googleapis.com`,
+     which Stripe.js fetches itself so a block would silently restore defect 16, and the presigned
+     upload bucket, on a page the checkout test never visits. Verified by a completed test-mode
+     purchase plus a sweep of account, orders, admin, the media library and the audit log.
    - **CORS was reviewed and deliberately left absent** — the browser never calls the API, so no
      CORS headers means deny-by-default. See `infra/README.md`.
    - **Port 80 now redirects to HTTPS** (2026-09-01). It was closed, so `http://imprimapress.com`
