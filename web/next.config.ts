@@ -21,12 +21,37 @@ import type { NextConfig } from "next";
  */
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+
+  // *.js.stripe.com as well as js.stripe.com: Stripe.js starts frames on
+  // sibling origins where it can, and their own CSP guide lists the wildcard in
+  // both script-src and frame-src. Taken from that guide rather than from what
+  // a working checkout happened to request, because the origins it picks vary.
+  "script-src 'self' 'unsafe-inline' https://js.stripe.com https://*.js.stripe.com",
+
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob:${process.env.CDN_HOST ? ` https://${process.env.CDN_HOST}` : ""}`,
+
+  // 'self' covers the fonts: next/font self-hosts them under
+  // /_next/static/media, confirmed against the live HTML rather than assumed.
   "font-src 'self' data:",
-  "connect-src 'self' https://api.stripe.com",
-  "frame-src https://js.stripe.com https://hooks.stripe.com",
+
+  // fonts.googleapis.com belongs in connect-src, which reads wrong until you
+  // know why: it is not a stylesheet OUR document loads. components/
+  // payment-form.tsx passes a `cssSrc` to <Elements/>, and Stripe.js fetches
+  // that URL itself to inject Inter into its iframe -- so it is a connection,
+  // not a style. Stripe's CSP guide says exactly this.
+  //
+  // Blocking it would not error. It would fall back to system-ui and render the
+  // payment step in a different typeface from every other page, which is
+  // defect 16 precisely.
+  "connect-src 'self' https://api.stripe.com https://fonts.googleapis.com",
+
+  // hooks.stripe.com is for the 3D Secure redirect. Link's hosts are absent on
+  // purpose: payment-form.tsx sets `wallets: { link: "never" }`, so there is no
+  // Link UI to frame, and a policy should not admit hosts the code refuses to
+  // use.
+  "frame-src https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com",
+
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

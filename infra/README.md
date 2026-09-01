@@ -1148,10 +1148,29 @@ built image rather than trusted to configuration.
 
 **CSP ships in Report-Only**, deliberately. Stripe Elements mounts an iframe from `js.stripe.com`; a
 policy that gets that wrong does not degrade, it stops customers paying at the last step of the
-funnel. To finish it: one test-mode purchase with the console open, then rename the header. Its
-`script-src` still needs `'unsafe-inline'` because the App Router injects inline bootstrap scripts —
-removing that needs nonce middleware, and until then the policy stops less than it looks like it
-does.
+funnel. Its `script-src` still needs `'unsafe-inline'` because the App Router injects inline
+bootstrap scripts — removing that needs nonce middleware, and until then the policy stops less than
+it looks like it does.
+
+**Three gaps were found by reading rather than by testing**, before anyone opened a browser —
+against Stripe's own CSP guide and this repository's checkout code:
+
+| directive | what was missing | what it would have cost |
+| --- | --- | --- |
+| `connect-src` | `https://fonts.googleapis.com` | **defect 16, exactly.** `payment-form.tsx` passes a `cssSrc` to `<Elements/>` and Stripe.js fetches that URL *itself* to inject Inter into its iframe — so it is a connection, not a stylesheet. Blocked, it would not error: it falls back to `system-ui` and the payment step renders in a different typeface from every other page |
+| `script-src`, `frame-src` | `https://*.js.stripe.com` | Stripe.js starts frames on sibling origins where it can. Their guide lists the wildcard; the origins it picks vary, so this cannot be derived from what one working checkout happened to request |
+| — | Link's hosts, **deliberately absent** | `payment-form.tsx` sets `wallets: { link: "never" }`, so there is no Link UI to frame. A policy should not admit hosts the code refuses to use |
+
+The lesson is narrower than "read the docs": **a CSP cannot be derived from observing one successful
+page load.** Wildcard origins, fallback fonts and features disabled in config all behave differently
+from what a single trace shows.
+
+### Why the last step is a person
+
+The remaining check needs a real browser completing a real payment, and it is not automatable here.
+The defect log already records two headless-Chrome probes built for defect 16 in which **the Payment
+Element never got past its skeleton state** — so a headless run would report no violations for a form
+that never rendered, which is indistinguishable from success and worse than not testing at all.
 
 ### Two things found and deliberately not changed
 
