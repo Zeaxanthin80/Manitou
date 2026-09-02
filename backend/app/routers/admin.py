@@ -41,6 +41,7 @@ from app.services.stock import reserved_expr, restock_for_order, sellable_expr
 from app.services.payments import (
     PaymentError,
     PaymentGateway,
+    CONFIRMED,
     apply_payment_event,
 )
 from app.schemas.admin import (
@@ -89,6 +90,7 @@ from app.schemas.admin import (
 from app.schemas.catalog import MAX_PAGE_SIZE
 from app.config import settings
 from app.dependencies import get_email_sender
+from app.services.notifications import send_order_confirmation
 from app.services import audit, image_match
 from app.services.account import anonymise, count_admins, password_matches
 from app.services.email import EmailMessage, EmailSender
@@ -1541,6 +1543,7 @@ def recheck_order_payment(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin),
     gateway: PaymentGateway = Depends(get_payment_gateway),
+    sender: EmailSender = Depends(get_email_sender),
 ) -> AdminPaymentRecheck:
     """Ask Stripe what it thinks, and apply the same rules the webhook applies.
 
@@ -1581,6 +1584,14 @@ def recheck_order_payment(
         ) from exc
 
     outcome = apply_payment_event(db, intent.id, intent.status, actor=user)
+
+    # The same transition the webhook sends on. An order confirmed by an admin
+    # re-check because the event never arrived is still an order the customer has
+    # not been told about -- and CONFIRMED means this call is what moved it, so
+    # the two paths cannot both send for one payment.
+    if outcome == CONFIRMED:
+        send_order_confirmation(sender, payment.order)
+
     return AdminPaymentRecheck(
         outcome=outcome, order=_to_order_detail(_admin_order(db, order_id))
     )

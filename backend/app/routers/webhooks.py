@@ -16,10 +16,16 @@ signature failure means the sender was not Stripe, so there is nobody to retry.
 import logging
 
 from fastapi import APIRouter, Depends, Request, Response, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.dependencies import get_email_sender
+from app.models import Payment
+from app.services.email import EmailSender
+from app.services.notifications import send_order_confirmation
 from app.services.payments import (
+    CONFIRMED,
     WebhookVerificationError,
     apply_payment_event,
     verify_webhook,
@@ -48,6 +54,7 @@ async def stripe_webhook(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
+    sender: EmailSender = Depends(get_email_sender),
 ) -> dict:
     """Receive one Stripe event and bring our records into line with it.
 
@@ -101,4 +108,18 @@ async def stripe_webhook(
     logger.info(
         "Stripe %s for %s -> %s", event_type, intent_id, outcome
     )
+
+    # CONFIRMED means this call is what moved the order pending -> paid, and
+    # apply_payment_event guarantees that happens exactly once however many times
+    # Stripe redelivers. So the confirmation goes out here, once, without needing
+    # a sent-flag of its own.
+    #
+    # AFTER the commit inside apply_payment_event, never before: an email about
+    # an order that then failed to save is a promise we did not keep.
+    if outcome == CONFIRMED:
+        payment = db.scalar(
+            select(Payment).where(Payment.stripe_payment_intent_id == intent_id)
+        )
+        if payment is not None:
+            send_order_confirmation(sender, payment.order)
     return {"received": True, "handled": True, "outcome": outcome}

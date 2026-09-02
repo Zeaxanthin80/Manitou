@@ -1046,6 +1046,19 @@ object; deleting a used one is refused with the list of products holding it.
    - **[You + Claude Code]** Re-check the browser console after enabling any wallet. **CSP is
      enforcing**, so an origin a wallet needs but the policy omits removes the button silently
      rather than erroring.
+
+   **Customer-facing email** (built 2026-09-02, dormant until SES production access):
+
+   - **Password reset** and **order confirmation** are both written and tested. They send through
+     whatever `EMAIL_SENDER` names, so they run against `MemoryEmailSender` in tests and print to the
+     log in production today. Flipping to `ses` is what starts real delivery — no code change.
+   - The confirmation follows the **`pending → paid` transition**, not the Stripe event.
+     `apply_payment_event` performs that transition exactly once however many times Stripe
+     redelivers, so the email inherits that guarantee and needs no sent-flag of its own. Both paths
+     that can confirm a payment — the webhook and the admin re-check — send from the same place.
+   - **A failed send never fails the webhook**, and that is correctness rather than tidiness: a
+     non-2xx would have Stripe redeliver, the redelivery would find the order already paid and take
+     the branch that sends nothing, so the message would be lost permanently rather than delayed.
 ### Phase 8 — Mobile Apps
 
 **Frameworks: Kotlin with Jetpack Compose (Android), Swift with SwiftUI (iOS).** Both consume the
