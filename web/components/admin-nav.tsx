@@ -62,7 +62,7 @@ export function AdminNav({
   const pathname = usePathname();
 
   return (
-    <header className="border-b border-border bg-surface">
+    <header className="border-b border-border bg-surface print:hidden">
       <nav
         aria-label="Admin"
         className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-4 lg:gap-6"

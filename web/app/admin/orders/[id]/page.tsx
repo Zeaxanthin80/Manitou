@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { OrderStatus } from "@/components/order-status";
 import { OrderStatusActions } from "@/components/order-status-actions";
+import { PrintButton } from "@/components/print-button";
 import { OrderTotals } from "@/components/order-totals";
 import { Card, CardBody } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -46,7 +47,7 @@ export default async function AdminOrderPage({
     <main className="mx-auto max-w-6xl px-6 py-12">
       <Link
         href="/admin/orders"
-        className="font-body text-xs uppercase tracking-tight text-muted hover:text-text"
+        className="font-body text-xs uppercase tracking-tight text-muted hover:text-text print:hidden"
       >
         &larr; All orders
       </Link>
@@ -55,7 +56,10 @@ export default async function AdminOrderPage({
         <h1 className="font-display text-2xl uppercase leading-none tracking-tight text-text">
           Order #{order.id}
         </h1>
-        <OrderStatus status={order.status} />
+        <div className="flex items-center gap-3">
+          <OrderStatus status={order.status} />
+          <PrintButton label="Print packing slip" />
+        </div>
       </div>
       <p className="mt-2 font-body text-sm text-muted">
         Placed{" "}
@@ -68,7 +72,10 @@ export default async function AdminOrderPage({
         })}
       </p>
 
-      <section className="mt-8 rounded-md border border-border bg-surface p-6">
+      {/* A control surface, not part of the document. It advances the order; a
+          packing slip that carries the buttons for doing so reads as an
+          instruction to the customer. */}
+      <section className="mt-8 rounded-md border border-border bg-surface p-6 print:hidden">
         <h2 className="font-body text-sm uppercase tracking-tight text-muted">
           Advance this order
         </h2>

@@ -58,7 +58,7 @@ export async function SiteFooter() {
     // here stacked on top of it and left 144px of dead space above the footer --
     // most of a phone fold. The border and the footer's own py-12 are the
     // separation; the page's padding is the gap.
-    <footer className="border-t border-border bg-surface">
+    <footer className="border-t border-border bg-surface print:hidden">
       <div className="mx-auto max-w-6xl px-6 py-10">
         {/* Two columns from the narrowest screen, not one. Stacking brand,
             Shop and Help vertically made the footer 593px against 424px of

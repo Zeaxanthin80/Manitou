@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { OrderTotals } from "@/components/order-totals";
+import { PrintButton } from "@/components/print-button";
 import { Card, CardBody } from "@/components/ui/card";
 import { ApiError, getOrder } from "@/lib/api";
 import type { Address, OrderDetail } from "@/lib/api";
@@ -56,9 +57,12 @@ export default async function OrderPage({
       <p className="font-body text-xs uppercase tracking-tight text-muted">
         Order #{order.id} &middot; {placed}
       </p>
-      <h1 className="mt-2 font-display text-2xl uppercase leading-none tracking-tight text-text">
-        {orderHeading(order.status, order.payment_status)}
-      </h1>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-display text-2xl uppercase leading-none tracking-tight text-text">
+          {orderHeading(order.status, order.payment_status)}
+        </h1>
+        <PrintButton label="Print receipt" />
+      </div>
       <PaymentState
         orderId={order.id}
         orderStatus={order.status}
@@ -108,7 +112,7 @@ export default async function OrderPage({
           </Card>
           <Link
             href="/"
-            className="mt-4 inline-block font-body text-sm uppercase tracking-tight text-text underline"
+            className="mt-4 inline-block font-body text-sm uppercase tracking-tight text-text underline print:hidden"
           >
             Continue shopping
           </Link>

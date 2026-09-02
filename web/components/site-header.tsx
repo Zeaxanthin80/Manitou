@@ -27,7 +27,7 @@ export async function SiteHeader() {
   const count = cart?.item_count ?? 0;
 
   return (
-    <header className="border-b border-border bg-surface">
+    <header className="border-b border-border bg-surface print:hidden">
       {/* One row at every width. Below 769px the categories collapse into the
           hamburger on the left; above it they sit inline. `wide` is a custom
           769px breakpoint -- Tailwind's `md` is min-width 768px, which would

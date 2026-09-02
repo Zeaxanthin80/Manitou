@@ -36,6 +36,53 @@ input::-ms-clear {
   display: none;
 }
 
+/* Printing an order.
+
+   Two documents come off the same pages rather than out of a separate route:
+   /admin/orders/[id] is the packing slip that goes in the box, and
+   /orders/[id] is the customer's own receipt. A dedicated print-only page would
+   render more cleanly and would drift from the real one, which is the failure
+   that matters -- a slip listing what an order USED to contain is worse than a
+   slightly untidy one.
+
+   Chrome is hidden with Tailwind's `print:hidden` on the components themselves
+   (site-header, site-footer, admin-nav, and the status actions) rather than with
+   element selectors here. `header, footer { display: none }` would reach into
+   any card that happens to use those elements, and would do it silently.
+
+   What is left in this file is the page itself, which has no component to hang
+   off. */
+@media print {
+  /* 15mm is inside the unprintable margin of every common home printer. Leaving
+     it to the browser default gives a different result per browser, and a slip
+     that loses its edge on one of them. */
+  @page {
+    margin: 15mm;
+  }
+
+  /* Backgrounds are not printed by default, so the page ground and every card
+     come out white regardless. Saying so explicitly means what is on screen and
+     what is on paper are decided here rather than by a browser setting. */
+  body {
+    background: white;
+  }
+
+  /* A line item split across a page break is the one formatting failure with a
+     real consequence: half a row at the foot of page one reads as a different
+     quantity than it is. */
+  tr,
+  li {
+    break-inside: avoid;
+  }
+
+  /* Keep a heading with what it introduces. */
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+}
+
 /* Toast entrance. Defined here rather than pulled from a plugin -- `animate-in`
    belongs to tailwindcss-animate, which is not installed, so that class silently
    did nothing.
