@@ -1416,6 +1416,72 @@ customer.
 
 ---
 
+## The restore test (Phase 7 task 4)
+
+Section 6.10's rule is that an untested backup is not a backup. Four encrypted automated snapshots
+existed, 7-day retention, `available` — and nobody had ever restored one. `available` describes an
+object nobody has looked inside.
+
+Restored `rds:manitou-db-2026-09-01-08-57` to a throwaway `manitou-db-restoretest`: same class, same
+subnet group, same security group, **private**, deletion protection off, tagged `ephemeral=true`.
+
+### The numbers worth keeping
+
+**Restore took about six minutes**, 04:01 → 04:07, through `configuring-enhanced-monitoring`,
+`backing-up`, `modifying`, `available`. That is the recovery-time figure — and it is the answer to
+"how long are we down", which no amount of reading the console tells you.
+
+The recovery *point* is the other half. The snapshot was taken 08:57 and the newest production order
+was created 13:58:
+
+| | production | restored |
+| --- | --- | --- |
+| `alembic_version` | `8350f895449a` | **identical** |
+| tables | 19 | 19 |
+| orders | 5 | **4** |
+| newest order | #5, 13:58 | **#4, 03:47** |
+| media assets | 9 | 7 |
+| total rows | 46 | 39 |
+
+**Every difference is later than 08:57, and that is the point.** A restore that matched production
+exactly would have meant the probe was pointed at the wrong database. Price snapshots came back
+intact — `'T-Shirt (Large/Black)' @ 29.95 x1`, subtotal + tax + shipping = total — which counting
+rows would not have shown.
+
+### The finding: a restored instance has no readable password
+
+Production uses an **RDS-managed master password**, rotated every 7 days. The restored instance came
+back with **`MasterUserSecret: none`**.
+
+So its master password is frozen at whatever it was when the snapshot was taken, and **no secret
+anywhere holds that value**. This restore was usable only by coincidence: the last rotation was
+2026-08-31 and the next is 2026-09-07, so the current production secret still happens to match.
+
+**Restore after a rotation and you have a database you cannot log into.** The data is intact and
+unreachable, which is a worse failure than an obvious one — you would be reading "available" while
+locked out, in the middle of an incident.
+
+**So the recovery procedure has a step the console does not mention:** immediately after
+`restore-db-instance-from-db-snapshot`, run
+
+    aws rds modify-db-instance --db-instance-identifier <restored> \
+      --manage-master-user-password --apply-immediately
+
+which has RDS generate and manage a fresh secret you can actually read. Do this before assuming the
+restore succeeded, because a restore you cannot authenticate against has not succeeded.
+
+This is exactly what the exercise exists to surface. Nothing about the snapshots, the retention
+setting or the encryption looked wrong; the gap was in the step after them.
+
+### Cost and cleanup
+
+A `db.t4g.micro` for under an hour — a few cents. Deleted with `--skip-final-snapshot
+--delete-automated-backups`, after asserting the identifier was the throwaway and not production.
+`infra/probes/db_census.py` is the reusable half: it takes a host override so the same probe
+describes production and a restore, and the two outputs diff directly.
+
+---
+
 ## GitHub Actions deploys without AWS keys
 
 **No access keys anywhere.** The workflow assumes an IAM role through GitHub's OIDC provider, and

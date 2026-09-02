@@ -1014,6 +1014,19 @@ object; deleting a used one is refused with the list of products holding it.
      nothing was listening — so this was one ALB listener and no firewall change. 301, preserving
      host, path and query, covering the apex, `www` and the API subdomain.
 4. **[You]** Verify backups by performing a test restore. An untested backup is not a backup.
+   - **Done 2026-09-02.** Restored the most recent daily snapshot to a throwaway private instance and
+     compared it against production with `infra/probes/db_census.py`. Schema version identical, 19
+     tables both sides, and every row that differed was created after the snapshot — a restore that
+     matched exactly would have meant the wrong database was measured. Deleted afterwards; a few
+     cents.
+   - **Recovery time ≈ 6 minutes. Recovery point ≈ up to 24 hours** on daily snapshots — PITR would
+     bring that to minutes and has not been exercised yet.
+   - **The finding: a restored instance has no readable master password.** Production's master
+     password is RDS-managed and rotates weekly; the restore came back with no managed secret at all,
+     so its password is frozen at snapshot time and stored nowhere. It worked only because no
+     rotation had happened in between. **After any restore, run `modify-db-instance
+     --manage-master-user-password` before assuming success** — otherwise the data is intact and
+     unreachable. See `infra/README.md`.
 5. **[You + Claude Code]** Confirm logging, alerts, and error tracking are in place, then launch.
 
    **Going live is not a switch, and none of the below is exercised by the test-mode integration.**
