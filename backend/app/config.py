@@ -98,6 +98,12 @@ class Settings(BaseSettings):
     s3_bucket: str = ""
     s3_region: str = "us-east-1"
 
+    #: Which region SES sends from. Separate from s3_region even though both are
+    #: us-east-1 today: they are different services and a clone may well verify
+    #: its sending domain somewhere else, and one variable serving two purposes
+    #: is a variable that cannot be changed for one of them.
+    ses_region: str = "us-east-1"
+
     #: The CloudFront domain, no scheme -- e.g. "d111111abcdef8.cloudfront.net".
     #:
     #: Load-bearing in two places that must agree: web/next.config.ts lists it in

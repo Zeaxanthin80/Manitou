@@ -1,5 +1,6 @@
 """Authentication and account self-service."""
 
+import logging
 from datetime import datetime, timezone
 
 import jwt
@@ -70,6 +71,8 @@ from app.services.password_reset import (
 )
 from app.services.email import EmailMessage, EmailSender
 from app.store import store_config
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -406,21 +409,48 @@ def forgot_password(
         db.commit()
 
         link = f"{settings.app_base_url}/reset-password?token={raw_token}"
-        sender.send(
-            EmailMessage(
-                to=user.email,
-                subject=f"Reset your {store_config.store.name} password",
-                body=(
-                    f"Someone asked to reset the password for your "
-                    f"{store_config.store.name} account.\n\n"
-                    f"{link}\n\n"
-                    f"This link works once and expires in "
-                    f"{int(TOKEN_TTL.total_seconds() // 60)} minutes.\n\n"
-                    f"If this wasn't you, ignore this email -- your password has "
-                    f"not changed. Questions: {store_config.store.support_email}"
-                ),
-            )
+        message = EmailMessage(
+            to=user.email,
+            subject=f"Reset your {store_config.store.name} password",
+            body=(
+                f"Someone asked to reset the password for your "
+                f"{store_config.store.name} account.\n\n"
+                f"{link}\n\n"
+                f"This link works once and expires in "
+                f"{int(TOKEN_TTL.total_seconds() // 60)} minutes.\n\n"
+                f"If this wasn't you, ignore this email -- your password has "
+                f"not changed. Questions: {store_config.store.support_email}"
+            ),
         )
+        try:
+            sender.send(message)
+        except Exception:  # noqa: BLE001 - see below; breadth is the point
+            # **A failed send must not change the response.**
+            #
+            # Every other outcome here returns the same 202 -- unknown address,
+            # suspended account, a repeat inside the cooldown. Letting an
+            # exception escape would make a KNOWN address answer 500 where an
+            # unknown one answers 202, which is precisely the account
+            # enumeration oracle this handler is shaped to deny. Whether our mail
+            # provider is having a bad afternoon is not a fact the caller is
+            # entitled to learn about somebody else's account.
+            #
+            # This could not happen while the console sender was the only
+            # implementation: printing does not fail. It became reachable the
+            # moment SES arrived, and SES fails in ordinary ways -- a throttle
+            # (one message per second in the sandbox), a suppressed recipient, a
+            # missing credential.
+            #
+            # Broad rather than `except EmailError`, because the requirement is
+            # about the RESPONSE, not about a family of errors: anything raised
+            # after the branch above is a leak, including a mistake of ours.
+            #
+            # Not silent. SesEmailSender already logged the cause at WARNING, and
+            # the manitou-app-warnings metric filter turns that into an alarm;
+            # this line adds the endpoint context the sender has no way to know.
+            logger.warning(
+                "password reset email could not be sent for user id=%s", user.id
+            )
 
     return {"detail": "If that address has an account, a reset link is on its way."}
 

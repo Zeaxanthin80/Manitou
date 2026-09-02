@@ -36,9 +36,25 @@ if not config.get_main_option("sqlalchemy.url", None):
     )
 
 # Interpret the config file for Python logging.
-# This line sets up loggers basically.
+#
+# **disable_existing_loggers=False, and the default is a trap.** fileConfig
+# defaults to True, which sets `.disabled = True` on every logger that already
+# exists at this moment -- not just the ones alembic.ini mentions.
+#
+# Standalone `alembic upgrade head` barely notices: almost nothing is imported
+# yet. The test suite is a different shape entirely. conftest builds the schema
+# by running these migrations IN PROCESS, after pytest has already collected the
+# test modules -- so every `logging.getLogger(__name__)` bound at module scope is
+# silenced for the rest of the session.
+#
+# Nothing failed loudly. The application still logged in production (migrations
+# run as their own one-off task and never share the API's process), and tests
+# that assert on logging passed as long as they fetched their logger INSIDE the
+# test, after this line had run. It surfaced only when a test imported the module
+# under test at the top of the file and then found its warnings had vanished --
+# a logging assertion that quietly cannot fail, which is worse than no assertion.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # Autogenerate compares this metadata against the live database.
 target_metadata = Base.metadata

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { logoutAction } from "@/app/actions/auth";
 import { MobileMenu } from "@/components/mobile-menu";
 import type { NavItem } from "@/components/mobile-menu";
-import { avatarClass, initials } from "@/components/ui/avatar";
+import { avatarClass, initial } from "@/components/ui/avatar";
 import { DropdownMenu, menuItemClass } from "@/components/ui/dropdown-menu";
 import { Wordmark } from "@/components/ui/wordmark";
 import { cn } from "@/lib/cn";
@@ -145,7 +145,7 @@ export function AdminNav({
             panelClassName="w-56"
             triggerLabel={`Account menu for ${fullName || email}`}
             triggerClassName={avatarClass}
-            trigger={initials(fullName, email)}
+            trigger={initial(fullName, email)}
           >
             <div className="border-b border-border px-4 py-3">
               <p className="font-body text-sm text-text">{fullName}</p>

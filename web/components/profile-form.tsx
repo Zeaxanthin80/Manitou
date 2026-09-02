@@ -19,7 +19,11 @@ export function ProfileForm({ user }: { user: User }) {
 
   return (
     <form action={action} className="flex max-w-md flex-col gap-4">
-      <FormField id="full_name" label="Name" required>
+      {/* "Full name", matching registration. The same field asked two ways reads
+          as two different questions -- and "Full name" is the wording that says
+          "write it however you write it", which is the point of storing one
+          column instead of a first/last pair. */}
+      <FormField id="full_name" label="Full name" required>
         {(c) => (
           <Input {...c} name="full_name" defaultValue={user.full_name} autoComplete="name" />
         )}

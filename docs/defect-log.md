@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [34](#34-alembics-logging-config-silently-disabled-the-applications-loggers-under-test) | 2026-09-01 | Alembic's logging config silently disabled the application's loggers under test | Fixed — uncommitted |
 | [33](#33-admin-image-upload-broke-the-day-the-domain-was-added) | 2026-09-01 | Admin image upload broke the day the domain was added | Fixed — uncommitted |
 | [32](#32-the-audit-trail-recorded-the-load-balancer-not-the-customer) | 2026-08-31 | The audit trail recorded the load balancer, not the customer | Fixed — uncommitted |
 | [31](#31-a-password-one-byte-too-long-returned-500-from-an-unauthenticated-endpoint) | 2026-08-31 | A password one byte too long returned 500 from an unauthenticated endpoint | Fixed — uncommitted |
@@ -49,6 +50,53 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 34. Alembic's logging config silently disabled the application's loggers under test
+
+**Status:** Fixed. Found while writing the first test that asserts on a log line
+from a module imported at the top of the file.
+
+**Seen.** A test asserting that `SesEmailSender` logs a failure at WARNING got an
+empty `caplog`. The log line was definitely produced -- it appeared in pytest's
+captured stdout -- but no handler saw it.
+
+**Cause.** `alembic/env.py` called::
+
+    fileConfig(config.config_file_name)
+
+`disable_existing_loggers` defaults to **True**, and it does not mean "the ones
+this file configures". It sets `.disabled = True` on **every logger that exists
+at that moment**.
+
+Standalone `alembic upgrade head` barely notices, because almost nothing is
+imported yet. The test suite is a different shape: conftest builds the schema by
+running the migrations **in process**, after pytest has already imported every
+test module. So every `logging.getLogger(__name__)` bound at module scope --
+which is all of them -- was disabled for the rest of the session.
+
+**Why it went unnoticed for so long.** Two independent reasons, and both are the
+interesting part:
+
+1. **Production was never affected.** Migrations run as their own one-off ECS
+   task and never share the API's process, so nothing in the running application
+   was ever disabled. The bug existed only where the tests live.
+2. **`test_logging.py` passes, correctly.** It fetches its loggers *inside* each
+   test — `logging.getLogger("app.routers.webhooks")` — which happens after the
+   migrations have run, so those loggers are created fresh and enabled. The file
+   that exists to test logging could not detect this, because of where it calls
+   `getLogger`.
+
+**The shape worth remembering: a logging assertion that quietly cannot fail.**
+An empty `caplog` reads exactly like "the code did not log", so the natural fix
+is to weaken the assertion until it passes -- which would have deleted a real
+test to accommodate a real bug. The tell was that the line appeared in stdout
+while `caplog.records` was empty: produced, but unroutable.
+
+**Fix.** `fileConfig(config.config_file_name, disable_existing_loggers=False)`.
+Strictly safer: alembic's config still configures what it names, and stops
+silencing what it does not.
 
 ---
 

@@ -1293,6 +1293,129 @@ push to main, so the check is cheap: `curl -sI http://imprimapress.com/ | grep -
 
 ---
 
+## Outbound email — SES (Phase 7)
+
+Production was running `EMAIL_SENDER=console`, which prints the message instead of sending it. So
+**no mail was leaving the application at all**: a customer who forgot their password got nothing, and
+the reset link they never received was sitting in a CloudWatch log group. Not a code defect — the
+console sender did exactly what it says — but a deployment that had never been given the real one.
+
+### The domain is the identity, not an address
+
+SES verifies either an address or a domain. Domain verification wins here for a reason that has
+nothing to do with scale: **verifying an address requires a mailbox that can receive the confirmation
+mail**, and `support@imprimapress.com` has no mailbox behind it. Domain verification is DNS only, and
+it additionally allows sending as any address at the domain later without a second round trip.
+
+Easy DKIM, so SES publishes three CNAMEs and signs outgoing mail. Route 53 already hosts the zone, so
+this was five records added in one change — never a replace, because the zone also holds the ALB
+alias records and the ACM validation CNAME:
+
+| record | value | why |
+| --- | --- | --- |
+| 3 × `<token>._domainkey` CNAME | `<token>.dkim.amazonses.com` | Easy DKIM. This is what actually authenticates the mail |
+| apex TXT | `v=spf1 include:amazonses.com ~all` | see below |
+| `_dmarc` TXT | `v=DMARC1; p=none;` | monitoring only, for now |
+
+**`~all` rather than `-all`, deliberately.** DKIM is what authenticates SES mail, and DKIM survives
+forwarding where SPF does not — so a hard fail buys very little and costs a silent outage the day a
+second sender appears (a mailbox provider for `support@`, say). **`p=none` is monitoring, not
+protection**: tighten to `quarantine` only after confirming alignment passes, or legitimate mail gets
+binned by the record meant to protect it.
+
+Verified in about twenty minutes: `VerifiedForSendingStatus: True`, `DkimAttributes.Status: SUCCESS`.
+
+### The sandbox is the long pole
+
+A new SES account is in the **sandbox**: 200 messages a day, one per second, and — the part that
+matters — **it can only send to verified addresses**. Real customers cannot receive anything until
+AWS grants production access, which is a request in the console and takes about a day.
+
+So the domain being verified does not mean mail works. `EMAIL_SENDER` stays `console` until
+production access is granted, because flipping it early would send nothing to real customers while
+looking configured.
+
+### The From address is store config, not a new variable
+
+`store.support_email` already appears in the storefront footer, and a reply to a reset email should
+reach the inbox a customer would write to anyway. A clone edits one file instead of a file and an
+environment variable.
+
+### Permissions, scoped to the identity
+
+The task role gained `ses:SendEmail` on the domain identity ARN only — a second inline policy, so the
+S3 upload policy was not rewritten to add it.
+
+A `ses:FromAddress` condition would be tighter still and was **rejected**: it would pin the policy to
+a value that lives in `store-config.json`, so changing the support address would break sending in a
+way that surfaces as an IAM error. The domain identity is the boundary that matters — it already
+prevents sending as anyone else's domain — and the marginal gain over a task that can already read
+the database is small.
+
+### Bounces have somewhere to go, and it was checked rather than declared
+
+The production-access form asks you to confirm *"you have a process in place for handling bounce and
+complaint notifications."* Before this, half of that was true and the half involving a human was not:
+
+- **Account suppression list: on** for `BOUNCE` and `COMPLAINT`, so SES already stopped resending to
+  addresses that hard-bounced. That is the automatic half.
+- **Feedback forwarding: on**, which mails bounce notices to the From address —
+  `support@imprimapress.com`, **which has no mailbox**. Notices were going into a void.
+
+So bounce and complaint notifications now publish to the existing `manitou-alerts` topic, and
+forwarding is off. Reusing that topic rather than making another: it already has a confirmed email
+subscription, a second would mean another confirmation link to find in a spam folder (task 11's went
+there), and the volume on a store sized at ~1 concurrent user is negligible.
+
+**The topic policy needed a statement.** It was still AWS's default, which does not let SES publish.
+The added statement carries a `AWS:SourceAccount` condition — a service principal is not an identity,
+and without the condition SES *in any account* could be induced to publish here.
+
+**Proven with the mailbox simulator**, which works inside the sandbox and does not touch sending
+reputation: `success@`, `bounce@` and `complaint@simulator.amazonses.com`. SNS recorded 4 published,
+4 delivered, **0 failed**.
+
+One expectation was wrong and is worth writing down. The check was going to be "the bounced address
+appears on the suppression list" — it did not, and that is correct: **AWS deliberately exempts
+simulator addresses from the suppression list** so the path can be tested repeatedly. Read as a
+failure it would have sent someone hunting a working feature. The SNS delivery count is the evidence;
+the suppression list is not.
+
+### The task role was tested separately, and that mattered
+
+The CLI sends above ran as an IAM user with `AdministratorAccess`. They proved SES works and proved
+nothing about the policy the application runs under. Running the same call inside a Fargate task
+carrying `manitou-api-task`:
+
+| from address | result |
+| --- | --- |
+| `support@imprimapress.com` | **ALLOWED** |
+| `nobody@example.com` | **DENIED** (`AccessDeniedException`) |
+
+The refusal is what makes the permit meaningful — a grant wide enough to permit everything would have
+passed the first row just as happily.
+
+**A constraint of `run_in_vpc.sh` surfaced here:** it runs the **deployed** image, so a probe cannot
+import code that has not shipped yet. The first attempt failed on `ImportError` for a class still
+sitting uncommitted. Test the AWS boundary with boto3 directly when the code under test is not
+deployed; test the class after it is.
+
+### One failure the console sender was hiding
+
+`ConsoleEmailSender.send` cannot fail; printing does not raise. So `/auth/forgot-password` called
+`sender.send(...)` unguarded, and its account-enumeration property held **by accident**.
+
+SES fails in ordinary ways — a throttle (one per second in the sandbox), a suppressed recipient, a
+missing credential. Unguarded, a **known** address would answer 500 where an unknown one answers 202,
+which is exactly the oracle that handler is shaped to deny. The send is now wrapped, deliberately
+broadly, because the requirement is about the response rather than about a family of exceptions.
+
+It is not silent: the sender logs the cause at WARNING, and the `manitou-app-warnings` metric filter
+turns that into an alarm. Mail that stops going out pages somebody instead of being discovered by a
+customer.
+
+---
+
 ## GitHub Actions deploys without AWS keys
 
 **No access keys anywhere.** The workflow assumes an IAM role through GitHub's OIDC provider, and

@@ -17,8 +17,26 @@ to add when something needs it and impossible to remove once several call sites
 assume it.
 """
 
+import logging
 from dataclasses import dataclass
 from typing import Protocol
+
+from app.config import settings
+from app.store import store_config
+
+logger = logging.getLogger(__name__)
+
+
+class EmailError(RuntimeError):
+    """Sending failed.
+
+    Raised rather than swallowed, because whether a failure is fatal depends
+    entirely on the caller. A reset email that does not go out must NOT turn into
+    a 500 -- that would answer differently for a known and an unknown address and
+    hand back the account-enumeration oracle `/auth/forgot-password` is built to
+    deny. An admin action might reasonably want to fail loudly. Only the call site
+    knows which it is.
+    """
 
 
 @dataclass(frozen=True)
@@ -97,9 +115,74 @@ class MemoryEmailSender:
         return None
 
 
+class SesEmailSender:
+    """Sends through Amazon SES.
+
+    **The From address comes from store config, not a new environment variable.**
+    `store.support_email` is already the address the storefront footer shows, and
+    a reply to a password-reset mail should reach the same inbox a customer would
+    write to anyway. A clone changes one file rather than one file and one
+    variable.
+
+    **Nothing here logs the message body.** A reset body contains the token in a
+    URL, and CloudWatch retains logs for 30 days -- so logging it would leave
+    working credentials sitting in a log group long after the 30-minute token
+    expiry. Same rule the audit trail enforces by refusing any key containing
+    "token".
+
+    A failure logs at WARNING, which is deliberate: the `manitou-app-warnings`
+    metric filter matches WARNING lines in the `app.` namespace, so mail that
+    stops going out raises an alarm instead of being noticed by a customer.
+    """
+
+    def __init__(self, client=None, source: str | None = None) -> None:
+        if client is None:
+            # Imported here rather than at module scope, for the reason
+            # admin._s3 documents: import-time construction would make every
+            # test and every `alembic` invocation try to resolve AWS
+            # credentials, and fail on any machine without them.
+            import boto3
+
+            client = boto3.client("sesv2", region_name=settings.ses_region)
+        self._client = client
+        self._source = source or store_config.store.support_email
+
+    def send(self, message: EmailMessage) -> None:
+        try:
+            response = self._client.send_email(
+                FromEmailAddress=self._source,
+                Destination={"ToAddresses": [message.to]},
+                Content={
+                    "Simple": {
+                        "Subject": {"Data": message.subject, "Charset": "UTF-8"},
+                        # Text only. EmailMessage has no HTML part by design --
+                        # see the dataclass above.
+                        "Body": {"Text": {"Data": message.body, "Charset": "UTF-8"}},
+                    }
+                },
+            )
+        except Exception as exc:
+            # Broad on purpose. This is an I/O boundary, and the failures are not
+            # one family: ClientError for a throttle or a suppressed recipient,
+            # NoCredentialsError for a misconfigured task role, EndpointConnection
+            # for a network fault. A caller that must not leak needs one thing to
+            # catch, not a list that grows silently.
+            logger.warning(
+                "SES send failed: to=%s subject=%r error=%s",
+                message.to, message.subject, exc,
+            )
+            raise EmailError(f"Could not send to {message.to}") from exc
+
+        logger.info(
+            "SES accepted message %s to %s",
+            response.get("MessageId"), message.to,
+        )
+
+
 SENDERS: dict[str, type] = {
     "console": ConsoleEmailSender,
     "memory": MemoryEmailSender,
+    "ses": SesEmailSender,
 }
 
 
@@ -114,6 +197,5 @@ def build_sender(name: str) -> EmailSender:
         return SENDERS[name]()
     except KeyError:
         raise ValueError(
-            f"Unknown EMAIL_SENDER {name!r}. Available: {', '.join(sorted(SENDERS))}. "
-            f"Phase 6 adds 'ses'."
+            f"Unknown EMAIL_SENDER {name!r}. Available: {', '.join(sorted(SENDERS))}."
         ) from None

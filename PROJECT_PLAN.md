@@ -1015,6 +1015,24 @@ object; deleting a used one is refused with the list of products holding it.
      host, path and query, covering the apex, `www` and the API subdomain.
 4. **[You]** Verify backups by performing a test restore. An untested backup is not a backup.
 5. **[You + Claude Code]** Confirm logging, alerts, and error tracking are in place, then launch.
+
+   **Going live is not a switch, and none of the below is exercised by the test-mode integration.**
+   Written down because each item fails in a different place, and two of them fail silently:
+
+   - **[You]** Stripe **live** API keys — secret into Secrets Manager, publishable into the
+     `STRIPE_PUBLISHABLE_KEY` repository variable. The publishable key is baked into the client
+     bundle at build time, so it needs a rebuild, not a restart.
+   - **[You]** A **live-mode webhook endpoint** with its own signing secret. The test-mode secret
+     will not verify live events, and the failure is a 400 that looks like ordinary traffic to the
+     load balancer — which is exactly what the `AppWarningCount` alarm was built for.
+   - **[You]** Register `imprimapress.com` **and** `www.imprimapress.com` on Stripe's Payment method
+     domains page. Dashboard only, no file to host. Required for Apple Pay; registering in live mode
+     covers sandboxes too.
+   - **[You]** Activate the payment methods you actually want in live mode. Unactivated methods show
+     in test mode and vanish in live, so the test-mode checkout is not a preview of the live one.
+   - **[You + Claude Code]** Re-check the browser console after enabling any wallet. **CSP is
+     enforcing**, so an origin a wallet needs but the policy omits removes the button silently
+     rather than erroring.
 ### Phase 8 — Mobile Apps
 
 **Frameworks: Kotlin with Jetpack Compose (Android), Swift with SwiftUI (iOS).** Both consume the

@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { logoutAction } from "@/app/actions/auth";
-import { avatarClass, initials } from "@/components/ui/avatar";
+import { avatarClass, initial } from "@/components/ui/avatar";
 import { DropdownMenu, menuItemClass } from "@/components/ui/dropdown-menu";
 import type { User } from "@/lib/api";
 
@@ -25,7 +25,7 @@ export function AccountMenu({ user }: { user: User }) {
       // "CC" read aloud means nothing, so the button says who it belongs to.
       triggerLabel={`Account menu for ${user.full_name || user.email}`}
       triggerClassName={avatarClass}
-      trigger={initials(user.full_name, user.email)}
+      trigger={initial(user.full_name, user.email)}
     >
       <div className="border-b border-border px-4 py-3">
         <p className="font-body text-sm text-text">{user.full_name}</p>
