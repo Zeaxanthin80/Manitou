@@ -1473,6 +1473,53 @@ restore succeeded, because a restore you cannot authenticate against has not suc
 This is exactly what the exercise exists to surface. Nothing about the snapshots, the retention
 setting or the encryption looked wrong; the gap was in the step after them.
 
+### Point-in-time recovery, tested separately
+
+The snapshot test proved the daily path. PITR is the one you would actually reach for after a bad
+migration or a mistaken delete, and it answers a different question, so it was run on its own.
+
+**Tested without writing anything to production**, by using existing history as the fixture. The
+database already contained two precisely dated events: order #4 created 03:47:49 on 2026-09-01, and
+product #26 created at **04:28:58**. Restoring to **04:00** therefore has a falsifiable expected
+answer, and it was written down before the restore ran:
+
+| | 08:57 snapshot | 04:00 PITR predicted | actual |
+| --- | --- | --- | --- |
+| products | 2 | **1** | **1** |
+| audit_events | 6 | **5** | **5** |
+| orders | 4 | 4 | 4 |
+
+A **28-minute window changes the answer**. That is the granularity claim demonstrated rather than
+asserted — and the product, its variant, its inventory row and its audit event all disappear
+together, so the restore is coherent at that instant rather than a partial reconstruction.
+
+### The two paths trade off against each other
+
+| | recovery time | recovery point |
+| --- | --- | --- |
+| Snapshot restore | **~6 minutes** | up to 24 hours of loss |
+| Point-in-time restore | **~30 minutes** | ~5 minutes of loss |
+
+PITR restores the base snapshot and then replays transaction logs, which is why it is far slower to
+come back. **Neither is better.** After a bad migration you want PITR and you will wait for it; after
+losing the instance you want the snapshot, because the lost day does not matter and the downtime
+does.
+
+### The missing password is a property of restoring, not of snapshots
+
+`MasterUserSecret` came back **`(none)`** here too, exactly as on the snapshot restore. So
+`modify-db-instance --manage-master-user-password` belongs in **any** recovery procedure, not just
+the snapshot one.
+
+### `EarliestRestorableTime` is absent, and that is not a limit
+
+`DescribeDBInstances` does not return the field at all — confirmed against the raw response, not
+inferred from a parse. `LatestRestorableTime` is present and current, and a PITR to 2026-09-01 04:00
+was accepted, so continuous backup is working across the retention window regardless.
+
+**Letting RDS adjudicate beat reasoning about the gap:** an out-of-window target fails with an error
+naming the valid range, which is a better answer than any inference from a field that is not there.
+
 ### Cost and cleanup
 
 A `db.t4g.micro` for under an hour — a few cents. Deleted with `--skip-final-snapshot

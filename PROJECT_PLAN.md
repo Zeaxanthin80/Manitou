@@ -1019,8 +1019,13 @@ object; deleting a used one is refused with the list of products holding it.
      tables both sides, and every row that differed was created after the snapshot — a restore that
      matched exactly would have meant the wrong database was measured. Deleted afterwards; a few
      cents.
-   - **Recovery time ≈ 6 minutes. Recovery point ≈ up to 24 hours** on daily snapshots — PITR would
-     bring that to minutes and has not been exercised yet.
+   - **Both recovery paths tested, and they trade off against each other.** Snapshot restore: ~6
+     minutes back, up to 24 hours of loss. Point-in-time restore: ~30 minutes back, ~5 minutes of
+     loss. Neither is better — after a bad migration you want PITR and will wait for it; after losing
+     the instance you want the snapshot, because the lost day matters less than the downtime.
+   - PITR was proved **without writing to production**, by restoring to a timestamp between two dated
+     events already in the data (order #4 at 03:47, product #26 at 04:28) and predicting the result
+     before running it. A 28-minute window changed the row counts exactly as predicted.
    - **The finding: a restored instance has no readable master password.** Production's master
      password is RDS-managed and rotates weekly; the restore came back with no managed secret at all,
      so its password is frozen at snapshot time and stored nowhere. It worked only because no
