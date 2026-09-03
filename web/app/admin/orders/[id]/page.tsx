@@ -3,13 +3,14 @@ import { notFound, redirect } from "next/navigation";
 
 import { OrderStatus } from "@/components/order-status";
 import { OrderStatusActions } from "@/components/order-status-actions";
+import { CopyButton } from "@/components/copy-button";
 import { PrintButton } from "@/components/print-button";
 import { OrderTotals } from "@/components/order-totals";
 import { Card, CardBody } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { ApiError, getAdminOrder } from "@/lib/api";
 import type { Address } from "@/lib/api";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, postalAddress } from "@/lib/format";
 import { getSession } from "@/lib/session";
 
 /**
@@ -144,7 +145,16 @@ export default async function AdminOrderPage({
                 {order.user_email}
               </a>
             </div>
-            <AddressBlock title="Ship to" address={order.shipping_address} />
+            <div>
+              <AddressBlock title="Ship to" address={order.shipping_address} />
+              {/* Only on "Ship to". Nothing gets posted to a billing address, so
+                  a copy button there would be an invitation to a mis-shipment. */}
+              <CopyButton
+                className="mt-2 print:hidden"
+                label="Copy address"
+                text={postalAddress(order.user_full_name, order.shipping_address)}
+              />
+            </div>
             <AddressBlock title="Bill to" address={order.billing_address} />
           </div>
         </div>
