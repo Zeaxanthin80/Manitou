@@ -1064,6 +1064,37 @@ object; deleting a used one is refused with the list of products holding it.
    - **A failed send never fails the webhook**, and that is correctness rather than tidiness: a
      non-2xx would have Stripe redeliver, the redelivery would find the order already paid and take
      the branch that sends nothing, so the message would be lost permanently rather than delayed.
+
+6. **[You + Claude Code]** Fill the storefront before launch: a catalogue that reads as a shop, a
+   home page that leads with something, and a real wordmark and favicon.
+   - Added 2026-09-04, and worth saying why it was not here already. Every other Phase 7 task is
+     infrastructure — capacity, security, backups, payments — because the phase was written as
+     *hardening*. But the site a customer opens was two products, one of them called `T-Shirt`, and
+     the default Next.js favicon in the tab. Defect 23 made the same argument from the other side
+     (**"Phase 7 is launch readiness"**), and an empty-looking store fails that test as surely as a
+     missing screen does.
+   - The **catalogue** is entered through `/admin` rather than seeded. `seed.py` truncates every
+     table and refuses any non-localhost database, so it cannot reach production by design; entering
+     the real catalogue through the portal is also the honest answer to defect 23's question, *can a
+     brand-new install be set up entirely through its own interface?*
+   - Four categories, and **the categories are the series** — `Field Guide`, `Emblem`, `Poster`,
+     `Orbit OS`. `products.category_id` is NOT NULL and single, so a product-type tree
+     (`T-Shirts` / `Accessories`) would have split the Orbit OS capsule, which is one design across
+     a tee, a tote and a cap. No `collections` table: a series is a grouping, the category tree
+     already groups, and Section 1.1 forbids generalising past that without an argument in writing.
+   - **`home.featured` in store config** drives the band above the grid: category slug, eyebrow,
+     heading, body, button label, image and its alt text. Empty `category` renders nothing, the same
+     convention `store.logo` uses — the key stays, the value empties. No component holds store voice
+     and no endpoint gained a `featured` flag.
+   - **The wordmark is outlines, not live text.** `IMPRIMA` over `PRESS`, tracked to one measure and
+     split by a rule, cut from Archivo Black. Set as a single line the name runs past 11:1 and wants
+     ~220px of a 375px screen; stacked it is 2.7:1, and 86px at the 32px height the header already
+     has spare. Its fill is the `text` token baked in, because an `<img>` cannot inherit
+     `currentColor` — the one place a token value lives outside the token file.
+   - **Still open:** the three Orbit OS products ship hidden (`is_active = false`) until their
+     artwork is redrawn. The current mockups carry garbled placeholder text on the garment, which is
+     worse for credibility than having no accessories at all.
+
 ### Phase 8 — Mobile Apps
 
 **Frameworks: Kotlin with Jetpack Compose (Android), Swift with SwiftUI (iOS).** Both consume the

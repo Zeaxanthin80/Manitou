@@ -41,12 +41,22 @@ export function Wordmark() {
      * different shape without touching code, and a hardcoded aspect ratio would
      * then silently squash it.
      *
-     * Fixed height, intrinsic width: `h-5` is 20px against the 18px display
-     * text it replaces, which is the usual optical match for a logo set beside
-     * body copy. A mark up to roughly 6:1 sits comfortably in the header at that
-     * height; anything wider needs the nav re-checked at 375px before shipping.
+     * Fixed height, intrinsic width. `h-8` is 32px, and it is set by the mark's
+     * PROPORTIONS rather than by matching the 18px text it replaces: the height
+     * of an all-caps mark is its cap height, where 18px of `text-lg` is a cap of
+     * about 13px inside a taller line box. ImprimaPress is twelve letters, so a
+     * single line runs past 11:1 and would need roughly 220px of a 375px screen;
+     * stacking the two words to a common measure brings it to 2.7:1, and at 32px
+     * that is 86px wide with 13px caps -- narrower than the text it replaces,
+     * and the same reading size.
+     *
+     * It costs no vertical space either: the cart link and the avatar beside it
+     * are `size-9`, so the header row is already 36px tall.
+     *
+     * A different mark needs this number re-derived, not inherited. Check the
+     * nav at 375px before shipping one.
      */
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={logo} alt={name} className="h-5 w-auto" />
+    <img src={logo} alt={name} className="h-8 w-auto" />
   );
 }

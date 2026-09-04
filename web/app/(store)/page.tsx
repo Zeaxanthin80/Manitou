@@ -1,3 +1,4 @@
+import { FeaturedSeries } from "@/components/featured-series";
 import { ProductCard } from "@/components/product-card";
 import { listProducts } from "@/lib/api";
 import { storeConfig } from "@/lib/store-config";
@@ -19,6 +20,11 @@ export default async function Home() {
       <p className="mt-4 max-w-prose font-body text-base text-muted">
         {storeConfig.store.tagline}
       </p>
+
+      {/* Merchandising, above the catalogue. It reads store-config itself and
+          renders nothing when no series is featured, so this stays one line and
+          the page keeps its old shape for a store that leads with nothing. */}
+      <FeaturedSeries />
 
       <p className="mt-12 font-body text-xs uppercase tracking-tight text-muted">
         {page.total} {page.total === 1 ? "product" : "products"}
