@@ -1293,7 +1293,13 @@ push to main, so the check is cheap: `curl -sI http://imprimapress.com/ | grep -
 
 ---
 
-## Outbound email — SES (Phase 7)
+## Email — sending and receiving (Phase 7)
+
+Two directions, two providers, one DNS zone holding both. **They are independent**: SES sends and
+never receives; ImprovMX receives and never sends. MX records govern inbound only, so adding them
+could not affect sending — which is why the two halves below can be reasoned about separately.
+
+### Outbound — SES
 
 Production was running `EMAIL_SENDER=console`, which prints the message instead of sending it. So
 **no mail was leaving the application at all**: a customer who forgot their password got nothing, and
@@ -1413,6 +1419,78 @@ broadly, because the requirement is about the response rather than about a famil
 It is not silent: the sender logs the cause at WARNING, and the `manitou-app-warnings` metric filter
 turns that into an alarm. Mail that stops going out pages somebody instead of being discovered by a
 customer.
+
+---
+
+## Inbound — forwarding, not a mailbox
+
+`support@imprimapress.com` is the From address on every message the store sends, and until this it
+had nothing behind it: **replies bounced.** A store whose confirmation emails cannot be replied to is
+a store that looks abandoned the first time somebody tries.
+
+### AWS is not in the mailbox business, permanently
+
+SES sends and can receive *programmatically* — into S3, or a Lambda — but it has no inbox anybody can
+open. The AWS product that did was **WorkMail, and it is discontinued: end of support 31 March 2027,
+new sign-ups already closed.** So this is not a gap to fill later with an AWS service; there will not
+be one.
+
+That is the **second** AWS sunset this project has walked into. Express Mode is here because App
+Runner closed to new customers in April 2026. Worth carrying forward as a way of reading the
+catalogue: the commodity primitives — S3, RDS running stock PostgreSQL, a load balancer — are
+load-bearing for AWS's own business and safe to depend on. The convenience layers on top are the ones
+that get retired.
+
+### Forwarding beats a mailbox here
+
+`support@` and `admin@` forward into an inbox that is already read every day. A real mailbox — Zoho,
+Google Workspace — would be a second inbox to remember, and **an inbox nobody opens is worse than
+none**: a customer replying gets silence either way, but the mailbox version also costs money and
+looks like it works.
+
+Two MX records at the apex, priority 10 and 20, pointing at `mx1`/`mx2.improvmx.com`. Free tier.
+
+### The provider's DNS checker reports two "errors" that are not errors
+
+Its dashboard shows **MX ✓✓ and SPF ✗**, and recommends:
+
+    v=spf1 include:amazonses.com include:spf.improvmx.com -all
+
+Neither half of that was adopted, and the reasoning matters more than the decision because the red
+banner will still be there in six months tempting somebody to "fix" it.
+
+**`include:spf.improvmx.com` is not needed for forwarding.** SPF authorises servers that send **as**
+this domain. When mail is forwarded, the `From` is the *original sender* — `someone@example.com` —
+so this domain's SPF is never evaluated in that path at all. The include only matters when sending
+*outbound* through their SMTP, which is a paid feature this account does not use. Adding it anyway
+would authorise ten IP ranges to send as the store, and spend one of SPF's **ten** permitted DNS
+lookups, for a service that never sends. Confirmed empirically: a test message forwarded correctly
+with the record exactly as it stands.
+
+**`-all` versus `~all` is a policy preference, not a fault.** Their advice is not wrong — a hard fail
+is stronger anti-spoofing, and would be safe today since SES is the only sender. But **DMARC is at
+`p=none`, so neither qualifier is enforced**: receivers are told to take no action either way.
+Changing it buys nothing until DMARC tightens, and DMARC must not tighten until `dkim=pass` has been
+observed on a real message to a real inbox — which needs SES production access first. Tightening
+before verifying alignment is how the record meant to protect the mail starts binning it.
+
+So: a red banner, no action. It compares against a generic ideal rather than detecting a break.
+
+### The catch-all was removed
+
+The provider's default configuration included a `*` alias forwarding **every** address at the domain.
+Deleted, leaving `support@` and `admin@` explicitly.
+
+A catch-all is a standing invitation: spammers run dictionary attacks against domains specifically to
+find them, every guess lands in the inbox, and forged bounces to addresses that never existed get
+forwarded too. Explicit aliases cost one dashboard entry each and stop all of it.
+
+### What is still missing
+
+Replies **arrive**, but they arrive in a personal inbox and would be answered *from* that address
+rather than from `support@`. Closing that gap needs Gmail's "send mail as" pointed at **SES SMTP
+credentials** — the sending path that already exists, no new provider — and it only works once SES
+production access is granted.
 
 ---
 
