@@ -13,8 +13,20 @@ export default async function Home() {
     <main className="mx-auto max-w-6xl px-6 py-12">
       {/* Studio leads with one big, quiet statement and a lot of air around it.
           text-3xl is 44px from the token scale -- the size Archivo Black was
-          chosen for. */}
-      <h1 className="max-w-2xl font-display text-3xl uppercase leading-none tracking-tight text-text">
+          chosen for.
+
+          It steps down to text-2xl below 769px because 44px does not fit. The
+          store name is twelve letters, which measures 366px in Archivo Black at
+          tracking-tight, against the 327px a 375px screen leaves inside px-6 --
+          so the heading ran off the right edge and took the whole page into
+          horizontal scroll with it. `max-w-2xl` does not help: it caps the BOX,
+          and a single unbreakable word overflows the box rather than wrapping.
+
+          The fix is a smaller step on the same scale, not a clamp() or an
+          arbitrary size -- 32px measures 265px and fits with room to spare. A
+          clone with a longer name than this still needs checking at 375px;
+          nothing here can know how long a name is. */}
+      <h1 className="max-w-2xl font-display text-2xl uppercase leading-none tracking-tight text-text wide:text-3xl">
         {storeConfig.store.name}
       </h1>
       <p className="mt-4 max-w-prose font-body text-base text-muted">

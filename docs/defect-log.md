@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [35](#35-the-store-name-pushed-the-home-page-into-horizontal-scroll-on-a-phone) | 2026-09-04 | The store name pushed the home page into horizontal scroll on a phone | Fixed — uncommitted |
 | [34](#34-alembics-logging-config-silently-disabled-the-applications-loggers-under-test) | 2026-09-01 | Alembic's logging config silently disabled the application's loggers under test | Fixed — uncommitted |
 | [33](#33-admin-image-upload-broke-the-day-the-domain-was-added) | 2026-09-01 | Admin image upload broke the day the domain was added | Fixed — uncommitted |
 | [32](#32-the-audit-trail-recorded-the-load-balancer-not-the-customer) | 2026-08-31 | The audit trail recorded the load balancer, not the customer | Fixed — uncommitted |
@@ -50,6 +51,46 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 35. The store name pushed the home page into horizontal scroll on a phone
+
+**Status:** Fixed. Found by measurement while building the featured-series band, not by the change
+itself — the bug had been live since Phase 3.
+
+**What was seen.** Nothing, for three weeks. The home page's `<h1>` is the store name at
+`text-3xl`, and on a 375px screen it ran off the right edge and took the page body into sideways
+scroll with it. It had shipped, been demonstrated and been load-tested in that state.
+
+**What caused it.** Two decisions that are each fine and only collide at one screen width.
+`text-3xl` is 44px, chosen because it is the size Archivo Black was picked for. `ImprimaPress` is
+twelve letters, and at that size with `tracking-tight` it measures **366px** — against the **327px**
+a 375px viewport leaves inside `px-6`.
+
+`max-w-2xl` on the heading looks like it should have prevented this and cannot: `max-width` caps the
+BOX, and a single word with no break opportunity overflows its box rather than wrapping. A
+constraint that only binds when the content is willing to reflow is not a constraint.
+
+**Why no test or review caught it.** Phase 3 task 9 says to check the storefront on a phone, and it
+was checked — by looking. Looking is what fails here: a heading whose last letters sit past the fold
+of a scrollable page reads as a heading, and the scroll needed to see the overflow is the same
+gesture as reading the page. There is no automated check either; the web side has no test runner at
+all, so nothing measures rendered geometry.
+
+**What was changed.** `text-2xl wide:text-3xl` on the heading in `web/app/(store)/page.tsx` — 32px
+below 769px, which measures 266px and fits with 61px spare. A step already on the token scale, not
+a `clamp()` or a one-off size, so the type system still has one set of sizes in it.
+
+**What makes it not happen again.** Honestly: not much, and worth saying so rather than inventing a
+process. What actually found it was refusing to accept "it looks fine" and asking the browser for a
+number — rendering the heading headless and reading its width against the available width. That
+technique generalises to any single-token heading and costs about a minute.
+
+The durable version of the lesson is narrower than "test on a phone", which had already been done.
+It is: **an unbreakable string in a fixed-size display face is a layout constraint, not a content
+choice.** Every clone of this repo picks a store name, and a longer one overflows again at a size
+this fix does not cover. That belongs in whatever checklist a clone gets, which does not exist yet.
 
 ---
 
