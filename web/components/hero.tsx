@@ -63,7 +63,21 @@ export function Hero() {
           both without covering the garments; the photograph is generated to
           that brief, and a future one that isn't gets a second art-directed
           <Image> rather than a change here. */}
-      <div className="relative aspect-[3/4] wide:aspect-[2/1]">
+      {/* max-h-[75svh] above wide: an aspect ratio alone scales with the
+          viewport's WIDTH, and on a 1920x1080 desktop 2:1 is 960px -- the hero
+          filled the screen and pushed its own button below the fold. Capped at
+          three-quarters of the small viewport height, the panel and its call to
+          action are always in the first screen, whatever the monitor. The
+          aspect ratio still governs narrower windows, where it never exceeds
+          the cap. (svh: the height with browser chrome shown, so a phone's
+          collapsing address bar cannot make it jump.)
+
+          w-full is load-bearing, not decoration. With the width left auto, CSS
+          transfers a max-height THROUGH an aspect ratio into a max-width, so
+          the box kept 2:1 and shrank sideways instead -- 682px tall, 1364px
+          wide, and a bare strip of page down the right of a 1920px monitor. A
+          definite width is what makes the height clamp and the ratio yield. */}
+      <div className="relative w-full aspect-[3/4] wide:aspect-[2/1] wide:max-h-[75svh]">
         <Image
           src={featured.image}
           alt={featured.image_alt}

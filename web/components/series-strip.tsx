@@ -96,11 +96,12 @@ export async function SeriesStrip() {
                   className="object-cover transition-transform group-hover:scale-[1.02] motion-reduce:transition-none"
                 />
               </div>
-              {/* The name underlines in the accent on hover -- the same gesture
-                  the nav uses for "you are here", offered here as "you could
-                  be". Transparent-to-accent rather than none-to-underline, so
-                  the text does not shift when the line appears. */}
-              <h3 className="mt-3 font-display text-sm uppercase leading-tight tracking-tight text-text underline decoration-transparent decoration-2 underline-offset-4 transition-[text-decoration-color] group-hover:decoration-accent motion-reduce:transition-none">
+              {/* The name underlines in muted on hover -- the nav's "you could
+                  be here" gesture, not its accent "you are here" one; the
+                  accent stays reserved for the current location and the
+                  hero's eyebrow. Transparent-to-muted rather than
+                  none-to-underline, so the text does not shift. */}
+              <h3 className="mt-3 font-display text-sm uppercase leading-tight tracking-tight text-text underline decoration-transparent decoration-2 underline-offset-4 transition-[text-decoration-color] duration-300 group-hover:decoration-muted motion-reduce:transition-none">
                 {category.name}
               </h3>
               {/* Same noun the catalogue heading uses. One vocabulary. */}

@@ -21,13 +21,27 @@ import { formatMoney, formatUnit } from "@/lib/format";
 export function ProductCard({ product }: { product: ProductListItem }) {
   return (
     <Link href={`/products/${product.slug}`} className="group block">
-      {/* The tile answers a hover the way the references do: it lifts, its
-          shadow deepens, and the photograph eases in by two percent. All three
-          are transitions, all three are off under prefers-reduced-motion, and
-          the image wrapper clips so the scaled photograph never leaks into the
-          meta block beneath it. */}
-      <article className="overflow-hidden rounded-md border border-border bg-surface transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-        <div className="relative aspect-[4/5] overflow-hidden bg-background">
+      {/* The tile answers a hover the way the references do: it lifts, a
+          shadow appears, and the photograph eases in by two percent.
+
+          Three things make it smooth rather than jittery, and each was learned
+          the hard way on the first version:
+
+          - The hover is the LINK's (`group-hover:`), not the article's. The
+            article is what moves; if it were also the hover target, the
+            pointer at its bottom edge would leave the lifted box, the card
+            would drop, the pointer would re-enter, and it would lift again --
+            a two-pixel flicker loop. The link's box never moves.
+          - The shadow is a pseudo-element that fades in. Animating box-shadow
+            itself repaints on every frame; opacity is composited.
+          - 300ms ease-out, not the 150ms default, so the lift reads as
+            settling rather than snapping.
+
+          The article no longer clips (a clipped shadow is no shadow); the
+          image wrapper clips instead, with the top corners rounded to match.
+          All of it is off under prefers-reduced-motion. */}
+      <article className="relative rounded-md border border-border bg-surface transition-transform duration-300 ease-out will-change-transform group-hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0 after:pointer-events-none after:absolute after:inset-0 after:rounded-md after:opacity-0 after:shadow-lg after:transition-opacity after:duration-300 group-hover:after:opacity-100 motion-reduce:after:transition-none">
+        <div className="relative aspect-[4/5] overflow-hidden rounded-t-md bg-background">
           {product.primary_image ? (
             <Image
               src={product.primary_image.url}
@@ -36,7 +50,7 @@ export function ProductCard({ product }: { product: ProductListItem }) {
               alt={product.primary_image.alt_text}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              className="object-cover transition-transform group-hover:scale-[1.02] motion-reduce:transition-none"
+              className="object-cover transition-transform duration-300 ease-out will-change-transform group-hover:scale-[1.02] motion-reduce:transition-none"
             />
           ) : (
             <div className="flex h-full items-center justify-center font-body text-xs text-muted">

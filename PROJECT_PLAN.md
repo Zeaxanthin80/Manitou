@@ -1109,9 +1109,14 @@ object; deleting a used one is refused with the list of products holding it.
      **The way round that, found the same evening:** a style created in the recraft.ai web app
      (`aac6ef79-7efe-4f45-9c4a-95feeb6e9561`, "T-Shirts", from the same references) has no base type
      and **is accepted by `recraftv4_1_raster`** — tested with one generation, visibly denser
-     line-work than the V3 set, at 2 credits an image against V3's 1. The two surfaces do not list
-     each other's styles but resolve each other's IDs. For the next series: make the style in the
-     app, generate through the API on V4.1.
+     line-work than the V3 set, at 2 credits an image against V3's 1 — and **10 an image on
+     V4.1 Pro** with a style attached, measured on the second hero pass. The two surfaces do not
+     list each other's styles but resolve each other's IDs. For the next series: make the style
+     in the app, generate through the API on V4.1; Pro only for the one image shown at full
+     viewport width. One more thing the app-made style does that the API one did not: it was
+     built from references that carried plate captions, so it *wants* to draw captions, and it
+     garbles them. Two of three V4.1 hero candidates came back with `TEROHIN / E'PLURE / 90?` under
+     a plate. "No text" in the prompt helps; reading every candidate at full size is what works.
    - **The same evening, a polish pass after the owner looked at it on a phone.** The hero's panel
      had been stacked below the image on small screens and pulled up to overlap it — and the
      overlap never rendered: the image wrapper was `relative`, the panel's wasn't, and a

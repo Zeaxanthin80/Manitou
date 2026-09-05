@@ -54,6 +54,16 @@ const s3Origins = s3Bucket
     ]
   : [];
 
+/**
+ * Development only: React's dev build uses eval() to rebuild call stacks for
+ * its error overlay, and the enforcing policy blocked it -- which surfaced as a
+ * permanent "1 Issue" badge on `next dev` that would have hidden any real one.
+ * Production React never calls eval(), so production never gets this. The
+ * branch is on NODE_ENV rather than on a flag of our own so it cannot be left
+ * switched on by accident: `next build` sets it to "production", full stop.
+ */
+const devEval = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
+
 const csp = [
   "default-src 'self'",
 
@@ -61,7 +71,7 @@ const csp = [
   // sibling origins where it can, and their own CSP guide lists the wildcard in
   // both script-src and frame-src. Taken from that guide rather than from what
   // a working checkout happened to request, because the origins it picks vary.
-  "script-src 'self' 'unsafe-inline' https://js.stripe.com https://*.js.stripe.com",
+  `script-src 'self' 'unsafe-inline'${devEval} https://js.stripe.com https://*.js.stripe.com`,
 
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob:${process.env.CDN_HOST ? ` https://${process.env.CDN_HOST}` : ""}`,

@@ -55,7 +55,20 @@ export async function SiteHeader() {
           <Wordmark />
         </Link>
 
-        <div className="hidden min-w-0 overflow-x-auto wide:block">
+        {/* py-2 -my-2 is not spacing -- it is what lets the nav's underlines
+            exist. `overflow-x: auto` makes a scroll container, and CSS forces
+            the other axis to `auto` with it: there is no such thing as
+            "scroll horizontally, overflow vertically". The container therefore
+            clips at its PADDING edge, and a text-decoration sits BELOW the
+            link's content box -- measured at y=52 against a box ending at
+            y=48. Both underlines, hover and active, were painted and then
+            clipped away for four phases; the red "active" state that looked
+            like it worked was only the text colour.
+
+            The padding moves the clip edge 8px down so the line fits inside
+            it; the negative margin takes the 8px back out of the layout, so
+            the header is exactly as tall as it was. */}
+        <div className="hidden min-w-0 overflow-x-auto py-2 -my-2 wide:block">
           <CategoryNav categories={categories} />
         </div>
 
