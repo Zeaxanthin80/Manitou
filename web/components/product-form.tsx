@@ -17,6 +17,14 @@ import type { AdminProduct, Category } from "@/lib/api";
  *
  * On edit the variant fields disappear; variants get their own section, because
  * by then there are several and each is edited independently.
+ *
+ * **Every default reads `state.values` first.** React 19 resets a form after
+ * its action settles, whether it succeeded or not, and an uncontrolled input
+ * goes back to its `defaultValue`. On create that default is empty, so one
+ * refused SKU used to wipe a whole product's worth of typing -- the owner met
+ * this entering the Orbit OS tote. The action now hands the submitted fields
+ * back on failure, and this form treats them as the new defaults; the saved
+ * product (on edit) or nothing (on create) is only the fallback beneath them.
  */
 export function ProductForm({
   action,
@@ -34,6 +42,7 @@ export function ProductForm({
 }) {
   const [state, formAction, pending] = useActionState(action, {});
   const creating = !product;
+  const v = state.values ?? {};
 
   return (
     <form action={formAction} className="flex max-w-2xl flex-col gap-5">
@@ -42,7 +51,7 @@ export function ProductForm({
       )}
 
       <FormField id="name" label="Name" required>
-        {(c) => <Input {...c} name="name" defaultValue={product?.name} />}
+        {(c) => <Input {...c} name="name" defaultValue={v.name ?? product?.name} />}
       </FormField>
 
       <FormField
@@ -51,7 +60,7 @@ export function ProductForm({
         required
         hint="The storefront URL: /products/<slug>. Must be unique."
       >
-        {(c) => <Input {...c} name="slug" defaultValue={product?.slug} />}
+        {(c) => <Input {...c} name="slug" defaultValue={v.slug ?? product?.slug} />}
       </FormField>
 
       <FormField id="description" label="Description">
@@ -60,7 +69,7 @@ export function ProductForm({
             {...c}
             name="description"
             rows={4}
-            defaultValue={product?.description ?? ""}
+            defaultValue={v.description ?? product?.description ?? ""}
             className="rounded-md border border-border bg-surface px-3 py-2 font-body text-sm text-text"
           />
         )}
@@ -72,7 +81,7 @@ export function ProductForm({
             <select
               {...c}
               name="category_id"
-              defaultValue={product?.category_id ?? categories[0]?.id}
+              defaultValue={v.category_id ?? product?.category_id ?? categories[0]?.id}
               className="rounded-md border border-border bg-surface px-3 py-2 font-body text-sm text-text"
             >
               {categories.map((cat) => (
@@ -100,7 +109,7 @@ export function ProductForm({
               name="base_price"
               inputMode="decimal"
               placeholder="24.00"
-              defaultValue={product?.base_price}
+              defaultValue={v.base_price ?? product?.base_price}
             />
           )}
         </FormField>
@@ -113,16 +122,28 @@ export function ProductForm({
           </legend>
           <div className="grid gap-5 sm:grid-cols-2">
             <FormField id="sku" label="SKU" required>
-              {(c) => <Input {...c} name="sku" placeholder="TEE-CLS-S-BLK" />}
+              {(c) => (
+                <Input {...c} name="sku" placeholder="TEE-CLS-S-BLK" defaultValue={v.sku} />
+              )}
             </FormField>
             <FormField id="variant_name" label="Variant name" required>
               {(c) => (
-                <Input {...c} name="variant_name" placeholder="Small / Black" />
+                <Input
+                  {...c}
+                  name="variant_name"
+                  placeholder="Small / Black"
+                  defaultValue={v.variant_name}
+                />
               )}
             </FormField>
             <FormField id="quantity_available" label="Opening stock">
               {(c) => (
-                <Input {...c} name="quantity_available" inputMode="numeric" defaultValue={0} />
+                <Input
+                  {...c}
+                  name="quantity_available"
+                  inputMode="numeric"
+                  defaultValue={v.quantity_available ?? 0}
+                />
               )}
             </FormField>
             <FormField
@@ -131,7 +152,12 @@ export function ProductForm({
               hint="Flagged as low when stock falls to this."
             >
               {(c) => (
-                <Input {...c} name="reorder_level" inputMode="numeric" defaultValue={0} />
+                <Input
+                  {...c}
+                  name="reorder_level"
+                  inputMode="numeric"
+                  defaultValue={v.reorder_level ?? 0}
+                />
               )}
             </FormField>
           </div>

@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [36](#36-a-refused-product-create-wiped-the-form-and-blamed-two-fields-for-one-collision) | 2026-09-05 | A refused product create wiped the form and blamed two fields for one collision | Fixed — uncommitted |
 | [35](#35-the-store-name-pushed-the-home-page-into-horizontal-scroll-on-a-phone) | 2026-09-04 | The store name pushed the home page into horizontal scroll on a phone | Fixed — uncommitted |
 | [34](#34-alembics-logging-config-silently-disabled-the-applications-loggers-under-test) | 2026-09-01 | Alembic's logging config silently disabled the application's loggers under test | Fixed — uncommitted |
 | [33](#33-admin-image-upload-broke-the-day-the-domain-was-added) | 2026-09-01 | Admin image upload broke the day the domain was added | Fixed — uncommitted |
@@ -51,6 +52,57 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 36. A refused product create wiped the form and blamed two fields for one collision
+
+**Status:** Fixed. Found by the owner, entering the eleventh product of the catalogue.
+
+**What was seen.** The Orbit OS tote was submitted from `/admin/products/new` and the page came
+back with `Duplicate product slug or variant SKU` in red — above a form with every field empty
+except the category select and a base-price placeholder that happened to read `24.00`. The tote
+was not in the product list. Nothing said which of the two fields had collided, and there was
+nothing left on screen to compare against.
+
+The collision turned out to be the SKU, on a product nobody suspected: the Orbit OS **tee**'s
+Small variant had been saved as `OS-TOTE` — one mis-paste from the plate beside it on the entry
+sheet. The product list shows a variant *count*, not SKUs, so it could not have surfaced this;
+`/admin/inventory`, which lists every variant with its SKU, found it in one sort. The message
+this entry fixes would have said so on the first attempt.
+
+**What caused it — two things, one visible.**
+
+*The wipe.* React 19 resets a `<form action={fn}>` after its action settles, success or failure,
+and an uncontrolled input returns to its `defaultValue`. On the edit form those defaults are the
+saved product, so a refused edit snaps back to the old values — annoying but recoverable. On the
+create form they are empty. The action returned `{ error }` and nothing else, so the re-render had
+nothing to repopulate from. A 409 for one wrong SKU cost a product's worth of typing.
+
+*The message.* `create_product` wrapped `db.commit()` in one `except IntegrityError` and answered
+every case with the same sentence. Postgres knows exactly which constraint tripped and carries the
+offending value in its DETAIL line — `Key (sku)=(OS-TOTE) already exists.` — on
+`exc.orig.diag.message_detail`. The handler never read it.
+
+**Why nothing caught it.** `test_duplicate_slug_and_sku_are_409` asserted the status code and
+nothing about the body, which is a test that passes for any 409 including a useless one. The
+web side has no tests at all, and the reset is invisible to anyone who has only ever submitted a
+form that succeeded — which, until the real catalogue went in, was everyone.
+
+**What was changed.**
+
+- `AdminActionState` gained `values?: Record<string, string>`. Both product actions return the
+  submitted fields on an `ApiError`, and `ProductForm` reads `state.values` before the saved
+  product for every `defaultValue`. The reset still happens; it now resets to what was typed.
+- `_duplicate_message()` in `routers/admin.py` parses the DETAIL line and names the field and
+  the value — *"SKU 'OS-TOTE' is already in use by another variant."* — falling back to the
+  constraint name, and only then to the old sentence. The test now asserts that the slug case
+  mentions the slug and not SKU, and vice versa.
+
+**What makes it not happen again.** The `values` mechanism is on the shared state type, so any
+new admin form gets it by returning `formValues(formData)` in its catch. The lesson for the test
+suite is older than this entry: a status-code assertion on an error response tests that the
+server refused, not that it *helped* — and the person reading a 409 is the one who typed it.
 
 ---
 

@@ -6,6 +6,7 @@ are allowed to reveal: inactive products are visible, real stock counts are
 returned instead of a boolean, and GET /admin/orders reads across every customer.
 """
 
+import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Literal
@@ -660,6 +661,41 @@ def list_inventory(
     )
 
 
+_DUPLICATE_KEY = re.compile(r"Key \((\w+)\)=\((.*?)\) already exists")
+
+
+def _duplicate_message(exc: IntegrityError, payload: AdminProductCreate) -> str:
+    """Turn a unique violation into a sentence naming the field and the value.
+
+    psycopg2 carries Postgres's DETAIL line -- `Key (sku)=(OS-TOTE) already
+    exists.` -- on `exc.orig.diag.message_detail`, which is both halves of what
+    the admin needs. The constraint name (`uq_products_slug`,
+    `uq_product_variants_sku`) is the fallback when the detail is missing, and
+    the old two-field sentence is the fallback for anything else: an unexpected
+    shape must degrade to a vaguer 409, never to a 500.
+
+    Found the way most of these are found -- an admin hunting through two lists
+    for a duplicate that was in exactly one of them.
+    """
+    diag = getattr(getattr(exc, "orig", None), "diag", None)
+    detail = getattr(diag, "message_detail", None) or ""
+    match = _DUPLICATE_KEY.search(detail)
+    if match:
+        column, value = match.groups()
+        if column == "slug":
+            return f"A product with the slug '{value}' already exists."
+        if column == "sku":
+            return f"SKU '{value}' is already in use by another variant."
+
+    constraint = getattr(diag, "constraint_name", None) or ""
+    if "slug" in constraint:
+        return f"A product with the slug '{payload.slug}' already exists."
+    if "sku" in constraint:
+        skus = ", ".join(v.sku for v in payload.variants)
+        return f"One of these SKUs is already in use: {skus}."
+    return "Duplicate product slug or variant SKU"
+
+
 @router.post(
     "/products", response_model=AdminProductRead, status_code=status.HTTP_201_CREATED
 )
@@ -695,10 +731,13 @@ def create_product(
         db.commit()
     except IntegrityError as exc:
         # products.slug and product_variants.sku are both unique. Returning the
-        # database error as a 500 would blame the server for a bad request.
+        # database error as a 500 would blame the server for a bad request --
+        # and returning "slug or SKU" sends the admin hunting through two lists
+        # for a collision that is in exactly one of them. Postgres names the
+        # constraint it tripped; say which, and say the value.
         db.rollback()
         raise HTTPException(
-            status.HTTP_409_CONFLICT, "Duplicate product slug or variant SKU"
+            status.HTTP_409_CONFLICT, _duplicate_message(exc, payload)
         ) from exc
 
     audit.record(

@@ -83,12 +83,23 @@ def test_duplicate_slug_and_sku_are_409(
         "variants": [{"sku": "DUP-SKU", "variant_name": "v"}]})
     assert first.status_code == 201
 
-    assert client.post("/admin/products", headers=h, json={
+    # The 409 names the field AND the value. "Duplicate slug or SKU" sent an
+    # admin through two lists looking for a collision that was in one of them.
+    by_slug = client.post("/admin/products", headers=h, json={
         **base, "name": "B", "slug": "dup-slug",
-        "variants": [{"sku": "OTHER", "variant_name": "v"}]}).status_code == 409
-    assert client.post("/admin/products", headers=h, json={
+        "variants": [{"sku": "OTHER", "variant_name": "v"}]})
+    assert by_slug.status_code == 409
+    assert "slug" in by_slug.json()["detail"]
+    assert "dup-slug" in by_slug.json()["detail"]
+    assert "SKU" not in by_slug.json()["detail"]
+
+    by_sku = client.post("/admin/products", headers=h, json={
         **base, "name": "C", "slug": "other-slug",
-        "variants": [{"sku": "DUP-SKU", "variant_name": "v"}]}).status_code == 409
+        "variants": [{"sku": "DUP-SKU", "variant_name": "v"}]})
+    assert by_sku.status_code == 409
+    assert "SKU" in by_sku.json()["detail"]
+    assert "DUP-SKU" in by_sku.json()["detail"]
+    assert "slug" not in by_sku.json()["detail"]
 
 
 def test_patch_only_changes_supplied_fields(

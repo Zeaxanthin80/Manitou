@@ -43,7 +43,29 @@ import { getSession } from "@/lib/session";
  * message the portal can display instead of a raw 403.
  */
 
-export type AdminActionState = { error?: string; ok?: string };
+/**
+ * `values` is what the admin had typed when an action failed.
+ *
+ * React 19 resets a `<form action>` after its action settles -- success or
+ * failure -- so an uncontrolled input goes back to its `defaultValue`. On a
+ * create form that is empty, and a 409 for one wrong SKU cost a whole product's
+ * worth of typing. Returning the submitted fields lets the form feed them back
+ * in as the new defaults, which is the pattern React documents for exactly this.
+ */
+export type AdminActionState = {
+  error?: string;
+  ok?: string;
+  values?: Record<string, string>;
+};
+
+/** Every string field the form sent, keyed by input name, for `values`. */
+function formValues(fd: FormData): Record<string, string> {
+  const out: Record<string, string> = {};
+  fd.forEach((v, k) => {
+    if (typeof v === "string") out[k] = v;
+  });
+  return out;
+}
 
 async function adminToken(): Promise<{ token?: string; error?: string }> {
   const token = await getSession();
@@ -274,7 +296,9 @@ export async function createProductAction(
       ],
     });
   } catch (err) {
-    if (err instanceof ApiError) return { error: err.message };
+    if (err instanceof ApiError) {
+      return { error: err.message, values: formValues(formData) };
+    }
     throw err;
   }
 
@@ -300,7 +324,11 @@ export async function updateProductAction(
     });
     revalidateCatalog(id, updated.slug);
   } catch (err) {
-    if (err instanceof ApiError) return { error: err.message };
+    // Same reset applies on edit: without this a refused slug change snaps the
+    // form back to the saved product and the admin's edit is simply gone.
+    if (err instanceof ApiError) {
+      return { error: err.message, values: formValues(formData) };
+    }
     throw err;
   }
   return { ok: "Product saved." };

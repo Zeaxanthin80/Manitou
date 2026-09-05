@@ -9,20 +9,23 @@ import { buttonClasses } from "@/components/ui/button";
 import { CartIcon } from "@/components/ui/icons";
 import { Wordmark } from "@/components/ui/wordmark";
 import { listCategories } from "@/lib/api";
+import { navCategories } from "@/lib/categories";
 
 /** Persistent top nav -- Section 4.3: the web expects one. Mobile gets native
  *  patterns in Phase 8, not a copy of this. */
 export async function SiteHeader() {
-  // Every category, not just top-level. The seeded tree is Apparel ->
-  // {T-Shirts, Accessories}, so filtering to parent_id === null left a nav with
-  // a single item and no way to reach the categories a shopper actually browses.
-  // A deeper tree would want dropdowns or a sub-nav on the category page; at two
-  // levels, flat is the honest answer.
-  const [categories, user, cart] = await Promise.all([
+  // Product types only -- the top of the tree. This used to list every
+  // category flat, with a comment explaining that filtering to the root left a
+  // one-item nav under the seeded Apparel root. Both concerns are now inside
+  // navCategories(): it shows the roots, and a lone root's children in its
+  // place. The series beneath the types have the front-page strip and the
+  // category page's own row of links; they do not belong up here.
+  const [all, user, cart] = await Promise.all([
     listCategories(),
     currentUser(),
     currentCart(),
   ]);
+  const categories = navCategories(all);
 
   const count = cart?.item_count ?? 0;
 

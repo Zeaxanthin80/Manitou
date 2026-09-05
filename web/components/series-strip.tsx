@@ -6,20 +6,34 @@ import type { Category, ProductListItem } from "@/lib/api";
 import { storeConfig } from "@/lib/store-config";
 
 /**
- * One tile per top-level category, between the hero and the grid.
+ * One tile per series, between the hero and the grid.
+ *
+ * **The tree has two jobs and this is the second one.** Top-level categories are
+ * product types -- T-Shirts, Accessories -- and they belong in the nav, where a
+ * shopper expects to find "jeans are jeans". The level beneath is the series:
+ * Field Guide, Emblem, Poster, Orbit OS. Those are what a front page shows off,
+ * so the strip reads the second level and leaves the first to the header.
+ *
+ * This is the shape `docs/reference/catalogue-grouping.html` §03 said the
+ * catalogue would need, and it needed it on the first day of data entry: the
+ * owner clicked T-Shirts and found nothing, because the tree had been organised
+ * by release instead. Re-nested on 2026-09-05.
+ *
+ * **A flat tree falls back to the top level.** A clone with no series yet still
+ * gets a strip -- of its product types, which duplicates the nav but beats an
+ * empty band -- and grows into the two-level shape without touching this file.
  *
  * **Everything here is derived; nothing is configured.** The tile's image is the
  * category's first product photograph and its count is the API's `total` for
- * that category -- both from calls the storefront already makes. There is no
- * `categories.image_url` column, no `home.series[]` block in store config, and
- * that is a decision rather than an omission: the moment a series gets its own
- * hero shot there is a second thing to update when a product changes, and
- * `docs/reference/catalogue-grouping.html` §05 is about what that looks like six
- * months later. First-product tiles cannot go stale.
+ * that category, from calls the storefront already makes. No `image_url` column,
+ * no `home.series[]` block: the moment a series gets its own hero shot there is a
+ * second thing to update when a product changes, and §05 of that document is
+ * about what that looks like six months later. First-product tiles cannot go
+ * stale.
  *
- * **A category with nothing sellable hides its tile.** Mid-catalogue-entry that
- * is the normal state, and a tile with no photograph and a count of zero reads
- * as a broken store rather than an empty shelf.
+ * **A category with nothing sellable hides its tile.** Mid-data-entry that is the
+ * normal state, and a tile with no photograph and a count of zero reads as a
+ * broken store rather than an empty shelf.
  *
  * One request per category, in parallel, and `allSettled` rather than `all`: a
  * category deleted between the two calls should lose its tile, not take the
@@ -33,7 +47,9 @@ type Tile = {
 };
 
 async function loadTiles(): Promise<Tile[]> {
-  const categories = (await listCategories()).filter((c) => c.parent_id === null);
+  const all = await listCategories();
+  const series = all.filter((c) => c.parent_id !== null);
+  const categories = series.length > 0 ? series : all.filter((c) => c.parent_id === null);
 
   // The featured series leads; the rest keep the API's alphabetical order. It is
   // the one place the strip reads config, and only to decide who goes first.
@@ -83,7 +99,7 @@ export async function SeriesStrip() {
               <h3 className="mt-3 font-display text-sm uppercase leading-tight tracking-tight text-text">
                 {category.name}
               </h3>
-              {/* Same noun the count line below the grid uses. One vocabulary. */}
+              {/* Same noun the catalogue heading uses. One vocabulary. */}
               <p className="mt-1 font-body text-xs uppercase tracking-tight text-muted">
                 {total} {total === 1 ? "product" : "products"}
               </p>

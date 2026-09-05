@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Wordmark } from "@/components/ui/wordmark";
 import { listCategories } from "@/lib/api";
+import { navCategories } from "@/lib/categories";
 import { storeConfig } from "@/lib/store-config";
 
 /**
@@ -48,7 +49,9 @@ const sectionLabel =
 const footerLink =
   "font-body text-sm text-muted transition-colors hover:text-accent motion-reduce:transition-none";
 export async function SiteFooter() {
-  const categories = await listCategories();
+  // The same departments the header shows, by the same rule, so the two ends
+  // of the page cannot disagree about what a shopper browses by.
+  const categories = navCategories(await listCategories());
   // Evaluated per request. These pages are all dynamic (they read cookies), so
   // there is no build-time value to go stale in January.
   const year = new Date().getFullYear();

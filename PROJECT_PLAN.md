@@ -1077,11 +1077,16 @@ object; deleting a used one is refused with the list of products holding it.
      table and refuses any non-localhost database, so it cannot reach production by design; entering
      the real catalogue through the portal is also the honest answer to defect 23's question, *can a
      brand-new install be set up entirely through its own interface?*
-   - Four categories, and **the categories are the series** — `Field Guide`, `Emblem`, `Poster`,
-     `Orbit OS`. `products.category_id` is NOT NULL and single, so a product-type tree
-     (`T-Shirts` / `Accessories`) would have split the Orbit OS capsule, which is one design across
-     a tee, a tote and a cap. No `collections` table: a series is a grouping, the category tree
-     already groups, and Section 1.1 forbids generalising past that without an argument in writing.
+   - ~~Four categories, and **the categories are the series**~~ — that shipped on 2026-09-04 and
+     broke on 2026-09-05, the first afternoon of data entry: the header showed six series, and
+     `T-Shirts` was an empty page while nine tees sat on the home page. **The tree is now two
+     levels: product types on top (`T-Shirts`, `Accessories`), series beneath** (`Field Guide`,
+     `Emblem`, `Poster`, `Orbit OS` under T-Shirts). The header reads only the top level, the
+     front-page strip only the second, and a category page shows its parent above and its series
+     beneath. `GET /products?category=` was already recursive, so `t-shirts` lists every tee.
+     **Orbit OS is split** — tee under T-Shirts › Orbit OS, tote and cap directly in Accessories —
+     because a category has one parent and the capsule spans two types. Still no `collections`
+     table; it is the first post-launch task, and Orbit OS is the case for it.
      **The preconditions that shortcut depends on, the symptom when each one breaks, and the shape
      to build when it does, are written up in `docs/reference/catalogue-grouping.html`** — including
      why "archive" should never become a table and why a `collections` seam fails Section 1.1's

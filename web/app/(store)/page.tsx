@@ -32,11 +32,18 @@ export default async function Home() {
         aria-labelledby="catalogue-heading"
         className="mx-auto max-w-6xl px-6 py-12"
       >
+        {/* A heading, not a caption. The footer's "All products" link lands
+            here, so the section is named the same way, and the count sits
+            beside the name where it can be read rather than 12px of grey
+            beneath a photograph. */}
         <h2
           id="catalogue-heading"
-          className="font-body text-xs uppercase tracking-tight text-muted"
+          className="font-display text-lg uppercase leading-none tracking-tight text-text"
         >
-          {page.total} {page.total === 1 ? "product" : "products"}
+          All products
+          <span className="ml-3 font-body text-sm normal-case tracking-normal text-muted">
+            {page.total} {page.total === 1 ? "product" : "products"}
+          </span>
         </h2>
 
         {page.items.length === 0 ? (
