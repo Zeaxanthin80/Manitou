@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "recraft": {
+      "type": "http",
+      "url": "https://mcp.recraft.ai/mcp"
+    }
+  }
+}

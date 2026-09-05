@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Grouping the Catalogue — Manitou Reference</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="reference.css" />
+    <style>
+      /* Only what this document needs. Everything else is the house style. */
+
+      /* --- the three mechanisms, as cards ---------------------------------- */
+      .mechs { display: grid; gap: 14px; margin: 24px 0 8px; }
+      @media (min-width: 760px) { .mechs { grid-template-columns: repeat(3, 1fr); } }
+
+      .mech {
+        border: 1px solid var(--line); border-radius: 3px;
+        background: var(--surface); padding: 16px 18px 18px;
+        border-top: 2px solid var(--line);
+      }
+      .mech.fact { border-top-color: var(--server); }
+      .mech.opinion { border-top-color: var(--client); }
+      .mech.consequence { border-top-color: var(--safe); }
+
+      .mech h4 {
+        font-family: var(--display); text-transform: uppercase; font-weight: 600;
+        font-size: 17px; letter-spacing: 0.02em; margin: 0 0 2px;
+      }
+      .mech .says {
+        font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em;
+        text-transform: uppercase; color: var(--muted); margin: 0 0 12px;
+      }
+      .mech p { font-size: 14.5px; margin: 0 0 10px; max-width: none; }
+      .mech p:last-child { margin-bottom: 0; }
+      .mech .store {
+        font-family: var(--mono); font-size: 11.5px; color: var(--ink);
+        background: var(--surface-2); border: 1px solid var(--line);
+        border-radius: 2px; padding: 7px 9px; display: block;
+      }
+
+      /* --- the schema-shape figure ----------------------------------------- */
+      .fig {
+        border: 1px solid var(--line); border-radius: 3px;
+        background: var(--surface); padding: 8px 12px 4px; margin: 24px 0 6px;
+        overflow-x: auto;
+      }
+      .fig svg { display: block; min-width: 720px; width: 100%; height: auto; }
+      .fig-cap {
+        font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+        margin: 0 0 24px; max-width: none;
+      }
+      .box { fill: var(--surface-2); stroke: var(--line); }
+      .box-label { font-family: var(--mono); font-size: 11px; fill: currentColor; }
+      .panel-title {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+        text-transform: uppercase; fill: var(--muted);
+      }
+      .edge { stroke: var(--server); fill: none; }
+      .edge-derived { stroke: var(--safe); fill: none; stroke-dasharray: 4 3; }
+      .edge-label { font-family: var(--mono); font-size: 10px; fill: var(--muted); }
+      .note-label { font-family: var(--mono); font-size: 10px; fill: var(--muted); }
+
+      /* --- the fill-in spec ------------------------------------------------- */
+      .spec {
+        display: grid; grid-template-columns: max-content 1fr;
+        border: 1px solid var(--line); border-radius: 3px;
+        margin: 22px 0 8px; overflow: hidden;
+      }
+      @media (max-width: 620px) { .spec { grid-template-columns: 1fr; } }
+      .spec dt {
+        font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em;
+        text-transform: uppercase; color: var(--muted);
+        padding: 11px 16px; background: var(--surface);
+        border-bottom: 1px solid var(--line); white-space: nowrap;
+      }
+      .spec dd {
+        margin: 0; padding: 11px 16px; font-size: 14.5px;
+        border-bottom: 1px solid var(--line); background: var(--surface-2);
+      }
+      .spec dt:last-of-type, .spec dt:last-of-type + dd { border-bottom: 0; }
+      .spec dd em { color: var(--muted); font-style: normal; }
+
+      /* --- verdict banner ---------------------------------------------------- */
+      .verdict {
+        border: 1px solid var(--line); border-left: 2px solid var(--server);
+        background: var(--surface); border-radius: 3px;
+        padding: 18px 20px; margin: 24px 0;
+      }
+      .verdict p:first-child {
+        font-family: var(--display); text-transform: uppercase; font-weight: 600;
+        font-size: 21px; letter-spacing: 0.02em; margin: 0 0 8px; color: var(--ink);
+      }
+      .verdict p { margin: 0 0 10px; max-width: none; }
+      .verdict p:last-child { margin-bottom: 0; }
+
+      td.q { font-family: var(--mono); font-size: 12px; color: var(--server); white-space: nowrap; }
+
+      @media print {
+        .fig svg .box { fill: none; }
+        .mech, .verdict, .spec dd, .spec dt { background: #f4f4f4; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <nav class="toc">
+      <div class="toc-inner">
+        <a href="#s0">00 · Three mechanisms</a>
+        <a href="#s1">01 · The five questions</a>
+        <a href="#s2">02 · The words, decided</a>
+        <a href="#s3">03 · Categories as series</a>
+        <a href="#s4">04 · The schema</a>
+        <a href="#s5">05 · The grouping spec</a>
+        <a href="#s6">06 · Clones</a>
+      </div>
+    </nav>
+
+    <div class="wrap">
+      <header class="masthead">
+        <p class="eyebrow">Manitou Reference · Catalogue · Architecture</p>
+        <h1>Grouping<br />the Catalogue</h1>
+        <p class="standfirst">
+          Sets, series, archives, catalogues, collections. Five words that sound
+          like five names for one feature and are not.
+          <strong>They describe three different mechanisms</strong>, one of which
+          should never be a table at all. This document sorts them, gives a
+          procedure for deciding which you actually have, and says what each one
+          costs in the schema — including the one Manitou is about to take a
+          shortcut on, and what unwinding it would cost.
+        </p>
+      </header>
+
+      <!-- ============================================================ 00 -- -->
+      <section id="s0">
+        <div class="sec-head">
+          <span class="sec-num">00</span><h2>Three mechanisms</h2>
+        </div>
+        <p class="lede">
+          Don't sort these words by what they're called. Sort them by
+          <strong>what kind of statement membership is</strong>. That one question
+          predicts the storage, the admin screen, and the way the feature rots.
+        </p>
+
+        <div class="mechs">
+          <div class="mech fact">
+            <h4>A fact</h4>
+            <p class="says">membership is intrinsic</p>
+            <p>
+              “This is a t-shirt.” True regardless of who is asking or what month
+              it is. A product has exactly one answer, and the answers nest —
+              a t-shirt is apparel.
+            </p>
+            <p><code class="store">products.category_id</code></p>
+          </div>
+
+          <div class="mech opinion">
+            <h4>An opinion</h4>
+            <p class="says">membership is curated</p>
+            <p>
+              “These six go together as Spring 2026.” Someone decided it, someone
+              can revise it, groups overlap, order inside them matters, and the
+              group itself has a name and a story to tell.
+            </p>
+            <p><code class="store">collections + product_collections</code></p>
+          </div>
+
+          <div class="mech consequence">
+            <h4>A consequence</h4>
+            <p class="says">membership is derived</p>
+            <p>
+              “We don't print this any more.” Nobody should be typing this in — it
+              follows from stock, from dates, from <code>is_active</code>. It is a
+              question, not a place.
+            </p>
+            <p><code class="store">a WHERE clause · no table</code></p>
+          </div>
+        </div>
+
+        <div class="note warn">
+          <strong>The third one is where catalogues go wrong.</strong> “Archive”
+          sounds like somewhere you put things, so it gets built as a table with a
+          flag someone has to set. It works for a month. Then a product sells out
+          and nobody remembers to file it, and now the archive is a page that
+          confidently lists the wrong products. A derived group cannot drift out of
+          date because there is nothing to forget.
+        </div>
+
+        <div class="fig">
+          <svg viewBox="0 0 900 210" role="img"
+               aria-label="Three storage shapes: a single foreign key, a join table, and a query with no table.">
+            <defs>
+              <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--server)" />
+              </marker>
+            </defs>
+
+            <!-- panel 1 : a fact -->
+            <text class="panel-title" x="30" y="24">A fact</text>
+            <rect class="box" x="30" y="60" width="92" height="36" rx="2" />
+            <text class="box-label" x="76" y="83" text-anchor="middle">products</text>
+            <line class="edge" x1="126" y1="78" x2="168" y2="78" marker-end="url(#arw)" />
+            <rect class="box" x="172" y="60" width="92" height="36" rx="2" />
+            <text class="box-label" x="218" y="83" text-anchor="middle">categories</text>
+            <text class="edge-label" x="147" y="120" text-anchor="middle">category_id</text>
+            <text class="note-label" x="30" y="150">NOT NULL · exactly one</text>
+            <text class="note-label" x="30" y="168">parent_id nests it</text>
+
+            <!-- panel 2 : an opinion -->
+            <text class="panel-title" x="316" y="24">An opinion</text>
+            <rect class="box" x="316" y="60" width="84" height="36" rx="2" />
+            <text class="box-label" x="358" y="83" text-anchor="middle">products</text>
+            <line class="edge" x1="404" y1="78" x2="436" y2="78" marker-end="url(#arw)" />
+            <rect class="box" x="440" y="60" width="112" height="36" rx="2" />
+            <text class="box-label" x="496" y="76" text-anchor="middle">product_</text>
+            <text class="box-label" x="496" y="90" text-anchor="middle">collections</text>
+            <line class="edge" x1="590" y1="78" x2="558" y2="78" marker-end="url(#arw)" />
+            <rect class="box" x="594" y="60" width="96" height="36" rx="2" />
+            <text class="box-label" x="642" y="83" text-anchor="middle">collections</text>
+            <text class="edge-label" x="496" y="120" text-anchor="middle">position lives here</text>
+            <text class="note-label" x="316" y="150">many per product, many per group</text>
+            <text class="note-label" x="316" y="168">the group carries its own name and dates</text>
+
+            <!-- panel 3 : a consequence -->
+            <text class="panel-title" x="742" y="24">A consequence</text>
+            <rect class="box" x="742" y="60" width="92" height="36" rx="2" />
+            <text class="box-label" x="788" y="83" text-anchor="middle">products</text>
+            <path class="edge-derived" d="M 788 100 v 18" />
+            <text class="edge-label" x="788" y="134" text-anchor="middle">WHERE …</text>
+            <text class="note-label" x="742" y="164">nothing new is stored</text>
+          </svg>
+        </div>
+        <p class="fig-cap">
+          The same three mechanisms as schema. Note what the third panel does not
+          contain.
+        </p>
+      </section>
+
+      <!-- ============================================================ 01 -- -->
+      <section id="s1">
+        <div class="sec-head">
+          <span class="sec-num">01</span><h2>The five questions</h2>
+        </div>
+        <p class="lede">
+          Answer these <em>before</em> naming the thing. The name is the part that
+          misleads — “collection” and “category” sound interchangeable and are not,
+          while “series” can be either depending on the catalogue.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th></th><th>Question</th><th>If no</th><th>If yes</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="q">Q1</td>
+                <td><strong>Can one product be in two of these at once?</strong></td>
+                <td>A single reference will do — the category tree already is one</td>
+                <td>You need many-to-many. Nothing else is honest</td>
+              </tr>
+              <tr>
+                <td class="q">Q2</td>
+                <td><strong>Does one of them contain another?</strong></td>
+                <td>Flat list</td>
+                <td>A tree — <code>parent_id</code> and a recursive walk</td>
+              </tr>
+              <tr>
+                <td class="q">Q3</td>
+                <td><strong>Could a correct answer be computed from data you already store?</strong></td>
+                <td>It has to be recorded</td>
+                <td><strong>Stop. Do not store it.</strong> Write the query</td>
+              </tr>
+              <tr>
+                <td class="q">Q4</td>
+                <td><strong>Does the group need its own name, blurb, image or dates?</strong></td>
+                <td>It's a label — a tag</td>
+                <td>It's an entity — its own table</td>
+              </tr>
+              <tr>
+                <td class="q">Q5</td>
+                <td><strong>Does the order of products inside it matter?</strong></td>
+                <td>Sort by whatever the list page sorts by</td>
+                <td><code>position</code> on the membership, not on the product</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          <strong>Q3 short-circuits the rest.</strong> If the answer is yes, none of
+          the other four matter — you have a query, and building a table for it is
+          how you get a page that lies. Ask it early.
+        </p>
+
+        <div class="note">
+          <strong>Q5 is the one people get wrong quietly.</strong> Order belongs on
+          the <em>membership</em>, because a product's place is per-group: first in
+          “New in”, seventh in “Gifts”. A <code>sort_order</code> column on
+          <code>products</code> can only ever express one of those, and it will be
+          the wrong one on every page but the first that used it.
+        </div>
+      </section>
+
+      <!-- ============================================================ 02 -- -->
+      <section id="s2">
+        <div class="sec-head">
+          <span class="sec-num">02</span><h2>The words, decided</h2>
+        </div>
+        <p class="lede">
+          Each of the five run through the procedure. Two of them are traps —
+          words that name something other than a grouping, where building the
+          obvious thing means building the wrong thing.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Word</th><th>Usually means</th><th>Q1 many?</th><th>Mechanism</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Category</strong></td>
+                <td>What kind of thing this is</td>
+                <td class="no">no</td>
+                <td>Single FK, nested. <em>Built.</em></td>
+              </tr>
+              <tr>
+                <td><strong>Series</strong></td>
+                <td>What we released together, numbered</td>
+                <td>usually — <em>but see below</em></td>
+                <td>Join table, or the category tree if genuinely one-per-product</td>
+              </tr>
+              <tr>
+                <td><strong>Collection</strong></td>
+                <td>What we grouped for a reason</td>
+                <td class="yes">yes</td>
+                <td>Join table. No shortcut survives here</td>
+              </tr>
+              <tr>
+                <td><strong>Set</strong></td>
+                <td><strong>Ambiguous — ask which</strong></td>
+                <td>—</td>
+                <td>Either a collection, or not a grouping at all</td>
+              </tr>
+              <tr>
+                <td><strong>Archive</strong></td>
+                <td>What we no longer sell</td>
+                <td>—</td>
+                <td>A query. <strong>Not a table</strong></td>
+              </tr>
+              <tr>
+                <td><strong>Catalogue</strong></td>
+                <td>All of it — or a published document</td>
+                <td>—</td>
+                <td>Not a grouping. <strong>Find out which meaning</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>The trap in “set”</h3>
+        <p>
+          “Set” carries two meanings and they cost wildly different amounts.
+          One is a curated group — a collection by another name, a few days' work.
+          The other is <strong>a sellable bundle</strong>: “gift set of three”, one
+          thing a customer adds to the cart that is made of other products.
+        </p>
+        <p>
+          That second one is not a grouping feature. It reaches into inventory
+          (buying the set has to decrement three components, and go out of stock
+          when any one of them does), into pricing (the set is usually cheaper than
+          its parts, so which price is authoritative?), into
+          <code>order_items</code> (does the snapshot record the set or the
+          components?), and into fulfilment (one parcel, three things to pick).
+          It is weeks, not days. <strong>Ask which one is meant before writing
+          anything.</strong>
+        </p>
+
+        <h3>The trap in “catalogue”</h3>
+        <p>
+          Most of the time it means “everything we sell”, which is the product list
+          you already have. Occasionally it means a <em>published artefact</em> — a
+          PDF, a printed lookbook, “the 2026 catalogue” — which is a document with a
+          date and a download, not a data structure. If someone asks for the
+          catalogue, find out whether they want a page or a file.
+        </p>
+
+        <h3>Why “archive” resists being a table</h3>
+        <p>
+          Three plausible meanings, and all three are already computable:
+        </p>
+        <ul>
+          <li><strong>“Sold out and not returning”</strong> — no variant has sellable stock and nothing is on order.</li>
+          <li><strong>“A series we finished”</strong> — the collection has an <code>ends_at</code> in the past.</li>
+          <li><strong>“Hidden from the shop”</strong> — that is <code>is_active = false</code>, which exists.</li>
+        </ul>
+        <p>
+          Each is a <code>WHERE</code> clause over rows Manitou already keeps. Add an
+          <code>is_archived</code> flag beside them and you have created a fourth
+          answer that can disagree with the other three — and it will, because it is
+          the only one a human has to maintain.
+        </p>
+        <div class="note good">
+          <strong>The one case that justifies storing it:</strong> when the archive
+          is an editorial act rather than a status — “these twelve are the ones we
+          are proud of.” That is an opinion, so it is a collection, and it goes
+          through the ordinary mechanism with a name like <em>Archive</em>. The rule
+          holds: opinions get stored, consequences get queried.
+        </div>
+      </section>
+
+      <!-- ============================================================ 03 -- -->
+      <section id="s3">
+        <div class="sec-head">
+          <span class="sec-num">03</span><h2>Categories as series</h2>
+        </div>
+        <p class="lede">
+          Phase 7 task 6 says <strong>“the categories are the series”</strong> —
+          <code>Field Guide</code>, <code>Emblem</code>, <code>Poster</code>,
+          <code>Orbit OS</code> as four top-level categories rather than a product-type
+          tree. That is a decision with preconditions, and it is worth writing them
+          down while it is still reversible.
+        </p>
+
+        <p>
+          The stated reason was sound: <code>products.category_id</code> is
+          <code>NOT NULL</code> and single, and the Orbit OS capsule spans a tee, a
+          tote and a cap — so a <code>T-Shirts</code> / <code>Accessories</code> tree
+          would have split one design across two branches with no way to reunite it.
+          Given one axis, release is the more useful axis for this catalogue.
+        </p>
+
+        <h3>What has to stay true</h3>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Precondition</th><th>True today?</th><th>The day it breaks</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Every product belongs to exactly one series</td>
+                <td class="yes">yes</td>
+                <td>“Put this shirt in Field Guide <em>and</em> Gifts Under $35.” You can't. Duplicating the product duplicates its SKUs and splits its stock</td>
+              </tr>
+              <tr>
+                <td>Nobody needs to browse by product type</td>
+                <td class="yes">yes</td>
+                <td>“Show me all the t-shirts.” There is no such page, because the tree is organised by release</td>
+              </tr>
+              <tr>
+                <td>Series don't accumulate faster than the nav can hold</td>
+                <td class="yes">yes — four</td>
+                <td>Every past series is a permanent nav row. <code>CategoryNav</code> renders them all, flat and alphabetical</td>
+              </tr>
+              <tr>
+                <td>A product never leaves a series while staying on sale</td>
+                <td class="yes">yes</td>
+                <td>Retiring a series means reassigning or hiding every product in it first — <code>category_id</code> is <code>NO ACTION</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>What unwinding costs</h3>
+        <p>
+          Adding <code>collections</code> later is cheap: two tables, additive, no
+          backfill. <strong>The expensive part is not the schema — it is the data.</strong>
+          If the category tree has been carrying release information, then on the day
+          real collections arrive somebody has to decide what a category means again,
+          and re-file every product. That is a data migration with judgement in it,
+          and judgement does not batch.
+        </p>
+        <p>
+          Its cost is proportional to catalogue size. Today production holds
+          <strong>two products</strong>, and the Field Guide categories have not been
+          created yet — so the decision is currently free to reverse. At two hundred
+          products it is an afternoon of someone's careful attention. That asymmetry
+          is the whole reason this section exists.
+        </p>
+
+        <div class="verdict">
+          <p>Keep it, and write down the trigger</p>
+          <p>
+            At this size the shortcut is correct, and the alternative — building a
+            collections system for a planned catalogue of eleven products across
+            four groups — is exactly the speculative generalisation Section 1.1
+            forbids.
+          </p>
+          <p>
+            <strong>Revisit the first time any of these happens:</strong> a product
+            needs to be in two groups at once; somebody asks for a page listing one
+            product <em>type</em>; or the header passes roughly six categories. Any
+            one of them means the single axis has run out, and that is the moment to
+            spend the migration — not before, and not several series later.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============================================================ 04 -- -->
+      <section id="s4">
+        <div class="sec-head">
+          <span class="sec-num">04</span><h2>The schema</h2>
+        </div>
+        <p class="lede">
+          Four ways to add a second grouping axis, in ascending order of what they
+          cost and what they buy.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Option</th><th>Cost</th><th>Ceiling</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>A · Nothing</strong><br /><em>today</em></td>
+                <td>None</td>
+                <td>One axis. One group per product</td>
+              </tr>
+              <tr>
+                <td><strong>B · A second nullable FK</strong><br /><code>products.collection_id</code></td>
+                <td>One migration, no backfill</td>
+                <td>Two axes, still one membership each. You will want a third, and then you are here again</td>
+              </tr>
+              <tr>
+                <td><strong>C · Join table</strong><br /><code>collections</code> + <code>product_collections</code></td>
+                <td>One migration, two tables, endpoints, an admin screen, a route</td>
+                <td>The general answer. Many groups, ordered, each with its own content</td>
+              </tr>
+              <tr>
+                <td><strong>D · JSONB array on products</strong></td>
+                <td>Looks like the cheapest</td>
+                <td class="no">Don't. No foreign keys, so a deleted collection leaves dangling names; nowhere to put <code>position</code>; nowhere for the group's own blurb and image; and “what is in this collection” needs a GIN index to stop being a scan</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>The shape of C, when it is time</h3>
+        <pre><code>collections
+  id            bigint  PK
+  name          text    not null
+  slug          text    unique          -- /collections/{slug}
+  description   text    null
+  hero_image    text    null            -- same URL rules as product_images
+  starts_at     timestamptz null
+  ends_at       timestamptz null        -- past ends_at IS the archive
+  is_active     boolean not null default true
+  created_at    timestamptz not null default now()
+
+product_collections
+  product_id    bigint  FK -&gt; products.id
+  collection_id bigint  FK -&gt; collections.id
+  position      int     not null default 0
+  PRIMARY KEY (product_id, collection_id)</code></pre>
+
+        <ul>
+          <li>
+            <strong>No <code>parent_id</code>.</strong> Collections do not nest. A
+            nested collection is two axes wearing one coat — and you already have a
+            tree for the axis that genuinely nests.
+          </li>
+          <li>
+            <strong>The composite primary key</strong> is what stops the same product
+            being added to the same collection twice, which is otherwise the first
+            bug an admin screen produces.
+          </li>
+          <li>
+            <strong>Index <code>collection_id</code></strong> separately. The PK
+            serves “which collections is this product in”; the reverse — “what is in
+            this collection”, the one every page asks — needs its own.
+          </li>
+          <li>
+            <strong><code>products.category_id</code> does not change.</strong> It
+            stays <code>NOT NULL</code> and keeps meaning “what kind of thing this
+            is”. The whole point of adding an axis is that the first one gets to go
+            back to being honest.
+          </li>
+        </ul>
+
+        <div class="note good">
+          <strong>The migration is additive and needs no backfill</strong>, which is
+          the same property that made <code>product_images.applies_to</code> safe to
+          add in Phase 4.6: an empty <code>product_collections</code> means every
+          product is in no collection, and that is precisely how the store behaves
+          today. Nothing changes appearance when it is applied, and the downgrade
+          loses configuration rather than content.
+        </div>
+
+        <div class="note warn">
+          <strong>Write the CHECK constraints by hand.</strong> PROJECT_PLAN Section
+          6.8: Alembic autogenerate does not diff CHECK constraints on a table that
+          already exists, and will silently produce an empty migration. A
+          <code>starts_at &lt; ends_at</code> guard needs
+          <code>op.create_check_constraint()</code> with a matching
+          <code>op.drop_constraint(..., type_='check')</code> in
+          <code>downgrade()</code>, verified against <code>pg_constraint</code>.
+        </div>
+
+        <h3>What the API would gain, and what it would not</h3>
+        <p>
+          <code>GET /collections</code> and <code>GET /collections/{slug}</code>,
+          mirroring the category pair. <code>GET /products</code> gains a
+          <code>collection</code> filter beside <code>category</code>.
+        </p>
+        <p>
+          It would <em>not</em> need a recursive walk —
+          <code>services/categories.py::descendant_ids</code> exists because
+          categories nest and collections do not. Nor would it need a
+          <code>featured</code> flag: <code>store-config.json</code>'s
+          <code>home.featured.category</code> already points the home page at a slug,
+          and pointing it at a collection slug instead is a config change.
+        </p>
+      </section>
+
+      <!-- ============================================================ 05 -- -->
+      <section id="s5">
+        <div class="sec-head">
+          <span class="sec-num">05</span><h2>The grouping spec</h2>
+        </div>
+        <p class="lede">
+          Fill this in before building any new way to group products. It is one
+          screen, it takes ten minutes, and it is much cheaper than the migration it
+          prevents. Copy it into the pull request or the plan entry.
+        </p>
+
+        <dl class="spec">
+          <dt>Working name</dt>
+          <dd><em>What people are calling it. Not necessarily what it is.</em></dd>
+
+          <dt>Membership is</dt>
+          <dd><em>Fact · opinion · consequence. If consequence, stop here and write the query instead.</em></dd>
+
+          <dt>Q1 · cardinality</dt>
+          <dd><em>Can a product be in two at once? Yes forces many-to-many.</em></dd>
+
+          <dt>Q2 · nesting</dt>
+          <dd><em>Does one contain another? Be suspicious — usually this is two axes.</em></dd>
+
+          <dt>Q4 · the group's own fields</dt>
+          <dd><em>Name only means a tag. Name plus blurb, image or dates means an entity.</em></dd>
+
+          <dt>Q5 · ordering</dt>
+          <dd><em>Does position inside the group matter? If so it lives on the membership.</em></dd>
+
+          <dt>Lifecycle</dt>
+          <dd><em>Does a group end? What happens to its products when it does — do they leave the shop, or just this page?</em></dd>
+
+          <dt>URL</dt>
+          <dd><em>What does it look like, and what happens to the old URL when a group is renamed?</em></dd>
+
+          <dt>Nav cost</dt>
+          <dd><em>How many rows does this add to the header, and how many after a year of them?</em></dd>
+
+          <dt>Who maintains it</dt>
+          <dd><em>Which human, doing what, how often.</em></dd>
+
+          <dt>What it looks like neglected</dt>
+          <dd><em>The most important line here. Describe the page after six months of nobody touching it. If the answer is "wrong", the design is wrong.</em></dd>
+        </dl>
+
+        <div class="note">
+          <strong>The last row does most of the work.</strong> A category tree
+          neglected for a year is still correct — a t-shirt is still a t-shirt. A
+          hand-maintained “New in” neglected for a year is a page of year-old
+          products presented as new, which is worse than not having the page. Prefer
+          groupings that degrade into being merely stale over ones that degrade into
+          being untrue.
+        </div>
+      </section>
+
+      <!-- ============================================================ 06 -- -->
+      <section id="s6">
+        <div class="sec-head">
+          <span class="sec-num">06</span><h2>Clones</h2>
+        </div>
+        <p class="lede">
+          Should <code>collections</code> become a fifth reusability seam, pre-built
+          so a clone inherits it? Section 1.1 sets the test:
+          <em>“They cost almost nothing in the default T-shirt build.”</em>
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Existing seam</th><th>What it costs unused</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>unit_of_measure</code></td><td>One text column with a default</td></tr>
+              <tr><td><code>attributes</code> JSONB</td><td>One column, <code>{}</code></td></tr>
+              <tr><td>Store config</td><td>A file that has to exist anyway</td></tr>
+              <tr><td><code>fulfilment.method</code> + event <code>source</code></td><td>One config key, one column on rows that are written regardless</td></tr>
+              <tr><td><strong>A collections system</strong></td><td class="no">Two tables, two endpoints, an admin screen, a storefront route, a nav decision — dead weight in every store that never groups anything</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="verdict">
+          <p>Not a seam — but one discipline</p>
+          <p>
+            It fails the test plainly, and adding it would be the speculative
+            generalisation the section exists to prevent. A clone that needs
+            collections adds them in a day, from the shape in §04, against a schema
+            that welcomes the addition.
+          </p>
+          <p>
+            <strong>What genuinely does cost nothing, and saves the expensive part:
+            keep <code>category</code> meaning “what kind of thing this is.”</strong>
+            The future migration is cheap; un-picking a category tree that was used
+            as a release axis is not. Discipline now, not schema now.
+          </p>
+        </div>
+
+        <p>
+          <strong>And Manitou is about to break that discipline on purpose.</strong>
+          Phase 7 task 6 files products by release, for the good reason in §03 —
+          one axis, and a capsule that spans product types. That is the right call at
+          eleven products. It is recorded here rather than left implicit so that a
+          clone reading the seeded catalogue does not copy the shape without the
+          reasoning, and so that whoever hits one of §03's triggers finds the cost
+          already written down instead of discovering it.
+        </p>
+
+        <div class="note">
+          <strong>For a clone that knows it needs both axes on day one</strong> —
+          a broad catalogue, a grocery store with weekly specials — build §04's two
+          tables before entering any products. The tables are cheap at any time; the
+          re-filing is what gets expensive, and entering a catalogue under the wrong
+          shape is how you buy it.
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          Manitou · Catalogue architecture reference. The schema as built is
+          <code>backend/app/models/catalog.py</code>; the recursive tree walk is
+          <code>backend/app/services/categories.py</code>. Seam policy is
+          PROJECT_PLAN.md Section 1.1, the tables are Section 6.3, and the Alembic
+          CHECK-constraint trap is Section 6.8. The additive-migration precedent is
+          <code>backend/alembic/versions/20260817_0111_dd2c06016289_product_image_applies_to.py</code>.
+          Nothing in §04 is built.
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>

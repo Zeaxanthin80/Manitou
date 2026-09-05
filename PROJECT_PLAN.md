@@ -1082,6 +1082,10 @@ object; deleting a used one is refused with the list of products holding it.
      (`T-Shirts` / `Accessories`) would have split the Orbit OS capsule, which is one design across
      a tee, a tote and a cap. No `collections` table: a series is a grouping, the category tree
      already groups, and Section 1.1 forbids generalising past that without an argument in writing.
+     **The preconditions that shortcut depends on, the symptom when each one breaks, and the shape
+     to build when it does, are written up in `docs/reference/catalogue-grouping.html`** — including
+     why "archive" should never become a table and why a `collections` seam fails Section 1.1's
+     cost test. Read it before adding a second way to group products.
    - **`home.featured` in store config** drives the band above the grid: category slug, eyebrow,
      heading, body, button label, image and its alt text. Empty `category` renders nothing, the same
      convention `store.logo` uses — the key stays, the value empties. No component holds store voice
