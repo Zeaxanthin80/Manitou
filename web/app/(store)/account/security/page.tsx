@@ -26,7 +26,7 @@ export default async function SecurityPage() {
     <main className="mx-auto max-w-4xl px-6 py-12">
       <Link
         href="/account"
-        className="font-body text-xs uppercase tracking-tight text-muted hover:text-text"
+        className="font-body text-xs uppercase tracking-wide text-muted hover:text-text"
       >
         &larr; Your account
       </Link>

@@ -40,7 +40,7 @@ export default async function AdminUserPage({
     <main className="mx-auto max-w-6xl px-6 py-12">
       <Link
         href="/admin/users"
-        className="font-body text-xs uppercase tracking-tight text-muted hover:text-text"
+        className="font-body text-xs uppercase tracking-wide text-muted hover:text-text"
       >
         &larr; All users
       </Link>
@@ -50,12 +50,12 @@ export default async function AdminUserPage({
           {user.full_name}
         </h1>
         {!user.is_active && (
-          <span className="rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-tight text-accent">
+          <span className="rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-wide text-accent">
             Suspended
           </span>
         )}
         {user.role === "admin" && (
-          <span className="rounded-sm border border-border px-2 py-1 font-body text-xs uppercase tracking-tight text-muted">
+          <span className="rounded-sm border border-border px-2 py-1 font-body text-xs uppercase tracking-wide text-muted">
             Admin
           </span>
         )}
@@ -173,7 +173,7 @@ export default async function AdminUserPage({
           {user.addresses.length > 0 && (
             <Card>
               <CardBody>
-                <h2 className="font-body text-xs uppercase tracking-tight text-muted">
+                <h2 className="font-body text-xs uppercase tracking-wide text-muted">
                   Addresses
                 </h2>
                 <ul className="mt-3 flex flex-col gap-3">

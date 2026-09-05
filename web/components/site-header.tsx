@@ -37,7 +37,7 @@ export async function SiteHeader() {
           have switched to the desktop nav AT 768 rather than below it. */}
       <nav
         aria-label="Main"
-        className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-4 wide:gap-8"
+        className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-5 wide:gap-8"
       >
         <MobileMenu
           items={categories.map((c) => ({

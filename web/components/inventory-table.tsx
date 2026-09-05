@@ -57,7 +57,7 @@ function Row({ row }: { row: InventoryRow }) {
           {row.productName}
         </Link>
         {!row.productActive && (
-          <span className="ml-2 font-body text-xs uppercase tracking-tight text-muted">
+          <span className="ml-2 font-body text-xs uppercase tracking-wide text-muted">
             hidden
           </span>
         )}
@@ -111,15 +111,15 @@ function Row({ row }: { row: InventoryRow }) {
             shelf and twelve reserved reads Sold out to customers, and this
             badge is what connects the two numbers beside it. */}
         {row.quantitySellable === 0 ? (
-          <span className="rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-tight text-accent">
+          <span className="rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-wide text-accent">
             Out of stock
           </span>
         ) : row.needsReorder ? (
-          <span className="rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-tight text-accent">
+          <span className="rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-wide text-accent">
             Reorder
           </span>
         ) : (
-          <span className="font-body text-xs uppercase tracking-tight text-muted">
+          <span className="font-body text-xs uppercase tracking-wide text-muted">
             OK
           </span>
         )}

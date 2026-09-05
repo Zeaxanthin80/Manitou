@@ -30,7 +30,10 @@ export default async function Home() {
 
       <section
         aria-labelledby="catalogue-heading"
-        className="mx-auto max-w-6xl px-6 py-12"
+        // One vertical scale for the whole page: the strip opens with the same
+        // pt-16 wide:pt-24, so hero -> strip -> catalogue are spaced by a rule
+        // rather than by whatever each file happened to choose.
+        className="mx-auto max-w-6xl px-6 py-16 wide:py-24"
       >
         {/* A heading, not a caption. The footer's "All products" link lands
             here, so the section is named the same way, and the count sits

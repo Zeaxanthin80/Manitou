@@ -54,7 +54,7 @@ export default async function OrderPage({
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">
-      <p className="font-body text-xs uppercase tracking-tight text-muted">
+      <p className="font-body text-xs uppercase tracking-wide text-muted">
         Order #{order.id} &middot; {placed}
       </p>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
@@ -410,7 +410,7 @@ function ActivityList({
 
   return (
     <div className="mt-6">
-      <h3 className="font-body text-xs uppercase tracking-tight text-muted">
+      <h3 className="font-body text-xs uppercase tracking-wide text-muted">
         Activity
       </h3>
       <ul className="mt-2 flex flex-col gap-1">

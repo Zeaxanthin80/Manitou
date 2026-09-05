@@ -16,6 +16,7 @@ was changed, and what makes it not happen again.
 
 | # | Date | Defect | Status |
 |---|---|---|---|
+| [37](#37-the-hero-panel-painted-under-its-own-photograph-and-two-states-that-had-never-worked) | 2026-09-05 | The hero panel painted under its own photograph, and two states that had never worked | Fixed — uncommitted |
 | [36](#36-a-refused-product-create-wiped-the-form-and-blamed-two-fields-for-one-collision) | 2026-09-05 | A refused product create wiped the form and blamed two fields for one collision | Fixed — uncommitted |
 | [35](#35-the-store-name-pushed-the-home-page-into-horizontal-scroll-on-a-phone) | 2026-09-04 | The store name pushed the home page into horizontal scroll on a phone | Fixed — uncommitted |
 | [34](#34-alembics-logging-config-silently-disabled-the-applications-loggers-under-test) | 2026-09-01 | Alembic's logging config silently disabled the application's loggers under test | Fixed — uncommitted |
@@ -52,6 +53,50 @@ was changed, and what makes it not happen again.
 | [3](#3-the-image-picker-offered-files-the-api-would-refuse) | 2026-08-15 | The image picker offered files the API would refuse | Fixed `b76cd7b` |
 | [2](#2-validation-messages-never-reached-the-admin) | 2026-08-15 | Validation messages never reached the admin | Fixed `9927535` |
 | [1](#1-one-external-image-url-took-down-three-pages) | 2026-08-15 | One external image URL took down three pages | Fixed `9927535` |
+
+---
+
+## 37. The hero panel painted under its own photograph, and two states that had never worked
+
+**Status:** Fixed. Found by the owner on a phone, the evening the new front page shipped, with a
+plain verdict — "not impressed" — and four specifics. Three of them were defects.
+
+**What was seen.** On a 440px screen the hero's copy panel sat *below* the photograph, flush
+against its bottom edge, with no eyebrow above the heading. The desktop had shown the panel
+bottom-left over the image with `SERIES 01` in red; the phone showed neither.
+
+**What caused it.** The panel was meant to stack below the image on a phone and pull up 40px over
+its bottom edge — `-mt-10`, the "card breaks the frame" device. The image wrapper is `relative`
+(it has to be, for `next/image fill`); the panel's wrapper was only positioned above `wide:`.
+**A positioned element paints above an in-flow sibling regardless of DOM order**, so the
+overlap region — the panel's top 40px, eyebrow included — was rendered underneath the photograph.
+The mock I checked it against had the same bug and I read the result as "stacked, fine." A bug
+that produces a *plausible* layout is the kind a screenshot confirms rather than catches.
+
+**Two more, found while fixing.** The primary button's hover was `hover:bg-text`; `text` and
+`primary` are the same hex, so the hover state had changed nothing since Phase 3. And `Input`
+placeholders used `muted` at 7.6:1 — body-text contrast — so a sample value read as a value
+already typed. Neither had ever been *wrong* on a screen; they had simply never done anything.
+
+**What was changed.**
+
+- `hero.tsx`: the panel is `absolute` at every width, so there is one stacking relationship and
+  no trick. It is translucent — `bg-surface/80` with a backdrop blur, tokens at an alpha — which
+  reads as one composition rather than a card on a photograph, and is legible over any image:
+  measured on the render, the ground behind the copy is ≥ 4.5:1 against `muted` at 375 and 1200.
+- `design-tokens.json` gained `color.subtle` (`#8F8A85`, 3.4:1 on surface), the first deliberate
+  revision since Phase 3, and `Input` uses it for placeholders.
+- `button.tsx`: primary hover is `bg-primary/90`.
+- In the same pass, forty-four 12px uppercase labels went from `tracking-tight` to
+  `tracking-wide` — the footer's own docstring had explained why, and nothing else had listened.
+
+**What makes it not happen again.** For the stacking class of bug, the discipline is the one
+that worked here: look at the thing on a phone, not at a mock of the thing. For the other two,
+the lesson is about states that are easy to write and impossible to notice — a hover that does
+nothing and a placeholder that looks like input both pass every test that exists, because no
+test asserts that an interactive state is *visibly different from rest*. That is a check worth
+adding to the Section 4.3 floor: every hover, focus and placeholder state differs from its
+resting state by something a person can see.
 
 ---
 

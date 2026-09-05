@@ -82,7 +82,7 @@ export default async function CartPage() {
                   <input type="hidden" name="item_id" value={item.id} />
                   <label
                     htmlFor={`qty-${item.id}`}
-                    className="font-body text-xs uppercase tracking-tight text-muted"
+                    className="font-body text-xs uppercase tracking-wide text-muted"
                   >
                     Qty
                   </label>
@@ -181,7 +181,7 @@ function StockNote({
   if (!note) return null;
 
   return (
-    <p className="mt-1 font-body text-xs uppercase tracking-tight text-accent">
+    <p className="mt-1 font-body text-xs uppercase tracking-wide text-accent">
       {note}
     </p>
   );

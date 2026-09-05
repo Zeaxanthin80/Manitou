@@ -22,7 +22,7 @@ export function OrderStatus({ status }: { status: string }) {
   const style = STYLES[status] ?? "border-border text-muted";
   return (
     <span
-      className={`inline-block rounded-sm border px-2 py-1 font-body text-xs uppercase tracking-tight ${style}`}
+      className={`inline-block rounded-sm border px-2 py-1 font-body text-xs uppercase tracking-wide ${style}`}
     >
       {status}
     </span>

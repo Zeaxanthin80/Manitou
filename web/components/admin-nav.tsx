@@ -83,7 +83,7 @@ export function AdminNav({
 
         {/* The badge is the one thing that must never be dropped on a small
             screen -- it is what distinguishes the portal from the storefront. */}
-        <span className="shrink-0 rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-tight text-accent">
+        <span className="shrink-0 rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-wide text-accent">
           <span className="hidden sm:inline">Vendor portal</span>
           <span className="sm:hidden">Admin</span>
         </span>

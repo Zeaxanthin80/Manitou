@@ -34,7 +34,7 @@ function AddressRow({ address }: { address: Address }) {
           ))}
         </address>
 
-        <p className="mt-2 flex items-center gap-2 font-body text-xs uppercase tracking-tight text-muted">
+        <p className="mt-2 flex items-center gap-2 font-body text-xs uppercase tracking-wide text-muted">
           <span>{address.type}</span>
           {address.is_default && (
             <span className="rounded-sm border border-border px-2 py-0.5">

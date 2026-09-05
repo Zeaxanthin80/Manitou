@@ -13,7 +13,10 @@ export function Input({ className, invalid, ...props }: InputProps) {
     <input
       className={cn(
         "w-full rounded-md border bg-surface px-3 py-2 font-body text-base text-text",
-        "placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-50",
+        // `subtle`, not `muted`: muted is body-text contrast (7.6:1), so a sample
+        // value read as something already typed. A placeholder should be seen
+        // and then ignored -- 3.4:1 is the line for that.
+        "placeholder:text-subtle disabled:cursor-not-allowed disabled:opacity-50",
         invalid ? "border-error" : "border-border",
         className,
       )}

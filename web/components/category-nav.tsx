@@ -32,9 +32,14 @@ export function CategoryNav({ categories }: { categories: Category[] }) {
               aria-current={active ? "page" : undefined}
               className={cn(
                 "block whitespace-nowrap font-body text-sm transition-colors motion-reduce:transition-none",
+                // Every link carries the underline; only its colour changes.
+                // Transparent at rest, muted on hover, accent when active --
+                // one gesture for "you could be here" and "you are here", and
+                // nothing moves when the line appears.
+                "underline decoration-2 underline-offset-8 transition-[color,text-decoration-color]",
                 active
-                  ? "text-accent underline decoration-2 underline-offset-8"
-                  : "text-muted hover:text-text",
+                  ? "text-accent decoration-accent"
+                  : "text-muted decoration-transparent hover:text-text hover:decoration-muted",
               )}
             >
               {c.name}

@@ -75,7 +75,7 @@ export async function SeriesStrip() {
   if (tiles.length === 0) return null;
 
   return (
-    <section aria-labelledby="series-strip-heading" className="mx-auto max-w-6xl px-6 pt-12">
+    <section aria-labelledby="series-strip-heading" className="mx-auto max-w-6xl px-6 pt-16 wide:pt-24">
       {/* Read by assistive tech, not shown: the tiles explain themselves, and
           the word for "a group of products" is the store's to choose --
           ImprimaPress says "series", a candle store would not. */}
@@ -96,11 +96,15 @@ export async function SeriesStrip() {
                   className="object-cover transition-transform group-hover:scale-[1.02] motion-reduce:transition-none"
                 />
               </div>
-              <h3 className="mt-3 font-display text-sm uppercase leading-tight tracking-tight text-text">
+              {/* The name underlines in the accent on hover -- the same gesture
+                  the nav uses for "you are here", offered here as "you could
+                  be". Transparent-to-accent rather than none-to-underline, so
+                  the text does not shift when the line appears. */}
+              <h3 className="mt-3 font-display text-sm uppercase leading-tight tracking-tight text-text underline decoration-transparent decoration-2 underline-offset-4 transition-[text-decoration-color] group-hover:decoration-accent motion-reduce:transition-none">
                 {category.name}
               </h3>
               {/* Same noun the catalogue heading uses. One vocabulary. */}
-              <p className="mt-1 font-body text-xs uppercase tracking-tight text-muted">
+              <p className="mt-1 font-body text-xs uppercase tracking-wide text-muted">
                 {total} {total === 1 ? "product" : "products"}
               </p>
             </Link>

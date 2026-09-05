@@ -84,7 +84,7 @@ export default async function PayPage({
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">
-      <p className="font-body text-xs uppercase tracking-tight text-muted">
+      <p className="font-body text-xs uppercase tracking-wide text-muted">
         Order #{order.id}
       </p>
       <h1 className="mt-2 font-display text-2xl uppercase leading-none tracking-tight text-text">

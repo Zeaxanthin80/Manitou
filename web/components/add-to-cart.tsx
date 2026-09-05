@@ -41,7 +41,7 @@ export function AddToCart({ variants }: { variants: Variant[] }) {
         <fieldset className="flex flex-col gap-2">
           {/* A fieldset/legend pair is what tells a screen reader these radios
               are one group and what the group is for. */}
-          <legend className="mb-2 font-body text-xs uppercase tracking-tight text-muted">
+          <legend className="mb-2 font-body text-xs uppercase tracking-wide text-muted">
             Options
           </legend>
           {variants.map((v) => (
@@ -70,7 +70,7 @@ export function AddToCart({ variants }: { variants: Variant[] }) {
               <span className="flex items-baseline gap-4">
                 <span className="text-text">{formatMoney(v.price)}</span>
                 {!v.in_stock && (
-                  <span className="text-xs uppercase tracking-tight text-accent">
+                  <span className="text-xs uppercase tracking-wide text-accent">
                     Sold out
                   </span>
                 )}

@@ -107,7 +107,7 @@ export function ProductImagesEditor({
               <p className="font-body text-sm text-text">{img.alt_text}</p>
 
               {img.is_primary ? (
-                <span className="inline-block w-fit rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-tight text-accent">
+                <span className="inline-block w-fit rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-wide text-accent">
                   Primary
                 </span>
               ) : (
@@ -127,7 +127,7 @@ export function ProductImagesEditor({
                   <input type="hidden" name="product_id" value={product.id} />
                   <input type="hidden" name="slug" value={product.slug} />
                   <input type="hidden" name="intent" value="applies" />
-                  <label className="font-body text-xs uppercase tracking-tight text-muted">
+                  <label className="font-body text-xs uppercase tracking-wide text-muted">
                     Shows for
                   </label>
                   <select

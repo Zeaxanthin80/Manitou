@@ -218,7 +218,7 @@ export function TwoFactorSection({
           />
         </div>
         <details>
-          <summary className="cursor-pointer font-body text-xs uppercase tracking-tight text-muted hover:text-text">
+          <summary className="cursor-pointer font-body text-xs uppercase tracking-wide text-muted hover:text-text">
             Can&apos;t scan? Enter this instead
           </summary>
           <p className="mt-2 font-body text-sm break-all text-text">

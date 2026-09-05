@@ -18,7 +18,7 @@ export default async function NewProductPage() {
     <main className="mx-auto max-w-6xl px-6 py-12">
       <Link
         href="/admin/products"
-        className="font-body text-xs uppercase tracking-tight text-muted hover:text-text"
+        className="font-body text-xs uppercase tracking-wide text-muted hover:text-text"
       >
         &larr; All products
       </Link>

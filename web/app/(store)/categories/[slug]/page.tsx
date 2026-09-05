@@ -54,7 +54,7 @@ export default async function CategoryPage({
       {parent && (
         <Link
           href={`/categories/${parent.slug}`}
-          className="font-body text-xs uppercase tracking-tight text-muted hover:text-text"
+          className="font-body text-xs uppercase tracking-wide text-muted hover:text-text"
         >
           &larr; {parent.name}
         </Link>

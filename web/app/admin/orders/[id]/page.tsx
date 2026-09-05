@@ -48,7 +48,7 @@ export default async function AdminOrderPage({
     <main className="mx-auto max-w-6xl px-6 py-12">
       <Link
         href="/admin/orders"
-        className="font-body text-xs uppercase tracking-tight text-muted hover:text-text print:hidden"
+        className="font-body text-xs uppercase tracking-wide text-muted hover:text-text print:hidden"
       >
         &larr; All orders
       </Link>

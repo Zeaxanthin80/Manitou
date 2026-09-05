@@ -70,7 +70,7 @@ export function ProductForm({
             name="description"
             rows={4}
             defaultValue={v.description ?? product?.description ?? ""}
-            className="rounded-md border border-border bg-surface px-3 py-2 font-body text-sm text-text"
+            className="rounded-md border border-border bg-surface px-3 py-2 font-body text-sm text-text placeholder:text-subtle"
           />
         )}
       </FormField>

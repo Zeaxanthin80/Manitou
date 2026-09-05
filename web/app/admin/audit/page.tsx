@@ -65,7 +65,7 @@ export default async function AuditPage({
       </p>
 
       <form action="/admin/audit" className="mt-6 flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 font-body text-xs uppercase tracking-tight text-muted">
+        <label className="flex flex-col gap-1 font-body text-xs uppercase tracking-wide text-muted">
           Action
           <select
             name="action"

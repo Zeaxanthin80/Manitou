@@ -73,7 +73,7 @@ export default async function AdminUsersPage({
       </div>
 
       <form action="/admin/users" className="mt-6 flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 font-body text-xs uppercase tracking-tight text-muted">
+        <label className="flex flex-col gap-1 font-body text-xs uppercase tracking-wide text-muted">
           Search
           <input
             name="q"
@@ -151,11 +151,11 @@ export default async function AdminUsersPage({
                     <TD className="text-muted">{u.role}</TD>
                     <TD>
                       {u.is_active ? (
-                        <span className="font-body text-xs uppercase tracking-tight text-muted">
+                        <span className="font-body text-xs uppercase tracking-wide text-muted">
                           Active
                         </span>
                       ) : (
-                        <span className="rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-tight text-accent">
+                        <span className="rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-wide text-accent">
                           Suspended
                         </span>
                       )}

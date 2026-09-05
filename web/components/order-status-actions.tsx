@@ -98,7 +98,7 @@ function DispatchForm({ orderId }: { orderId: number }) {
       <form action={formAction} className="flex flex-wrap items-end gap-3">
         <input type="hidden" name="order_id" value={orderId} />
         <label className="flex flex-col gap-1">
-          <span className="font-body text-xs uppercase tracking-tight text-muted">
+          <span className="font-body text-xs uppercase tracking-wide text-muted">
             Carrier
           </span>
           <select
@@ -114,7 +114,7 @@ function DispatchForm({ orderId }: { orderId: number }) {
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-xs uppercase tracking-tight text-muted">
+          <span className="font-body text-xs uppercase tracking-wide text-muted">
             Tracking number
           </span>
           <Input name="tracking_number" className="w-64" autoComplete="off" />
@@ -224,7 +224,7 @@ function ShipmentPanel({
               name="status"
               value={s}
               disabled={pending}
-              className="rounded-md border border-border bg-transparent px-2 py-1 font-body text-xs uppercase tracking-tight text-text hover:bg-background disabled:opacity-50"
+              className="rounded-md border border-border bg-transparent px-2 py-1 font-body text-xs uppercase tracking-wide text-text hover:bg-background disabled:opacity-50"
             >
               {eventLabel(s)}
             </button>

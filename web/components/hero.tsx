@@ -20,13 +20,18 @@ import { storeConfig } from "@/lib/store-config";
  * category slug for the featured-series band this replaces -- the hero is that
  * band promoted to lead, so the config shape did not change.
  *
- * **The copy sits in a panel, not on the photograph.** Text laid straight over
- * a photo is legible exactly as long as the photo stays light where the text is,
- * and the photo is a config value that will change. A `bg-surface` panel is
- * legible over anything. On a phone the panel stacks below the image and pulls
- * up over its bottom edge; above `wide:` it sits bottom-left inside the same
- * content column the rest of the page uses, so the copy lines up with the grid
- * beneath it rather than floating at the viewport's edge.
+ * **The panel sits on the photograph at every width, and it is translucent.**
+ * The first version stacked it below the image on a phone and pulled it up by
+ * 40px to "break the frame" -- and the frame won: the image wrapper is
+ * `relative` and the panel's wasn't, so a positioned sibling painted over an
+ * in-flow one and the overlap, eyebrow included, was hidden under the
+ * photograph. Absolute at every width removes the bug and the trick together.
+ * `bg-surface/80` with a backdrop blur keeps the copy legible over any part of
+ * any photograph while still reading as one composition rather than a card
+ * pasted on top; the tokens are unchanged, only their alpha.
+ *
+ * The frame is 3:4 on a phone -- taller than the 4:5 the tiles use -- so the
+ * garments still show above a panel that covers roughly the lower 45%.
  *
  * The heading is the page's `<h1>`. The store name is carried by the wordmark's
  * alt text and by `<title>`; a heading that says what the store is *leading
@@ -53,11 +58,12 @@ export function Hero() {
 
   return (
     <section aria-labelledby="hero-heading" className="relative">
-      {/* Portrait on a phone, wide on a desktop. A 3:2 source with its subject
-          centred crops acceptably into both; if a future photograph doesn't,
-          the fix is a second <Image> art-directed with wide:hidden / hidden
-          wide:block, not a change here. */}
-      <div className="relative aspect-[4/5] wide:aspect-[2/1]">
+      {/* Portrait on a phone, wide on a desktop. A 3:2 source composed with its
+          subject in the upper right and empty backdrop lower left crops into
+          both without covering the garments; the photograph is generated to
+          that brief, and a future one that isn't gets a second art-directed
+          <Image> rather than a change here. */}
+      <div className="relative aspect-[3/4] wide:aspect-[2/1]">
         <Image
           src={featured.image}
           alt={featured.image_alt}
@@ -70,32 +76,34 @@ export function Hero() {
         />
       </div>
 
-      {/* In normal flow below the image on a phone, pulled up by -mt-10 so the
-          panel breaks the photograph's bottom edge. Above wide: the wrapper is
-          absolute at the bottom of the section and shares the page's content
-          column, so the panel's left edge lines up with the grid below. */}
-      <div className="mx-auto max-w-6xl px-6 wide:absolute wide:inset-x-0 wide:bottom-0">
-        <div className="-mt-10 rounded-md border border-border bg-surface p-6 shadow-md wide:mb-10 wide:mt-0 wide:max-w-md wide:p-8">
-          {/* Merchandising is what the accent token is for; this and the active
-              nav item are its two appearances on the page. */}
-          <p className="font-body text-xs uppercase tracking-tight text-accent">
-            {featured.eyebrow}
-          </p>
-          <h1
-            id="hero-heading"
-            className="mt-3 font-display text-2xl uppercase leading-none tracking-tight text-text wide:text-3xl"
-          >
-            {featured.heading}
-          </h1>
-          <p className="mt-4 max-w-prose font-body text-sm text-muted wide:text-base">
-            {featured.body}
-          </p>
-          <Link
-            href={`/categories/${featured.category}`}
-            className={buttonClasses({ className: "mt-6 inline-flex" })}
-          >
-            {featured.cta}
-          </Link>
+      {/* Absolute at every width. On a phone the panel keeps the page's 24px
+          gutter; above wide: the wrapper spans the section and the inner column
+          is the same max-w-6xl the grid uses, so the panel's left edge lines up
+          with everything below it. */}
+      <div className="absolute inset-x-6 bottom-6 wide:inset-x-0 wide:bottom-10">
+        <div className="mx-auto max-w-6xl wide:px-6">
+          <div className="rounded-md border border-border/60 bg-surface/80 p-6 shadow-lg backdrop-blur-md wide:max-w-md wide:p-8">
+            {/* Merchandising is what the accent token is for; this and the
+                active nav item are its two appearances on the page. */}
+            <p className="font-body text-xs uppercase tracking-wide text-accent">
+              {featured.eyebrow}
+            </p>
+            <h1
+              id="hero-heading"
+              className="mt-3 font-display text-2xl uppercase leading-none tracking-tight text-text wide:text-3xl"
+            >
+              {featured.heading}
+            </h1>
+            <p className="mt-4 max-w-prose font-body text-sm text-muted wide:text-base">
+              {featured.body}
+            </p>
+            <Link
+              href={`/categories/${featured.category}`}
+              className={buttonClasses({ className: "mt-6 inline-flex" })}
+            >
+              {featured.cta}
+            </Link>
+          </div>
         </div>
       </div>
     </section>

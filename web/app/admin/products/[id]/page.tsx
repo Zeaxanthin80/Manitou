@@ -54,7 +54,7 @@ export default async function EditProductPage({
     <main className="mx-auto max-w-6xl px-6 py-12">
       <Link
         href="/admin/products"
-        className="font-body text-xs uppercase tracking-tight text-muted hover:text-text"
+        className="font-body text-xs uppercase tracking-wide text-muted hover:text-text"
       >
         &larr; All products
       </Link>
@@ -64,7 +64,7 @@ export default async function EditProductPage({
           {product.name}
         </h1>
         {!product.is_active && (
-          <span className="rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-tight text-accent">
+          <span className="rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-wide text-accent">
             Hidden
           </span>
         )}

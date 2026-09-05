@@ -9,13 +9,15 @@
       "Archivo Black has exactly ONE weight (400) - 'Black' is the family name, not a weight axis. Requesting 700 makes the browser synthesise a fake bold. If a lighter display face is ever wanted, swap the family to 'Archivo' (variable), do not change the weight.",
       "color.accent is merchandising (Sale, New). color.error is validation (Card declined). They are deliberately different reds so a sale badge and a failure message never look alike.",
       "color.accent was nudged from #E11D48 to #DB1B45 during task 2. The original computed 4.497:1 on the background - failing AA for small text by 0.003, which rounding to 4.50 concealed. The darker value clears AA in every usage, so the token carries no conditional rule.",
-      "color.border is 1.20:1 and is DECORATIVE ONLY - borders and dividers, never text."
+      "color.border is 1.20:1 and is DECORATIVE ONLY - borders and dividers, never text.",
+      "color.subtle was added in Phase 7 (2026-09-05), the first deliberate revision since Phase 3. It is for text that should be seen and then ignored - placeholders, sample values - at 3.42:1 on surface: above the 3:1 line for non-text UI, well under muted's 7.6:1. Before it, placeholders used muted and a sample value read as something already typed. Never use it for copy a person has to read."
     ],
     "contrast": {
       "reference": "WCAG 2.1 relative luminance. AA body text requires 4.5:1, AA large text 3:1, AAA 7:1.",
       "onBackground": {
         "text": 16.74,
         "muted": 7.3,
+        "subtle": 3.27,
         "primary": 16.74,
         "accent": 4.73,
         "success": 4.8,
@@ -37,6 +39,7 @@
     "surface": "#FFFFFF",
     "text": "#1C1917",
     "muted": "#57534E",
+    "subtle": "#8F8A85",
     "border": "#E7E5E4",
     "primary": "#1C1917",
     "accent": "#DB1B45",

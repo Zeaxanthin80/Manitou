@@ -15,7 +15,10 @@ type Size = "sm" | "md" | "lg";
 
 const VARIANTS: Record<Variant, string> = {
   // Every pairing below is one of the combinations verified in task 2.
-  primary: "bg-primary text-surface hover:bg-text",
+  // hover:bg-primary/90, not hover:bg-text: `primary` and `text` are the same
+  // hex, so the old hover state changed nothing and nobody noticed for four
+  // phases. Ten percent of the surface showing through is a visible answer.
+  primary: "bg-primary text-surface hover:bg-primary/90",
   accent: "bg-accent text-surface hover:bg-error",
   ghost: "bg-transparent text-text border border-border hover:bg-background",
   danger: "bg-error text-surface hover:bg-accent",

@@ -216,7 +216,7 @@ function Stat({
   return (
     <Card>
       <CardBody>
-        <p className="font-body text-xs uppercase tracking-tight text-muted">
+        <p className="font-body text-xs uppercase tracking-wide text-muted">
           {label}
         </p>
         <p

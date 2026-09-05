@@ -47,7 +47,7 @@ export default async function ProductPage({
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-12">
-      <nav className="font-body text-xs uppercase tracking-tight text-muted">
+      <nav className="font-body text-xs uppercase tracking-wide text-muted">
         <Link href="/" className="hover:text-text">
           All products
         </Link>
@@ -80,7 +80,7 @@ export default async function ProductPage({
             </p>
 
             {!anyInStock && (
-              <p className="mt-3 inline-block rounded-sm bg-accent px-2 py-1 font-body text-xs uppercase tracking-tight text-surface">
+              <p className="mt-3 inline-block rounded-sm bg-accent px-2 py-1 font-body text-xs uppercase tracking-wide text-surface">
                 Sold out
               </p>
             )}

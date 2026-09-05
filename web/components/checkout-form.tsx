@@ -27,7 +27,7 @@ function AddressChoice({
 }) {
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="mb-2 font-body text-xs uppercase tracking-tight text-muted">
+      <legend className="mb-2 font-body text-xs uppercase tracking-wide text-muted">
         {legend}
       </legend>
       {addresses.map((a) => (

@@ -21,8 +21,13 @@ import { formatMoney, formatUnit } from "@/lib/format";
 export function ProductCard({ product }: { product: ProductListItem }) {
   return (
     <Link href={`/products/${product.slug}`} className="group block">
-      <article className="overflow-hidden rounded-md border border-border bg-surface transition-shadow hover:shadow-md motion-reduce:transition-none">
-        <div className="relative aspect-[4/5] bg-background">
+      {/* The tile answers a hover the way the references do: it lifts, its
+          shadow deepens, and the photograph eases in by two percent. All three
+          are transitions, all three are off under prefers-reduced-motion, and
+          the image wrapper clips so the scaled photograph never leaks into the
+          meta block beneath it. */}
+      <article className="overflow-hidden rounded-md border border-border bg-surface transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+        <div className="relative aspect-[4/5] overflow-hidden bg-background">
           {product.primary_image ? (
             <Image
               src={product.primary_image.url}
@@ -31,7 +36,7 @@ export function ProductCard({ product }: { product: ProductListItem }) {
               alt={product.primary_image.alt_text}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              className="object-cover"
+              className="object-cover transition-transform group-hover:scale-[1.02] motion-reduce:transition-none"
             />
           ) : (
             <div className="flex h-full items-center justify-center font-body text-xs text-muted">
@@ -48,7 +53,7 @@ export function ProductCard({ product }: { product: ProductListItem }) {
               single-price product would imply a choice that does not exist. */}
           <p className="mt-2 font-display text-lg text-text">
             {product.min_price !== product.max_price && (
-              <span className="font-body text-xs uppercase tracking-tight text-muted">
+              <span className="font-body text-xs uppercase tracking-wide text-muted">
                 From{" "}
               </span>
             )}

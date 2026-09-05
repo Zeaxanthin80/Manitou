@@ -1106,6 +1106,22 @@ object; deleting a used one is refused with the list of products holding it.
      series is generated with that ID, not a new one. It was created under V3 because V4.1 refuses a
      photographic base type, and Recraft binds a style to the model that made it — so the catalogue
      is V3 raster at 4:5, and a V4.1 request against this style is rejected server-side.
+     **The way round that, found the same evening:** a style created in the recraft.ai web app
+     (`aac6ef79-7efe-4f45-9c4a-95feeb6e9561`, "T-Shirts", from the same references) has no base type
+     and **is accepted by `recraftv4_1_raster`** — tested with one generation, visibly denser
+     line-work than the V3 set, at 2 credits an image against V3's 1. The two surfaces do not list
+     each other's styles but resolve each other's IDs. For the next series: make the style in the
+     app, generate through the API on V4.1.
+   - **The same evening, a polish pass after the owner looked at it on a phone.** The hero's panel
+     had been stacked below the image on small screens and pulled up to overlap it — and the
+     overlap never rendered: the image wrapper was `relative`, the panel's wasn't, and a
+     positioned sibling paints over an in-flow one. The panel is now absolute at every width and
+     translucent (`bg-surface/80` + backdrop blur; tokens at an alpha, no new hex). The hero
+     photograph was regenerated on V4.1 with the app-made style — the first one had a tote with
+     sleeves, which a thumbnail hid. And **one token was added, deliberately** per Section 4.3:
+     `color.subtle` (`#8F8A85`, 3.4:1 on surface) for placeholders, because `muted` at 7.6:1 made
+     a sample value read as a typed one. Also fixed in passing: the primary button's hover was
+     `bg-text`, which is the same hex as `bg-primary` — it had never visibly done anything.
    - **The rule that made it work: no small text on any garment.** The old plates' captions were
      the thing AI got wrong. Series numbering lives in product names and descriptions now. Large
      display words only where the word is the design (`LIVE FAST · DIE FREE`, `NEW YORK`), and each

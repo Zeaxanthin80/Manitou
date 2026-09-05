@@ -123,7 +123,7 @@ export default async function AdminProductsPage({
               href={categoryHref(c.id)}
               aria-current={active ? "true" : undefined}
               className={cn(
-                "rounded-sm border px-3 py-1 font-body text-xs uppercase tracking-tight transition-colors motion-reduce:transition-none",
+                "rounded-sm border px-3 py-1 font-body text-xs uppercase tracking-wide transition-colors motion-reduce:transition-none",
                 active
                   ? "border-accent text-accent"
                   : "border-border text-muted hover:text-text",
@@ -198,11 +198,11 @@ export default async function AdminProductsPage({
                       </TD>
                       <TD>
                         {p.is_active ? (
-                          <span className="font-body text-xs uppercase tracking-tight text-muted">
+                          <span className="font-body text-xs uppercase tracking-wide text-muted">
                             Visible
                           </span>
                         ) : (
-                          <span className="rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-tight text-accent">
+                          <span className="rounded-sm border border-accent px-2 py-1 font-body text-xs uppercase tracking-wide text-accent">
                             Hidden
                           </span>
                         )}
