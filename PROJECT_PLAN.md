@@ -1095,9 +1095,27 @@ object; deleting a used one is refused with the list of products holding it.
      ~220px of a 375px screen; stacked it is 2.7:1, and 86px at the 32px height the header already
      has spare. Its fill is the `text` token baked in, because an `<img>` cannot inherit
      `currentColor` — the one place a token value lives outside the token file.
-   - **Still open:** the three Orbit OS products ship hidden (`is_active = false`) until their
-     artwork is redrawn. The current mockups carry garbled placeholder text on the garment, which is
-     worse for credibility than having no accessories at all.
+   - **All ten photographs were regenerated on 2026-09-05** with Recraft, in one custom style seeded
+     from the four cleanest of the old mockups so the whole catalogue shares a backdrop and a light.
+     The style is `67bd0053-c71a-48ae-bd03-59b1f414a204` on the store's Recraft account; the next
+     series is generated with that ID, not a new one. It was created under V3 because V4.1 refuses a
+     photographic base type, and Recraft binds a style to the model that made it — so the catalogue
+     is V3 raster at 4:5, and a V4.1 request against this style is rejected server-side.
+   - **The rule that made it work: no small text on any garment.** The old plates' captions were
+     the thing AI got wrong. Series numbering lives in product names and descriptions now. Large
+     display words only where the word is the design (`LIVE FAST · DIE FREE`, `NEW YORK`), and each
+     was read at 2× before shipping. Two things leaked from prompts into pixels and were caught only
+     by zooming: a hex colour code written as `#FAFAF9` was printed onto a cap, and a word spelled
+     out as `N-E-W Y-O-R-K` came back with the hyphens. Describe colours in words; never spell.
+   - **The style decided the Orbit OS colourway.** It would not produce sage — every piece came out
+     charcoal with white ink, matching the references it was built from. Accepted: the capsule reads
+     as a cousin of Field Guide, the descriptions say charcoal, and all three ship **active**. The
+     "hidden until redrawn" step is gone.
+   - **The front page** leads with a full-bleed hero (`components/hero.tsx`) and a strip of
+     first-product tiles per category (`components/series-strip.tsx`); the h1/tagline block and the
+     featured-series band are gone. The hero copy is still `home.featured`, the strip derives
+     everything from the API. See `docs/reference/catalogue-grouping.html` for why nothing new is
+     stored.
 
 ### Phase 8 — Mobile Apps
 
