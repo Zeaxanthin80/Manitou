@@ -63,21 +63,40 @@ export function Hero() {
           both without covering the garments; the photograph is generated to
           that brief, and a future one that isn't gets a second art-directed
           <Image> rather than a change here. */}
-      {/* max-h-[75svh] above wide: an aspect ratio alone scales with the
-          viewport's WIDTH, and on a 1920x1080 desktop 2:1 is 960px -- the hero
-          filled the screen and pushed its own button below the fold. Capped at
-          three-quarters of the small viewport height, the panel and its call to
-          action are always in the first screen, whatever the monitor. The
-          aspect ratio still governs narrower windows, where it never exceeds
-          the cap. (svh: the height with browser chrome shown, so a phone's
-          collapsing address bar cannot make it jump.)
+      {/* The frame is bounded on BOTH axes, and the two bounds are the same
+          number twice: max-h-[75svh] and max-w-[150svh]. That pins the worst
+          case at exactly 2:1 whatever the window, because a box capped at H
+          tall and 2H wide cannot be shaped otherwise.
 
-          w-full is load-bearing, not decoration. With the width left auto, CSS
-          transfers a max-height THROUGH an aspect ratio into a max-width, so
-          the box kept 2:1 and shrank sideways instead -- 682px tall, 1364px
-          wide, and a bare strip of page down the right of a 1920px monitor. A
-          definite width is what makes the height clamp and the ratio yield. */}
-      <div className="relative w-full aspect-[3/4] wide:aspect-[2/1] wide:max-h-[75svh]">
+          It matters because object-cover discards whatever the frame's shape
+          does not want, and with only the HEIGHT capped the shape ran away. On
+          a 1920px-wide window the box became 2.78:1 and threw away 45% of the
+          photograph's height; a 1366x768 laptop did the same thing for the
+          opposite reason, being short rather than wide. What the crop took was
+          the empty backdrop the panel was composed to sit on, so the panel
+          ended up over a garment and needed its blur to stay readable. Capping
+          the width against the SAME viewport height holds the ratio at 2:1 and
+          the loss at 23%, which is the crop that looked right in review.
+
+          aspect-[20/13] is the photograph's own ratio, 2560x1664. It is the
+          shape the frame relaxes to whenever there is room, so below about
+          1400px nothing is cropped at all. A replacement photograph at a
+          different ratio changes this one number and nothing else.
+
+          svh, not vh: the height with browser chrome shown, so a phone's
+          collapsing address bar cannot make the hero jump.
+
+          w-full is load-bearing. With the width left auto, CSS transfers a
+          max-height THROUGH an aspect ratio into a max-width, so the box keeps
+          its ratio and shrinks sideways instead -- 682px tall, 1364px wide, and
+          a bare strip of page down the right of a 1920px monitor. A definite
+          width is what makes the height clamp and the ratio yield.
+
+          The phone frame is unchanged and still crops the sides hard. A
+          landscape photograph in a 3:4 portrait box has to lose width, and the
+          box is 3:4 because the copy panel needs that height. The fix there is
+          a second art-directed source, not a number here. */}
+      <div className="relative mx-auto w-full aspect-[3/4] wide:aspect-[20/13] wide:max-h-[75svh] wide:max-w-[150svh]">
         <Image
           src={featured.image}
           alt={featured.image_alt}
