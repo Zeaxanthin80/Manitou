@@ -1079,6 +1079,16 @@ object; deleting a used one is refused with the list of products holding it.
      table and refuses any non-localhost database, so it cannot reach production by design; entering
      the real catalogue through the portal is also the honest answer to defect 23's question, *can a
      brand-new install be set up entirely through its own interface?*
+     **The values to type are laid out in `docs/reference/catalogue-sheet.html`** — one plate per
+     product carrying the six fields the form asks for, in the order it asks: slug, category, base
+     price, description, file and alt text. **The line under each product name is a caption, not a
+     field.** It names the series and then repeats whatever the artwork itself prints — `Emblem ·
+     Vol. I / Est. 2024`, `Field Guide · Explore / 001` — so a row can be matched to the garment in
+     front of you. It was read as a missing field once; the sheet has no seventh box because the
+     form has no seventh field. There are ten plates because ten products were being added — Miami
+     T-Shirt was already in the database and appears instead in the sheet's list of existing rows,
+     to be re-filed under `Poster`. Eleven visible products was the sheet's own target, and eleven
+     is what the live catalogue holds.
    - ~~Four categories, and **the categories are the series**~~ — that shipped on 2026-09-04 and
      broke on 2026-09-05, the first afternoon of data entry: the header showed six series, and
      `T-Shirts` was an empty page while nine tees sat on the home page. **The tree is now two

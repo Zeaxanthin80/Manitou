@@ -1,0 +1,959 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Catalogue Sheet — Manitou Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600&display=swap">
+
+<style>
+  /* Palette is ImprimaPress's own design-tokens.json, not a new one -- this
+     sheet documents that store, so it uses that store's colours and faces.
+     The dark set is derived: same warm stone hues, inverted roles, accent
+     lifted from #DB1B45 to #F2557A so it still reads on a near-black ground. */
+  :root {
+    --ground:  #FAFAF9;
+    --surface: #FFFFFF;
+    --sunk:    #F5F5F4;
+    --ink:     #1C1917;
+    --muted:   #57534E;
+    --rule:    #E7E5E4;
+    --accent:  #DB1B45;
+    --low:     #B45309;
+    --out:     #B91C1C;
+    --ok:      #15803D;
+
+    --display: "Archivo Black", "Helvetica Neue", Arial, sans-serif;
+    --body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    --page: 60rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #131110;
+      --surface: #1C1917;
+      --sunk:    #232020;
+      --ink:     #FAFAF9;
+      --muted:   #A8A29E;
+      --rule:    #302B29;
+      --accent:  #F2557A;
+      --low:     #E0A458;
+      --out:     #F08A83;
+      --ok:      #6EC08A;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:  #131110;
+    --surface: #1C1917;
+    --sunk:    #232020;
+    --ink:     #FAFAF9;
+    --muted:   #A8A29E;
+    --rule:    #302B29;
+    --accent:  #F2557A;
+    --low:     #E0A458;
+    --out:     #F08A83;
+    --ok:      #6EC08A;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: var(--page);
+    margin: 0 auto;
+    padding: 3rem 1.5rem 6rem;
+  }
+
+  /* ---- masthead ---- */
+
+  .masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(1.75rem, 5vw, 2.75rem);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .masthead p {
+    margin: 0.5rem 0 0;
+    color: var(--muted);
+    max-width: 46ch;
+  }
+
+  .tally {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .tally strong {
+    display: block;
+    font-family: var(--display);
+    font-size: 1.75rem;
+    line-height: 1.1;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+
+  /* ---- steps ---- */
+
+  .step { margin-top: 3.5rem; }
+
+  .step-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.85rem;
+    margin-bottom: 0.35rem;
+  }
+  .step-num {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    border: 1px solid currentColor;
+    border-radius: 2px;
+    padding: 0.15rem 0.4rem;
+    flex: none;
+  }
+  h2 {
+    font-family: var(--display);
+    font-size: 1.15rem;
+    text-transform: uppercase;
+    letter-spacing: -0.005em;
+    margin: 0;
+  }
+  .step > p {
+    color: var(--muted);
+    max-width: 68ch;
+    margin: 0 0 1.25rem;
+  }
+
+  /* ---- tables ---- */
+
+  .scroll { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    min-width: 34rem;
+  }
+  th {
+    text-align: left;
+    font-family: var(--body);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    padding: 0 0.75rem 0.5rem 0;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  td {
+    padding: 0.6rem 0.75rem 0.6rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  td:last-child, th:last-child { padding-right: 0; }
+  .num { font-variant-numeric: tabular-nums; text-align: right; }
+
+  /* ---- copyable values ---- */
+
+  .v {
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    background: var(--sunk);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 0.1rem 0.35rem;
+    cursor: pointer;
+    color: inherit;
+    text-align: left;
+    position: relative;
+  }
+  .v:hover { border-color: var(--accent); }
+  .v:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .v.copied { border-color: var(--ok); color: var(--ok); }
+  .v.failed { border-color: var(--out); color: var(--out); }
+
+  /* ---- product plates ---- */
+
+  .plates {
+    display: grid;
+    gap: 1.25rem;
+    margin-top: 1.5rem;
+  }
+
+  .plate {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1.25rem 1.5rem 1.5rem;
+  }
+  .plate.done { opacity: 0.55; }
+  .plate.inactive { border-style: dashed; }
+
+  .plate-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .tick {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: none;
+    width: 1.15rem;
+    height: 1.15rem;
+    margin: 0.2rem 0 0;
+    border: 1.5px solid var(--muted);
+    border-radius: 2px;
+    background: transparent;
+    cursor: pointer;
+    display: grid;
+    place-content: center;
+  }
+  .tick:checked { background: var(--ink); border-color: var(--ink); }
+  .tick:checked::after {
+    content: "";
+    width: 0.55rem;
+    height: 0.3rem;
+    border-left: 2px solid var(--surface);
+    border-bottom: 2px solid var(--surface);
+    transform: rotate(-45deg) translate(1px, -1px);
+  }
+  .tick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .plate-title { flex: 1 1 auto; min-width: 0; }
+  .plate-title h3 {
+    font-family: var(--display);
+    font-size: 1rem;
+    text-transform: uppercase;
+    margin: 0;
+    letter-spacing: -0.005em;
+  }
+  .caption {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin: 0.2rem 0 0;
+  }
+  .price {
+    font-family: var(--display);
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+    flex: none;
+  }
+
+  .fields {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.5rem 1rem;
+    margin: 1rem 0 0;
+    font-size: 0.875rem;
+    align-items: start;
+  }
+  .fields dt {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    padding-top: 0.15rem;
+    white-space: nowrap;
+  }
+  .fields dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+  .sub {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    margin: 1.4rem 0 0.6rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  .flag {
+    display: inline-block;
+    font-family: var(--body);
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.05rem 0.35rem;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .flag.low { color: var(--low); }
+  .flag.out { color: var(--out); }
+  .flag.hold { color: var(--accent); }
+
+  .note {
+    background: var(--sunk);
+    border-left: 2px solid var(--accent);
+    padding: 0.85rem 1rem;
+    margin: 1.5rem 0 0;
+    font-size: 0.875rem;
+    color: var(--muted);
+    border-radius: 0 2px 2px 0;
+  }
+  .note strong { color: var(--ink); font-weight: 600; }
+
+  a { color: inherit; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: var(--sunk);
+    padding: 0.05rem 0.3rem;
+    border-radius: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+
+  @media print {
+    body { background: #fff; color: #000; }
+    .plate { break-inside: avoid; }
+    .tally, .note { break-inside: avoid; }
+  }
+</style>
+  </head>
+  <body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div>
+      <h1>Catalogue entry sheet</h1>
+      <p>
+        Every field the vendor portal asks for, in the order it asks. Click any
+        boxed value to copy it.
+      </p>
+    </div>
+    <div class="tally">
+      <strong id="tally-count">0 / 10</strong>
+      products entered
+    </div>
+  </header>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">01</span>
+      <h2>Categories</h2>
+    </div>
+    <p>
+      <code>/admin/categories</code>. Two levels. The top level is what a
+      product <em>is</em> — the departments a shopper expects in the header.
+      The series sit inside them, and show up as tiles on the front page and as
+      a row of links on the department's page. Orbit OS spans a tee and two
+      accessories, and a category has one parent, so it is split: the tee under
+      T-Shirts › Orbit OS, the tote and cap filed directly under Accessories.
+    </p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Web address</th><th>Inside</th><th>Holds</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>T-Shirts</strong></td><td><button class="v">t-shirts</button></td><td>— top level —</td><td class="num">9</td></tr>
+          <tr><td><strong>Accessories</strong></td><td><button class="v">accessories</button></td><td>— top level —</td><td class="num">2</td></tr>
+          <tr><td>Field Guide</td><td><button class="v">field-guide</button></td><td>T-Shirts</td><td class="num">3</td></tr>
+          <tr><td>Emblem</td><td><button class="v">emblem</button></td><td>T-Shirts</td><td class="num">3</td></tr>
+          <tr><td>Poster</td><td><button class="v">poster</button></td><td>T-Shirts</td><td class="num">2</td></tr>
+          <tr><td>Orbit OS</td><td><button class="v">orbit-os</button></td><td>T-Shirts</td><td class="num">1</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      The header and footer show only the top level —
+      <strong>T-Shirts · Accessories</strong>. The four series appear as tiles on
+      the front page and as links across the top of the T-Shirts page.
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">02</span>
+      <h2>Getting there from where the tree is now</h2>
+    </div>
+    <p>
+      If you followed the first version of this sheet, the four series are at the
+      top level, <code>Apparel › T-Shirts</code> still exists, and
+      <code>Accessories</code> is gone. In this order — a category cannot be
+      deleted while anything points at it, and the portal will name what is in
+      the way:
+    </p>
+    <ol>
+      <li>Edit <strong>T-Shirts</strong>: set <em>Inside</em> to <em>— top level —</em>.</li>
+      <li>Delete <strong>Apparel</strong>. If it refuses with “still holds 1 product”, that is the hidden <code>T-Shirt</code> placeholder — move it to T-Shirts first.</li>
+      <li>Create <strong>Accessories</strong> again, top level, web address <code>accessories</code>.</li>
+      <li>Edit <strong>Field Guide</strong>, <strong>Emblem</strong>, <strong>Poster</strong> and <strong>Orbit OS</strong>: set <em>Inside</em> to <em>T-Shirts</em>.</li>
+      <li>Edit the <strong>Orbit OS Tote</strong> and <strong>Orbit OS Field Cap</strong> products: category <em>Accessories</em>. The tote also needs its visibility set back to <strong>visible</strong> — it was hidden under the old instructions.</li>
+    </ol>
+    <p>Then the two products that were there from the start:</p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Product</th><th>Do</th><th>Why</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Miami T-Shirt</td>
+            <td>Change category to <strong>Poster</strong></td>
+            <td>It is a city plate, same as New York.</td>
+          </tr>
+          <tr>
+            <td>T-Shirt</td>
+            <td>Set to <strong>hidden</strong></td>
+            <td>A placeholder name with no design behind it. Soft delete keeps the row.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <strong>Nothing else gets deleted.</strong> T-Shirts is a department now,
+      and the hidden <code>T-Shirt</code> placeholder stays filed under it —
+      a soft-deleted product keeps its category, and the row cannot be removed
+      without removing order history that might one day point at it.
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">03</span>
+      <h2>Products</h2>
+    </div>
+    <p>
+      <code>/admin/products/new</code> takes the top block plus one opening
+      variant. The remaining sizes and the photograph are added afterwards from
+      the product's own page — the create form has no image field.
+      Reorder level is <strong>5</strong> throughout.
+    </p>
+
+    <div class="plates" id="plates">
+
+      <!-- FIELD GUIDE ------------------------------------------------- -->
+
+      <article class="plate" data-id="terrain">
+        <div class="plate-head">
+          <input type="checkbox" class="tick" aria-label="Terrain entered">
+          <div class="plate-title">
+            <h3>Terrain</h3>
+            <p class="caption">Field Guide · Explore / 001</p>
+          </div>
+          <span class="price">$32.00</span>
+        </div>
+
+        <dl class="fields">
+          <dt>Slug</dt><dd><button class="v">terrain</button></dd>
+          <dt>Category</dt><dd>Field Guide</dd>
+          <dt>Base price</dt><dd><button class="v">32.00</button></dd>
+          <dt>Description</dt><dd><button class="v">Topographic contour lines lifted from a survey sheet, printed white on charcoal. The first plate in the Field Guide series.</button></dd>
+        </dl>
+
+        <p class="sub">Variants — opening one first, the rest on the edit page</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>SKU</th><th>Variant name</th><th class="num">Opening stock</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><button class="v">FG-TER-S</button></td><td>S</td><td class="num">12</td><td></td></tr>
+              <tr><td><button class="v">FG-TER-M</button></td><td>M</td><td class="num">18</td><td></td></tr>
+              <tr><td><button class="v">FG-TER-L</button></td><td>L</td><td class="num">14</td><td></td></tr>
+              <tr><td><button class="v">FG-TER-XL</button></td><td>XL</td><td class="num">6</td><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="sub">Image</p>
+        <dl class="fields">
+          <dt>File</dt><dd><button class="v">/terrain.webp</button></dd>
+          <dt>Alt text</dt><dd><button class="v">Charcoal t-shirt printed with a white rectangular plate of fine topographic contour lines</button></dd>
+        </dl>
+      </article>
+
+      <article class="plate" data-id="oceanic">
+        <div class="plate-head">
+          <input type="checkbox" class="tick" aria-label="Oceanic entered">
+          <div class="plate-title">
+            <h3>Oceanic</h3>
+            <p class="caption">Field Guide · Explore / 002</p>
+          </div>
+          <span class="price">$32.00</span>
+        </div>
+
+        <dl class="fields">
+          <dt>Slug</dt><dd><button class="v">oceanic</button></dd>
+          <dt>Category</dt><dd>Field Guide</dd>
+          <dt>Base price</dt><dd><button class="v">32.00</button></dd>
+          <dt>Description</dt><dd><button class="v">A cross-section of the deep water column — submersible, siphonophores, hydrothermal vents — drawn as a single plate.</button></dd>
+        </dl>
+
+        <p class="sub">Variants</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>SKU</th><th>Variant name</th><th class="num">Opening stock</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><button class="v">FG-OCE-S</button></td><td>S</td><td class="num">9</td><td></td></tr>
+              <tr><td><button class="v">FG-OCE-M</button></td><td>M</td><td class="num">15</td><td></td></tr>
+              <tr><td><button class="v">FG-OCE-L</button></td><td>L</td><td class="num">11</td><td></td></tr>
+              <tr><td><button class="v">FG-OCE-XL</button></td><td>XL</td><td class="num">4</td><td><span class="flag low">Low</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="sub">Image</p>
+        <dl class="fields">
+          <dt>File</dt><dd><button class="v">/oceanic.webp</button></dd>
+          <dt>Alt text</dt><dd><button class="v">Charcoal t-shirt printed with a white line-drawn plate of a submersible, fish and jellyfish</button></dd>
+        </dl>
+      </article>
+
+      <article class="plate" data-id="celestial">
+        <div class="plate-head">
+          <input type="checkbox" class="tick" aria-label="Celestial entered">
+          <div class="plate-title">
+            <h3>Celestial</h3>
+            <p class="caption">Field Guide · Navigate / 001</p>
+          </div>
+          <span class="price">$32.00</span>
+        </div>
+
+        <dl class="fields">
+          <dt>Slug</dt><dd><button class="v">celestial</button></dd>
+          <dt>Category</dt><dd>Field Guide</dd>
+          <dt>Base price</dt><dd><button class="v">32.00</button></dd>
+          <dt>Description</dt><dd><button class="v">A chart of joined constellations under a scatter of stars. Printed white on charcoal.</button></dd>
+        </dl>
+
+        <p class="sub">Variants</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>SKU</th><th>Variant name</th><th class="num">Opening stock</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><button class="v">FG-CEL-S</button></td><td>S</td><td class="num">7</td><td></td></tr>
+              <tr><td><button class="v">FG-CEL-M</button></td><td>M</td><td class="num">0</td><td><span class="flag out">Sold out</span></td></tr>
+              <tr><td><button class="v">FG-CEL-L</button></td><td>L</td><td class="num">13</td><td></td></tr>
+              <tr><td><button class="v">FG-CEL-XL</button></td><td>XL</td><td class="num">8</td><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="sub">Image</p>
+        <dl class="fields">
+          <dt>File</dt><dd><button class="v">/celestial.webp</button></dd>
+          <dt>Alt text</dt><dd><button class="v">Charcoal t-shirt printed with a white star chart of joined constellations inside a thin rectangular border</button></dd>
+        </dl>
+      </article>
+
+      <!-- EMBLEM ------------------------------------------------------ -->
+
+      <article class="plate" data-id="ancient-grove">
+        <div class="plate-head">
+          <input type="checkbox" class="tick" aria-label="Ancient Grove entered">
+          <div class="plate-title">
+            <h3>Ancient Grove</h3>
+            <p class="caption">Emblem · Est. 1898</p>
+          </div>
+          <span class="price">$28.00</span>
+        </div>
+
+        <dl class="fields">
+          <dt>Slug</dt><dd><button class="v">ancient-grove</button></dd>
+          <dt>Category</dt><dd>Emblem</dd>
+          <dt>Base price</dt><dd><button class="v">28.00</button></dd>
+          <dt>Description</dt><dd><button class="v">An engraved oak inside a struck circle. Black on heather grey.</button></dd>
+        </dl>
+
+        <p class="sub">Variants</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>SKU</th><th>Variant name</th><th class="num">Opening stock</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><button class="v">EM-GRV-S</button></td><td>S</td><td class="num">10</td><td></td></tr>
+              <tr><td><button class="v">EM-GRV-M</button></td><td>M</td><td class="num">16</td><td></td></tr>
+              <tr><td><button class="v">EM-GRV-L</button></td><td>L</td><td class="num">12</td><td></td></tr>
+              <tr><td><button class="v">EM-GRV-XL</button></td><td>XL</td><td class="num">5</td><td><span class="flag low">At level</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="sub">Image</p>
+        <dl class="fields">
+          <dt>File</dt><dd><button class="v">/ancient-grove.webp</button></dd>
+          <dt>Alt text</dt><dd><button class="v">Grey heather t-shirt printed with a black engraved oak tree inside a double circular border</button></dd>
+        </dl>
+      </article>
+
+      <article class="plate" data-id="abstracted-series">
+        <div class="plate-head">
+          <input type="checkbox" class="tick" aria-label="Abstracted Series entered">
+          <div class="plate-title">
+            <h3>Abstracted Series</h3>
+            <p class="caption">Emblem · Vol. I / Est. 2024</p>
+          </div>
+          <span class="price">$28.00</span>
+        </div>
+
+        <dl class="fields">
+          <dt>Slug</dt><dd><button class="v">abstracted-series</button></dd>
+          <dt>Category</dt><dd>Emblem</dd>
+          <dt>Base price</dt><dd><button class="v">28.00</button></dd>
+          <dt>Description</dt><dd><button class="v">Interlocking geometry, stippled by hand and set in a circular badge. Volume I.</button></dd>
+        </dl>
+
+        <p class="sub">Variants</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>SKU</th><th>Variant name</th><th class="num">Opening stock</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><button class="v">EM-ABS-S</button></td><td>S</td><td class="num">8</td><td></td></tr>
+              <tr><td><button class="v">EM-ABS-M</button></td><td>M</td><td class="num">14</td><td></td></tr>
+              <tr><td><button class="v">EM-ABS-L</button></td><td>L</td><td class="num">9</td><td></td></tr>
+              <tr><td><button class="v">EM-ABS-XL</button></td><td>XL</td><td class="num">3</td><td><span class="flag low">Low</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="sub">Image</p>
+        <dl class="fields">
+          <dt>File</dt><dd><button class="v">/abstracted-series.webp</button></dd>
+          <dt>Alt text</dt><dd><button class="v">Grey heather t-shirt printed with a black stippled geometric medallion</button></dd>
+        </dl>
+      </article>
+
+      <article class="plate" data-id="wings">
+        <div class="plate-head">
+          <input type="checkbox" class="tick" aria-label="Wings entered">
+          <div class="plate-title">
+            <h3>Wings</h3>
+            <p class="caption">Emblem · Live Fast, Die Free</p>
+          </div>
+          <span class="price">$28.00</span>
+        </div>
+
+        <dl class="fields">
+          <dt>Slug</dt><dd><button class="v">wings</button></dd>
+          <dt>Category</dt><dd>Emblem</dd>
+          <dt>Base price</dt><dd><button class="v">28.00</button></dd>
+          <dt>Description</dt><dd><button class="v">A winged skull in the old tattoo-flash manner, printed black on heather grey.</button></dd>
+        </dl>
+
+        <p class="sub">Variants</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>SKU</th><th>Variant name</th><th class="num">Opening stock</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><button class="v">EM-WNG-S</button></td><td>S</td><td class="num">6</td><td></td></tr>
+              <tr><td><button class="v">EM-WNG-M</button></td><td>M</td><td class="num">12</td><td></td></tr>
+              <tr><td><button class="v">EM-WNG-L</button></td><td>L</td><td class="num">10</td><td></td></tr>
+              <tr><td><button class="v">EM-WNG-XL</button></td><td>XL</td><td class="num">7</td><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="sub">Image</p>
+        <dl class="fields">
+          <dt>File</dt><dd><button class="v">/wings.webp</button></dd>
+          <dt>Alt text</dt><dd><button class="v">Grey heather t-shirt printed with a black winged skull between the words Live Fast and Die Free</button></dd>
+        </dl>
+      </article>
+
+      <!-- POSTER ------------------------------------------------------ -->
+
+      <article class="plate" data-id="new-york">
+        <div class="plate-head">
+          <input type="checkbox" class="tick" aria-label="New York entered">
+          <div class="plate-title">
+            <h3>New York</h3>
+            <p class="caption">Poster · Est. 1624</p>
+          </div>
+          <span class="price">$30.00</span>
+        </div>
+
+        <dl class="fields">
+          <dt>Slug</dt><dd><button class="v">new-york</button></dd>
+          <dt>Category</dt><dd>Poster</dd>
+          <dt>Base price</dt><dd><button class="v">30.00</button></dd>
+          <dt>Description</dt><dd><button class="v">The skyline as a single line drawing in a square frame. Printed white on charcoal.</button></dd>
+        </dl>
+
+        <p class="sub">Variants</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>SKU</th><th>Variant name</th><th class="num">Opening stock</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><button class="v">PO-NYC-S</button></td><td>S</td><td class="num">5</td><td><span class="flag low">At level</span></td></tr>
+              <tr><td><button class="v">PO-NYC-M</button></td><td>M</td><td class="num">11</td><td></td></tr>
+              <tr><td><button class="v">PO-NYC-L</button></td><td>L</td><td class="num">9</td><td></td></tr>
+              <tr><td><button class="v">PO-NYC-XL</button></td><td>XL</td><td class="num">4</td><td><span class="flag low">Low</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="sub">Image</p>
+        <dl class="fields">
+          <dt>File</dt><dd><button class="v">/new-york.webp</button></dd>
+          <dt>Alt text</dt><dd><button class="v">Charcoal t-shirt printed with a white line-drawn Manhattan skyline above the words New York, inside a square border</button></dd>
+        </dl>
+      </article>
+
+      <!-- ORBIT OS ---------------------------------------------------- -->
+
+      <article class="plate" data-id="orbit-os-tee">
+        <div class="plate-head">
+          <input type="checkbox" class="tick" aria-label="Orbit OS Tee entered">
+          <div class="plate-title">
+            <h3>Orbit OS Tee</h3>
+            <p class="caption">Orbit OS</p>
+          </div>
+          <span class="price">$32.00</span>
+        </div>
+
+        <dl class="fields">
+          <dt>Slug</dt><dd><button class="v">orbit-os-tee</button></dd>
+          <dt>Category</dt><dd>Orbit OS</dd>
+          <dt>Base price</dt><dd><button class="v">32.00</button></dd>
+          <dt>Description</dt><dd><button class="v">An orbital diagram — concentric orbits and their moons — printed white on charcoal.</button></dd>
+        </dl>
+
+        <p class="sub">Variants</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>SKU</th><th>Variant name</th><th class="num">Opening stock</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><button class="v">OS-TEE-S</button></td><td>S</td><td class="num">6</td><td></td></tr>
+              <tr><td><button class="v">OS-TEE-M</button></td><td>M</td><td class="num">10</td><td></td></tr>
+              <tr><td><button class="v">OS-TEE-L</button></td><td>L</td><td class="num">8</td><td></td></tr>
+              <tr><td><button class="v">OS-TEE-XL</button></td><td>XL</td><td class="num">4</td><td><span class="flag low">Low</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="sub">Image</p>
+        <dl class="fields">
+          <dt>File</dt><dd><button class="v">/orbit-os-tee.webp</button></dd>
+          <dt>Alt text</dt><dd><button class="v">Charcoal t-shirt printed with a white diagram of concentric orbits and small moons</button></dd>
+        </dl>
+      </article>
+
+      <article class="plate" data-id="orbit-os-tote">
+        <div class="plate-head">
+          <input type="checkbox" class="tick" aria-label="Orbit OS Tote entered">
+          <div class="plate-title">
+            <h3>Orbit OS Tote</h3>
+            <p class="caption">Orbit OS</p>
+          </div>
+          <span class="price">$24.00</span>
+        </div>
+
+        <dl class="fields">
+          <dt>Slug</dt><dd><button class="v">orbit-os-tote</button></dd>
+          <dt>Category</dt><dd>Accessories</dd>
+          <dt>Base price</dt><dd><button class="v">24.00</button></dd>
+          <dt>Description</dt><dd><button class="v">Heavy black canvas with cotton webbing handles. The Orbit OS diagram printed large in white.</button></dd>
+        </dl>
+
+        <p class="sub">Variants — one size, so one variant</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>SKU</th><th>Variant name</th><th class="num">Opening stock</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><button class="v">OS-TOTE</button></td><td>One size</td><td class="num">20</td><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="sub">Image</p>
+        <dl class="fields">
+          <dt>File</dt><dd><button class="v">/orbit-os-tote.webp</button></dd>
+          <dt>Alt text</dt><dd><button class="v">Black canvas tote bag printed with a white diagram of concentric orbits and small moons</button></dd>
+        </dl>
+      </article>
+
+      <article class="plate" data-id="orbit-os-field-cap">
+        <div class="plate-head">
+          <input type="checkbox" class="tick" aria-label="Orbit OS Field Cap entered">
+          <div class="plate-title">
+            <h3>Orbit OS Field Cap</h3>
+            <p class="caption">Orbit OS</p>
+          </div>
+          <span class="price">$28.00</span>
+        </div>
+
+        <dl class="fields">
+          <dt>Slug</dt><dd><button class="v">orbit-os-field-cap</button></dd>
+          <dt>Category</dt><dd>Accessories</dd>
+          <dt>Base price</dt><dd><button class="v">28.00</button></dd>
+          <dt>Description</dt><dd><button class="v">A structured grey canvas cap with the Orbit OS diagram on the front panel.</button></dd>
+        </dl>
+
+        <p class="sub">Variants — one size, so one variant</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>SKU</th><th>Variant name</th><th class="num">Opening stock</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><button class="v">OS-CAP</button></td><td>One size</td><td class="num">15</td><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="sub">Image</p>
+        <dl class="fields">
+          <dt>File</dt><dd><button class="v">/orbit-os-field-cap.webp</button></dd>
+          <dt>Alt text</dt><dd><button class="v">Grey canvas cap printed with a white diagram of concentric orbits on the front panel</button></dd>
+        </dl>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">04</span>
+      <h2>Nothing to hide</h2>
+    </div>
+    <p>
+      The Orbit OS three were going to ship hidden until their artwork was
+      redrawn. It has been: every photograph in this sheet was generated in one
+      Recraft style, read at full size, and carries no small text. All ten new
+      products ship <strong>visible</strong>.
+    </p>
+
+    <div class="note">
+      <strong>Eleven visible products when this is done</strong> — ten new ones
+      plus Miami, across four series. That is a catalogue that reads as a shop
+      rather than a staging environment.
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">05</span>
+      <h2>What to check afterwards</h2>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Where</th><th>Should show</th></tr></thead>
+        <tbody>
+          <tr><td><code>/</code></td><td>Eleven products in the grid, count line reading “11 products”</td></tr>
+          <tr><td><code>/categories/field-guide</code></td><td>Terrain, Oceanic, Celestial</td></tr>
+          <tr><td>Header nav</td><td>T-Shirts · Accessories — nothing else</td></tr>
+          <tr><td><code>/categories/t-shirts</code></td><td>Nine tees, with Field Guide · Emblem · Poster · Orbit OS as a row of links above them</td></tr>
+          <tr><td><code>/categories/accessories</code></td><td>The tote and the cap</td></tr>
+          <tr><td><code>/products/celestial</code></td><td>Four sizes, M marked sold out</td></tr>
+          <tr><td><code>/admin/inventory</code></td><td>Four variants flagged low or at level</td></tr>
+          <tr><td><code>/admin/products</code></td><td>Twelve rows, one hidden — the retired <code>T-Shirt</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  // Click a boxed value to copy it. It reports failure rather than pretending:
+  // navigator.clipboard needs a secure context and can still be refused, and a
+  // button that silently does nothing leaves you pasting the previous clipboard
+  // into a product field without noticing. Same reasoning as the store's own
+  // CopyButton component.
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".v");
+    if (!btn) return;
+    const text = btn.textContent.trim();
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.classList.add("copied");
+    } catch {
+      btn.classList.add("failed");
+    }
+    setTimeout(() => btn.classList.remove("copied", "failed"), 1200);
+  });
+
+  // Progress is a per-viewer convenience, so it lives in localStorage: it is
+  // your place in a form-filling job, not store data. Every read and write is
+  // guarded because a private window or blocked site data makes the accessor
+  // itself throw, and the sheet has to render correctly with no saved state.
+  const KEY = "imprimapress-catalogue-sheet";
+
+  const load = () => {
+    try { return new Set(JSON.parse(localStorage.getItem(KEY) || "[]")); }
+    catch { return new Set(); }
+  };
+  const save = (set) => {
+    try { localStorage.setItem(KEY, JSON.stringify([...set])); }
+    catch { /* nothing to do; the ticks still work for this session */ }
+  };
+
+  const done = load();
+  const plates = [...document.querySelectorAll(".plate")];
+
+  const tally = () => {
+    document.getElementById("tally-count").textContent =
+      `${done.size} / ${plates.length}`;
+  };
+
+  for (const plate of plates) {
+    const id = plate.dataset.id;
+    const tick = plate.querySelector(".tick");
+    if (done.has(id)) { tick.checked = true; plate.classList.add("done"); }
+    tick.addEventListener("change", () => {
+      tick.checked ? done.add(id) : done.delete(id);
+      plate.classList.toggle("done", tick.checked);
+      save(done);
+      tally();
+    });
+  }
+
+  tally();
+</script>
+  </body>
+</html>
