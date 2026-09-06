@@ -6,7 +6,7 @@
       "Read by both the backend (app/store.py) and the web app. One file, two readers - so currency and tax cannot disagree between what checkout charges and what the storefront displays.",
       "features.variants_enabled = false hides the variant picker in the UI. It does NOT mean products can exist without variants: inventory and cart_items both hang off product_variants, so a variant-less product is unsellable. A single-variant product with empty attributes is how a store with no meaningful variant dimensions is modelled - see seed.py's Canvas Tote Bag.",
       "Feature flags are declared here before the UI that reads them exists (Phase 3 tasks 5-6). Until then they are inert on the web side, though the backend already honours the catalog and money values.",
-      "store.tagline is the one line of store voice the storefront shows in two places (home hero and footer). It lives here rather than in a component because a clone selling candles must not have to edit page.tsx to change it.",
+      "store.tagline is one line of store voice, shown in the footer's brand block - it had a second home on the home page until the hero replaced that headline. It lives here rather than in a component because a clone selling candles must not have to edit a component to change its pitch. EMPTY IS A VALID STATE and is what this store ships: naming the runs as short raises a question a footer cannot answer, about reprints and delivery time. Blank renders nothing at all, the same convention as store.logo and home.featured.category.",
       "home.featured is merchandising, and it is optional. Set featured.category to a category slug to put a band above the catalogue grid; leave it empty and the band does not render at all, which is the correct state for a clone that has not decided what to lead with. Every string in it is store voice, which is why none of it lives in the component - the same argument as store.tagline, one level up in ambition.",
       "home.featured.image is a deliberate second choice rather than the featured category's first product photograph. The lead shot is a merchandising decision: it may be a lifestyle frame that is not a product image at all, and deriving it would silently hand that decision to whichever product sorts first alphabetically."
     ]
@@ -15,7 +15,7 @@
     "name": "ImprimaPress",
     "logo": "/wordmark.svg",
     "support_email": "support@imprimapress.com",
-    "tagline": "Printed in small runs and restocked when they sell out."
+    "tagline": ""
   },
   "home": {
     "featured": {

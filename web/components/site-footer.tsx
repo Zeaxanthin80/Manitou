@@ -56,6 +56,12 @@ export async function SiteFooter() {
   // there is no build-time value to go stale in January.
   const year = new Date().getFullYear();
 
+  // Widened from the generated `as const` literal. lib/store-config.ts types
+  // this as whatever string the JSON currently holds, so a check against the
+  // literal type reads as decided at compile time rather than as a real branch.
+  // Same move hero.tsx makes for `featured.category`.
+  const tagline: string = storeConfig.store.tagline;
+
   return (
     // No top margin. Every page already ends with its own py-12, so an mt-24
     // here stacked on top of it and left 144px of dead space above the footer --
@@ -73,9 +79,15 @@ export async function SiteFooter() {
             <p className="font-display text-lg uppercase tracking-tight text-text">
               <Wordmark />
             </p>
-            <p className="mt-2 max-w-xs font-body text-sm text-muted">
-              {storeConfig.store.tagline}
-            </p>
+            {/* Omitted entirely when blank rather than left as an empty <p>.
+                An empty paragraph is invisible but not free: it still brings
+                its mt-2 into the flow, so the space under the wordmark stops
+                being the value the layout states. */}
+            {tagline ? (
+              <p className="mt-2 max-w-xs font-body text-sm text-muted">
+                {tagline}
+              </p>
+            ) : null}
             {/* Contact lives in the full-width brand block, not in the Help
                 column. At 375px that column is 152px wide and the address broke
                 mid-word -- "support@manitou.exa / mple". Wrapping an email

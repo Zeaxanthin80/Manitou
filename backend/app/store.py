@@ -38,9 +38,18 @@ class StoreIdentity(BaseModel):
     #: to a different typeface if the font fails to load.
     logo: str = ""
     support_email: str
-    # One line of store voice, shown on the home hero and in the footer. Here
-    # rather than in a component so a clone changes its pitch by editing config.
-    tagline: str = Field(min_length=1)
+    #: One line of store voice, shown in the footer's brand block. It had a
+    #: second home on the home page until the hero replaced that headline.
+    #:
+    #: EMPTY IS A VALID STATE, and it is what ImprimaPress ships. Naming the
+    #: runs as short raises a question a footer cannot answer -- whether a thing
+    #: can sell out, how long a reprint takes, and what that does to delivery --
+    #: so the line was removed rather than reworded.
+    #:
+    #: Same convention as `logo` above: the key stays, the value empties, and no
+    #: component changes. Blank renders nothing at all rather than an empty
+    #: paragraph; see web/components/site-footer.tsx.
+    tagline: str = ""
 
     @field_validator("logo")
     @classmethod
