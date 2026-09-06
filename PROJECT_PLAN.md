@@ -1052,11 +1052,13 @@ object; deleting a used one is refused with the list of products holding it.
      enforcing**, so an origin a wallet needs but the policy omits removes the button silently
      rather than erroring.
 
-   **Customer-facing email** (built 2026-09-02, dormant until SES production access):
+   **Customer-facing email** (built 2026-09-02, live since 2026-09-06):
 
    - **Password reset** and **order confirmation** are both written and tested. They send through
-     whatever `EMAIL_SENDER` names, so they run against `MemoryEmailSender` in tests and print to the
-     log in production today. Flipping to `ses` is what starts real delivery — no code change.
+     whatever `EMAIL_SENDER` names, so they run against `MemoryEmailSender` in tests and, until
+     2026-09-06, printed to the log in production. Flipping that value to `ses` started real
+     delivery, with no code change. A reset was then put through the live site end to end: SES
+     accepted it, reported delivery, and it arrived in a primary inbox with a working link.
    - The confirmation follows the **`pending → paid` transition**, not the Stripe event.
      `apply_payment_event` performs that transition exactly once however many times Stripe
      redelivers, so the email inherits that guarantee and needs no sent-flag of its own. Both paths

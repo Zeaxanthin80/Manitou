@@ -1331,15 +1331,36 @@ binned by the record meant to protect it.
 
 Verified in about twenty minutes: `VerifiedForSendingStatus: True`, `DkimAttributes.Status: SUCCESS`.
 
-### The sandbox is the long pole
+### The sandbox was the long pole
 
 A new SES account is in the **sandbox**: 200 messages a day, one per second, and — the part that
 matters — **it can only send to verified addresses**. Real customers cannot receive anything until
 AWS grants production access, which is a request in the console and takes about a day.
 
-So the domain being verified does not mean mail works. `EMAIL_SENDER` stays `console` until
-production access is granted, because flipping it early would send nothing to real customers while
-looking configured.
+So the domain being verified did not mean mail worked. `EMAIL_SENDER` stayed `console` until
+production access was granted, because flipping it early would have sent nothing to real customers
+while looking configured.
+
+**Granted 2026-09-05, flipped 2026-09-06.** Production limits are 50,000 a day at 14 a second, which
+is not a number this store will approach; the point of the grant is the removal of the
+verified-recipient restriction, not the volume.
+
+**The flip is a service configuration change, not a deploy.** The image tag does not move, so
+nothing about it is visible to a watcher that tracks tags — what changes is the task definition
+revision and one environment value. It reads the container definition whole and rewrites one field,
+for the same reason `deploy.sh` does: send only the field you want and the environment and the
+Secrets Manager references go with it, and the service comes back with no database password.
+
+**Proven end to end rather than assumed.** A password reset was requested on the live site. The API
+logged `SES accepted message`, which proves the first hop; SES then reported Send 1 and Delivery 1
+with no bounce, complaint or reject, which proves the second. Those are different facts and a send
+can succeed while still bouncing. The message reached a primary inbox rather than spam — the first
+evidence that DKIM satisfies a major provider on a domain that had never sent before — the link
+resolved, which is the only test `APP_BASE_URL` had ever had, and the reset completed.
+
+**`p=none` still stands, and one message is not a sample.** Alignment passing once is not grounds to
+tighten DMARC to `quarantine`. Leave it as monitoring until there is a run of real traffic to look
+at, per the reasoning above.
 
 ### The From address is store config, not a new variable
 
