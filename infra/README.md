@@ -1293,6 +1293,87 @@ push to main, so the check is cheap: `curl -sI http://imprimapress.com/ | grep -
 
 ---
 
+## Closing the front door (TEMPORARY — delete this section with the rule)
+
+**Why.** The site went live while Stripe was still in test mode. A visitor could register, fill a
+cart and reach the payment step, where a real card is refused — no money moves, but the impression
+is a broken shop. Worse, if a webhook endpoint is pointed here with the test-mode signing secret, a
+visitor using a well-known test card number could drive an order to `paid`, decrementing stock and
+sending a real confirmation now that SES sends.
+
+**The switch is one additive ALB rule.** Priority `100`, ahead of Express Mode's own `44890` and
+`44990`, matching `host-header` on the two public names and returning a `fixed-response` holding
+page. Express Mode's rules are **not modified** — additive is the lowest-risk shape and deleting one
+rule undoes it entirely.
+
+**The generated hostname is deliberately not matched, and that is the whole design.** Requests to
+`ma-<web>.ecs.us-east-1.on.aws` fall through to Express Mode's own rule and reach the web service
+normally, so **that hostname is the admin door** while the brand domain is dark. The API rule is
+untouched, which is required rather than incidental: the web app calls the API over its public
+HTTPS URL and back through this same balancer.
+
+**Why not "everyone except my IP".** ALB conditions AND together and there is no NOT, so an
+exception needs a pass-through *forward* rule — and a hand-made forward rule has to name the
+weighted target-group pair, which is exactly what "Extend the existing rules; do not add new ones"
+below says breaks on the next canary. Using the generated hostname avoids inventing one.
+
+**Why a 503 cannot block a deployment.** Both `default/manitou-{api,web}/RollbackAlarm` are metric
+math over `HTTPCode_Target_4XX_Count`, `HTTPCode_Target_5XX_Count` and `RequestCount`, and
+`manitou-alb-target-5xx` watches the target 5xx count. **A fixed-response never reaches a target**,
+so it contributes to none of them. Checked against the live alarm definitions, not assumed. 503 also
+tells crawlers the closure is temporary, where a 200 would invite indexing "Opening soon".
+
+**What this is not.** It is not a blackout. The generated hostname serves the whole site and the API
+stays public; both are what keep the admin working. It closes the door people actually arrive
+through, nothing more.
+
+**Same caveat as the port-80 listener above:** this rule was added outside Express Mode, so a future
+Express Mode operation could in principle reconcile it away. The failure direction is the site
+quietly coming *back up*, so check after any deploy.
+
+### To close
+
+```
+LB=$(aws elbv2 describe-load-balancers --region us-east-1 \
+  --query "LoadBalancers[?starts_with(LoadBalancerName,'ecs-express-gateway-alb')].LoadBalancerArn | [0]" --output text)
+L=$(aws elbv2 describe-listeners --region us-east-1 --load-balancer-arn "$LB" \
+  --query "Listeners[?Port==\`443\`].ListenerArn | [0]" --output text)
+
+python3 -c "import json,pathlib; print(json.dumps([{'Type':'fixed-response','FixedResponseConfig':{'StatusCode':'503','ContentType':'text/html','MessageBody':pathlib.Path('infra/holding-page.html').read_text()}}]))" > /tmp/hold-actions.json
+
+aws elbv2 create-rule --region us-east-1 --listener-arn "$L" --priority 100 \
+  --conditions 'Field=host-header,HostHeaderConfig={Values=[imprimapress.com,www.imprimapress.com]}' \
+  --actions file:///tmp/hold-actions.json \
+  --tags Key=Name,Value=storefront-holding-page
+```
+
+### To reopen
+
+```
+LB=$(aws elbv2 describe-load-balancers --region us-east-1 \
+  --query "LoadBalancers[?starts_with(LoadBalancerName,'ecs-express-gateway-alb')].LoadBalancerArn | [0]" --output text)
+L=$(aws elbv2 describe-listeners --region us-east-1 --load-balancer-arn "$LB" \
+  --query "Listeners[?Port==\`443\`].ListenerArn | [0]" --output text)
+R=$(aws elbv2 describe-rules --region us-east-1 --listener-arn "$L" \
+  --query "Rules[?Priority=='100'].RuleArn | [0]" --output text)
+
+aws elbv2 delete-rule --region us-east-1 --rule-arn "$R"
+```
+
+**Listener changes take tens of seconds to propagate** — see the measurement mistake recorded above.
+Re-read until two consecutive checks agree before believing either command worked.
+
+```
+curl -sI https://imprimapress.com/           # 503 while closed, 200 when open
+curl -sI https://www.imprimapress.com/       # same
+curl -sI https://api.imprimapress.com/health # 200 throughout
+```
+
+**When Stripe goes live:** run the reopen command, delete `infra/holding-page.html`, and delete this
+section. It is scaffolding, not architecture.
+
+---
+
 ## Email — sending and receiving (Phase 7)
 
 Two directions, two providers, one DNS zone holding both. **They are independent**: SES sends and
