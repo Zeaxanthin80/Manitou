@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brand Strategy & Archive System</title>
+  <style>
+    :root {
+      --bg: #09090b;
+      --card-bg: #121215;
+      --code-bg: #1a1a1e;
+      --border: #27272a;
+      --border-focus: #3f3f46;
+      --text-main: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --accent: #38bdf8;
+      --accent-muted: #0284c7;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: "JetBrains Mono", "SF Mono", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding: 3rem 1.5rem;
+      max-width: 880px;
+      margin: 0 auto;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 2rem;
+      margin-bottom: 3rem;
+    }
+
+    .system-tag {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+
+    h1 {
+      font-size: 2.25rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text-main);
+      margin-bottom: 0.75rem;
+    }
+
+    .lead-text {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      max-width: 680px;
+    }
+
+    h2 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text-main);
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    h2::before {
+      content: "";
+      display: inline-block;
+      width: 4px;
+      height: 1.2rem;
+      background-color: var(--accent);
+      border-radius: 2px;
+    }
+
+    .section-block {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.75rem;
+      margin-bottom: 2.5rem;
+    }
+
+    p {
+      margin-bottom: 1rem;
+      color: var(--text-muted);
+      font-size: 0.975rem;
+    }
+
+    p strong {
+      color: var(--text-main);
+    }
+
+    /* Comparison Box */
+    .compare-container {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    @media (min-width: 600px) {
+      .compare-container {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .compare-box {
+      background-color: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.25rem;
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+    }
+
+    .compare-box.traditional {
+      opacity: 0.6;
+    }
+
+    .compare-box.archival {
+      border-color: var(--accent-muted);
+    }
+
+    .compare-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+      display: block;
+    }
+
+    .meta-line {
+      display: block;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .meta-highlight {
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    /* Lists & Systems */
+    .system-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+
+    .system-card {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--accent);
+      text-align: center;
+    }
+
+    .archive-preview {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.25rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      margin-top: 1rem;
+    }
+
+    .archive-item {
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .archive-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .archive-item:first-child {
+      padding-top: 0;
+    }
+
+    /* Shortlist Grid */
+    .name-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    @media (min-width: 600px) {
+      .name-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .name-card {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+    }
+
+    .name-title {
+      font-weight: 700;
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      color: var(--text-main);
+      margin-bottom: 0.25rem;
+      letter-spacing: 0.05em;
+    }
+
+    .name-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Identity Directions */
+    .identity-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    @media (min-width: 768px) {
+      .identity-grid {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+    }
+
+    .identity-card {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.25rem;
+    }
+
+    .identity-badge {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      background: var(--border);
+      color: var(--accent);
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .identity-name {
+      font-weight: 700;
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-main);
+    }
+
+    .callout-box {
+      border: 1px dashed var(--accent-muted);
+      background-color: rgba(56, 189, 248, 0.03);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-top: 2.5rem;
+    }
+
+    .callout-box p {
+      margin-bottom: 0;
+      color: var(--text-main);
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <span class="system-tag">Brand Architecture Strategy</span>
+    <h1>The Archival Label Concept</h1>
+    <p class="lead-text">Shift away from traditional retail print shops toward a volume-based visual publishing house.</p>
+  </header>
+
+  <main>
+    <!-- Section 1: The Archive Concept -->
+    <section class="section-block">
+      <h2>The Archival Paradigm Shift</h2>
+      <p>This approach elevates the brand from a standard clothing line to a curated creative body of work. <strong>The period itself becomes part of the product.</strong></p>
+
+      <div class="compare-container">
+        <div class="compare-box traditional">
+          <span class="compare-label">Standard Retail Model</span>
+          <div class="meta-highlight">New T-shirt</div>
+          <div class="meta-line">$32.00</div>
+        </div>
+
+        <div class="compare-box archival">
+          <span class="compare-label">Archival Publishing Model</span>
+          <div class="meta-highlight">JOMA / VOL. 04</div>
+          <div class="meta-line">“Things We Leave Behind”</div>
+          <div class="meta-line">Edition 07/50</div>
+          <div class="meta-line">Screenprint · 2026</div>
+        </div>
+      </div>
+
+      <p>Subsequent periods continue to establish narrative continuity:</p>
+      <div class="archive-preview">
+        <div class="archive-item">VOL. 05 — FALSE MEMORIES</div>
+        <div class="archive-item">VOL. 06 — FLORIDA AFTER DARK</div>
+        <div class="archive-item">COLLABORATION 02 — JM × ARTIST NAME</div>
+      </div>
+    </section>
+
+    <!-- Section 2: Catalog System -->
+    <section class="section-block">
+      <h2>Catalog System & Website Structure</h2>
+      <p>A structured catalog numbering convention builds instant credibility and long-term collectibility.</p>
+
+      <div class="system-grid">
+        <div class="system-card">JM-001</div>
+        <div class="system-card">V01-001</div>
+        <div class="system-card">ED.001</div>
+        <div class="system-card">JMX01</div>
+      </div>
+
+      <p style="margin-top: 1.5rem;">This structure powers an evolving web archive, allowing the brand to serve as a record of artistic exploration:</p>
+
+      <div class="archive-preview">
+        <div class="archive-item">
+          <span class="meta-highlight">ARCHIVE: VOL. 01 — ORIGIN</span>
+          <span class="meta-line">12 works · 2026</span>
+        </div>
+        <div class="archive-item">
+          <span class="meta-highlight">ARCHIVE: VOL. 02 — DRIFT</span>
+          <span class="meta-line">9 works · 2026</span>
+        </div>
+        <div class="archive-item">
+          <span class="meta-highlight">ARCHIVE: VOL. 03 — [UNTITLED]</span>
+          <span class="meta-line" style="color: var(--accent);">In Progress</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 3: Name Shortlist -->
+    <section class="section-block">
+      <h2>First-Round Naming Board</h2>
+      <div class="name-grid">
+        <div class="name-card">
+          <div class="name-title">VERSA</div>
+          <div class="name-desc">Minimal, flexible, visual. Could easily cover fashion, art, publishing, or objects.</div>
+        </div>
+        <div class="name-card">
+          <div class="name-title">AVERO</div>
+          <div class="name-desc">Feels invented yet established. Excellent wordmark potential for tags and labels.</div>
+        </div>
+        <div class="name-card">
+          <div class="name-title">JOMA</div>
+          <div class="name-desc">Extremely simple. Personal without feeling explicitly autobiographical.</div>
+        </div>
+        <div class="name-card">
+          <div class="name-title">JOTAEME</div>
+          <div class="name-desc">Distinctive and personal with a strong art-label quality.</div>
+        </div>
+        <div class="name-card">
+          <div class="name-title">COLOPHON</div>
+          <div class="name-desc">Conceptually strong for an archive-driven art and print label.</div>
+        </div>
+        <div class="name-card">
+          <div class="name-title">UNDERBASE</div>
+          <div class="name-desc">Embeds the physical screen printing process directly into the brand DNA.</div>
+        </div>
+        <div class="name-card">
+          <div class="name-title">ESTAMPA</div>
+          <div class="name-desc">Strong Spanish/Latin print association with an authentic tone.</div>
+        </div>
+        <div class="name-card">
+          <div class="name-title">INKWRIGHT</div>
+          <div class="name-desc">Narrative and artisanal; carries the weight of a traditional craft profession.</div>
+        </div>
+        <div class="name-card">
+          <div class="name-title">DERIVA</div>
+          <div class="name-desc">Philosophically powerful; built on the concept of drifting through artistic realms.</div>
+        </div>
+        <div class="name-card">
+          <div class="name-title">PRESS & PEEL</div>
+          <div class="name-desc">Tactile and interactive—you can feel the DTF/screen process in the title.</div>
+        </div>
+        <div class="name-card">
+          <div class="name-title">AVESSO</div>
+          <div class="name-desc">Evokes the inside-out / reverse side, establishing a distinct brand philosophy.</div>
+        </div>
+        <div class="name-card">
+          <div class="name-title">VESSA</div>
+          <div class="name-desc">Completely open-ended canvas. Ready to take on whatever meaning you assign it.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 4: Brand Directions -->
+    <section class="section-block">
+      <h2>Explore Three Strategic Directions</h2>
+      <div class="identity-grid">
+        <div class="identity-card">
+          <span class="identity-badge">Direction A</span>
+          <div class="identity-name">The Personal Artist</div>
+          <p><strong>JOMA</strong></p>
+          <p>An evolving personal archive of printed apparel and visual work.</p>
+        </div>
+        <div class="identity-card">
+          <span class="identity-badge">Direction B</span>
+          <div class="identity-name">The Anonymous Label</div>
+          <p><strong>AVERO</strong></p>
+          <p>Vol. 01 / 2026. A sleek, detached streetwear output.</p>
+        </div>
+        <div class="identity-card">
+          <span class="identity-badge">Direction C</span>
+          <div class="identity-name">The Art Institution</div>
+          <p><strong>COLOPHON</strong></p>
+          <p>Editions, objects & printed matter. Multi-artist publishing house model.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Callout Box -->
+    <div class="callout-box">
+      <p><strong>Strategic Rule:</strong> Don't force the name to explicitly communicate "T-shirts." Let the site architecture and visual media handle product function. The brand name should easily scale into prints, posters, zines, hats, and future collaborations without outgrowing its identity.</p>
+    </div>
+  </main>
+
+</body>
+</html>

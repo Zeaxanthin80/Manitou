@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Authentication Methods — Manitou Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#0E141B; --surface:#161F29; --surface-2:#1D2833; --line:#2A3947;
+  --ink:#E6EDF4; --muted:#8496A6;
+  --pw:#D4A32C;      /* amber   — Password + bcrypt + JWT */
+  --web:#4DB6E2;     /* cyan    — WebAuthn / FIDO2 */
+  --oauth:#B08FD9;   /* violet  — OAuth / OIDC */
+  --sms:#D9775B;     /* clay    — SMS OTP (also the "risk" hue, deliberately) */
+  --safe:#8FA98B;    /* green   — good / recommended, evaluative only */
+  --display:"Barlow Condensed",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);
+  font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1100px;margin:0 auto;padding:0 24px 96px}
+
+.masthead{padding:72px 0 40px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 18px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(40px,7.5vw,80px);
+  line-height:.94;letter-spacing:-.01em;margin:0 0 20px;text-transform:uppercase}
+h1 .sep{color:var(--muted);font-weight:500}
+.standfirst{max-width:66ch;color:var(--muted);font-size:17px;margin:0}
+.standfirst strong{color:var(--ink);font-weight:500}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin:28px 0 0}
+.tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:5px 10px;border:1px solid var(--line);border-radius:2px;color:var(--muted);
+  display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;flex:none}
+.dot.pw{background:var(--pw)} .dot.web{background:var(--web)}
+.dot.oauth{background:var(--oauth)} .dot.sms{background:var(--sms)}
+
+.toc{position:sticky;top:0;z-index:10;background:rgba(14,20,27,.92);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);display:flex;gap:2px;overflow-x:auto;padding:10px 0;margin-bottom:-1px}
+.toc a{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);text-decoration:none;padding:6px 12px;border-radius:2px;white-space:nowrap}
+.toc a:hover,.toc a:focus-visible{color:var(--ink);background:var(--surface-2)}
+.toc a.on{color:var(--ink);background:var(--surface-2)}
+
+section{padding:64px 0 0;scroll-margin-top:20px}
+.sec-head{display:flex;align-items:baseline;gap:16px;margin:0 0 8px}
+.sec-num{font-family:var(--mono);font-size:12px;color:var(--muted);
+  border:1px solid var(--line);padding:3px 8px;border-radius:2px;flex:none}
+h2{font-family:var(--display);font-weight:600;text-transform:uppercase;
+  font-size:clamp(26px,4vw,38px);line-height:1.05;letter-spacing:.01em;margin:0}
+h3{font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+  font-size:17px;margin:36px 0 12px}
+.lede{max-width:70ch;color:var(--muted);margin:14px 0 0}
+p{max-width:72ch}
+code{font-family:var(--mono);font-size:.88em;background:var(--surface-2);
+  border:1px solid var(--line);padding:1px 5px;border-radius:2px;color:var(--ink)}
+
+pre{font-family:var(--mono);font-size:13px;line-height:1.7;background:var(--surface);
+  border:1px solid var(--line);border-radius:2px;padding:16px 18px;margin:20px 0;
+  overflow-x:auto;color:var(--ink)}
+pre.flow{color:var(--muted);white-space:pre;font-size:12px}
+pre b{color:var(--ink);font-weight:500}
+.c-pw{color:var(--pw)} .c-web{color:var(--web)} .c-oauth{color:var(--oauth)}
+.c-sms{color:var(--sms)} .c-safe{color:var(--safe)} .c-muted{color:var(--muted)}
+
+.callout{border:1px solid var(--line);border-left:3px solid var(--web);
+  background:var(--surface);padding:18px 22px;margin:26px 0;border-radius:2px}
+.callout.warn{border-left-color:var(--sms)}
+.callout.good{border-left-color:var(--safe)}
+.callout.oauth{border-left-color:var(--oauth)}
+.callout .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);display:block;margin-bottom:8px}
+.callout p{margin:0;max-width:74ch}
+.callout p + p{margin-top:12px}
+
+.tbl{width:100%;border-collapse:collapse;margin:24px 0;font-size:15px}
+.tbl th{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);text-align:left;padding:0 16px 10px 0;border-bottom:1px solid var(--line);font-weight:400}
+.tbl td{padding:13px 16px 13px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl tr:last-child td{border-bottom:none}
+.tbl .m{font-family:var(--mono);font-size:13px;color:var(--ink)}
+.yes{color:var(--safe)!important} .no{color:var(--sms)!important}
+
+/* method cards — at-a-glance strip */
+.methods{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:28px 0 0}
+.mcard{border:1px solid var(--line);background:var(--surface);border-radius:2px;
+  padding:18px;border-top:3px solid}
+.mcard.pw{border-top-color:var(--pw)} .mcard.web{border-top-color:var(--web)}
+.mcard.oauth{border-top-color:var(--oauth)} .mcard.sms{border-top-color:var(--sms)}
+.mcard h4{font-family:var(--display);text-transform:uppercase;font-size:17px;
+  letter-spacing:.03em;margin:0 0 8px;font-weight:600}
+.mcard p{font-size:13.5px;color:var(--muted);margin:0;max-width:none}
+.mcard .factor{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);margin-top:10px;display:block}
+
+/* factor framework strip */
+.factors{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:24px 0}
+.factor{border:1px solid var(--line);background:var(--surface);border-radius:2px;padding:18px}
+.factor h4{font-family:var(--display);text-transform:uppercase;font-size:15px;letter-spacing:.03em;
+  margin:0 0 8px;font-weight:600;color:var(--ink)}
+.factor p{font-size:13px;color:var(--muted);margin:0}
+.factor .ex{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:10px;display:block}
+
+.card{border:1px solid var(--line);background:var(--surface);border-radius:2px;
+  margin:24px 0 0;overflow:hidden}
+.card-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:14px 20px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.card-title{font-family:var(--display);font-weight:600;font-size:19px;
+  text-transform:uppercase;letter-spacing:.02em}
+.badge{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  padding:4px 8px;border-radius:2px;margin-left:auto;white-space:nowrap}
+.badge.rec{color:var(--safe);border:1px solid rgba(143,169,139,.45)}
+.badge.warn{color:var(--sms);border:1px solid rgba(217,119,91,.4)}
+.card-body{padding:20px}
+.card-body > *:first-child{margin-top:0}
+.card-body > *:last-child{margin-bottom:0}
+
+footer{margin-top:80px;padding-top:24px;border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:11.5px;color:var(--muted);
+  display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+:focus-visible{outline:2px solid var(--web);outline-offset:2px}
+
+@media (max-width:820px){
+  .methods{grid-template-columns:repeat(2,1fr)}
+  .factors{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:600px){
+  .masthead{padding:48px 0 32px}
+  .methods{grid-template-columns:1fr}
+  .factors{grid-template-columns:1fr}
+  .badge{margin-left:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Manitou · Authentication landscape · Reference</p>
+    <h1>Four Ways<span class="sep">/</span><br>To Prove Who You Are</h1>
+    <p class="standfirst">Password + bcrypt + JWT, WebAuthn/FIDO2 passkeys, OAuth/OIDC, and SMS one-time codes —
+      what each actually is, how it works underneath, and which problem it's really solving. Plus two things often
+      confused with them: <strong>identity proofing</strong> (ID.me) and <strong>IAM/CIAM platforms</strong>. Ends
+      with what fits Manitou now and what's worth adding later.</p>
+    <div class="legend">
+      <span class="tag"><span class="dot pw"></span>Password + JWT</span>
+      <span class="tag"><span class="dot web"></span>WebAuthn / FIDO2</span>
+      <span class="tag"><span class="dot oauth"></span>OAuth / OIDC</span>
+      <span class="tag"><span class="dot sms"></span>SMS OTP</span>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Sections">
+    <a href="#glance">At a glance</a>
+    <a href="#factors">Factor framework</a>
+    <a href="#password">Password + JWT</a>
+    <a href="#webauthn">WebAuthn / FIDO2</a>
+    <a href="#oauth">OAuth / OIDC</a>
+    <a href="#sms">SMS codes</a>
+    <a href="#proofing">Identity proofing</a>
+    <a href="#iam">IAM / CIAM</a>
+    <a href="#aal">Assurance levels</a>
+    <a href="#compare">Head-to-head</a>
+    <a href="#manitou">For Manitou</a>
+    <a href="#glossary">Glossary</a>
+  </nav>
+
+  <section id="glance">
+    <div class="sec-head"><span class="sec-num">00</span><h2>At a glance</h2></div>
+    <p class="lede">Before the mechanics: what each one fundamentally is, in one line.</p>
+    <div class="methods">
+      <div class="mcard pw">
+        <h4>Password + JWT</h4>
+        <p>You memorize a secret. The server checks it, then issues a signed token for subsequent requests.</p>
+        <span class="factor">Something you know</span>
+      </div>
+      <div class="mcard web">
+        <h4>WebAuthn / FIDO2</h4>
+        <p>Your device holds a private key it never reveals. It proves possession by signing a challenge.</p>
+        <span class="factor">Something you have</span>
+      </div>
+      <div class="mcard oauth">
+        <h4>OAuth / OIDC</h4>
+        <p>A third party (Google, Apple) vouches for you. You never give your password to the app you're logging into.</p>
+        <span class="factor">Delegated trust</span>
+      </div>
+      <div class="mcard sms">
+        <h4>SMS OTP</h4>
+        <p>The server texts a short-lived code to your phone number; you type it back to prove you received it.</p>
+        <span class="factor">Something you have (weakly)</span>
+      </div>
+    </div>
+    <div class="callout">
+      <span class="k">The framing to hold onto</span>
+      <p>These aren't four competitors for the same job. Password+JWT and WebAuthn both <em>authenticate</em> — they
+        answer "who is this." OAuth/OIDC <em>delegates</em> that question to someone else. SMS OTP is usually a
+        <em>second</em> factor bolted onto one of the others, not a standalone login method. Comparing them fairly
+        means keeping straight which problem each one is actually solving.</p>
+    </div>
+  </section>
+
+  <section id="factors">
+    <div class="sec-head"><span class="sec-num">01</span><h2>The factor framework</h2></div>
+    <p class="lede">Security literature groups authentication into a small number of "factors." Every method in this
+      document is built from one or more of them.</p>
+    <div class="factors">
+      <div class="factor">
+        <h4>Knowledge</h4>
+        <p>Something only you should know.</p>
+        <span class="ex">Password, PIN, security question</span>
+      </div>
+      <div class="factor">
+        <h4>Possession</h4>
+        <p>Something only you should have.</p>
+        <span class="ex">Phone, hardware key, authenticator app</span>
+      </div>
+      <div class="factor">
+        <h4>Inherence</h4>
+        <p>Something you biologically are.</p>
+        <span class="ex">Fingerprint, face — usually unlocks a possession factor locally</span>
+      </div>
+      <div class="factor">
+        <h4>Federated trust</h4>
+        <p>Someone else already verified you.</p>
+        <span class="ex">"Sign in with Google" — not one of the classic three, but how OAuth/OIDC actually works</span>
+      </div>
+    </div>
+    <p><b>Multi-factor authentication means combining factors from different categories</b> — a password (knowledge)
+      plus an SMS code (weak possession) is genuine MFA. Two things you merely <em>know</em> — a password and a
+      security question — is not, however different they feel; an attacker who learns one often learns both from the
+      same breach.</p>
+    <div class="callout">
+      <span class="k">Where each method sits</span>
+      <p><b>Password + JWT</b> is pure knowledge. <b>WebAuthn</b> is possession, typically unlocked locally by
+        inherence (Face ID, a fingerprint) — but that biometric never leaves your device; it's not sent anywhere. <b>SMS
+        OTP</b> is possession, but of something increasingly easy to steal without stealing the physical phone (§05).
+        <b>OAuth/OIDC</b> doesn't add a factor at all — it hands the whole question to a provider who already
+        authenticated you some other way.</p>
+    </div>
+  </section>
+
+  <section id="password">
+    <div class="sec-head"><span class="sec-num">02</span><h2>Password + bcrypt + JWT</h2></div>
+    <p class="lede">Manitou's current baseline. Covered in full depth in the companion API authentication
+      reference — this section is a fair-comparison summary, not a repeat.</p>
+    <pre class="flow">  <span class="c-pw">User</span>                                    <span class="c-muted">API</span>
+    │  POST /auth/login {email, password}     │
+    ├─────────────────────────────────────────▶│
+    │                            bcrypt.checkpw(sent, stored)
+    │                            sign JWT with server secret
+    │  { access_token, token_type: "bearer" }  │
+    │◀─────────────────────────────────────────┤
+    │  every later request:                    │
+    │  Authorization: Bearer eyJ...             │
+    ├─────────────────────────────────────────▶│  verify signature, no DB hit</pre>
+    <table class="tbl">
+      <tbody>
+        <tr><td class="m yes" style="width:170px">Universal</td><td>Works on any device with a keyboard. No hardware requirement, no app to install.</td></tr>
+        <tr><td class="m yes">Cheap</td><td>No per-login cost, no third-party service, no SMS gateway bill.</td></tr>
+        <tr><td class="m yes">Well understood</td><td>Decades of tooling, libraries, and institutional knowledge. bcrypt itself has aged well.</td></tr>
+        <tr><td class="m no">Phishable</td><td>A convincing fake login page captures the password just as well as the real one. The user has no way to tell the two apart.</td></tr>
+        <tr><td class="m no">Reuse risk</td><td>People reuse passwords across sites. A breach elsewhere becomes a breach here via credential stuffing.</td></tr>
+        <tr><td class="m no">Friction</td><td>Remembering, typing, and resetting passwords is real, measurable user friction — and the leading cause of abandoned checkouts industry-wide.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout good">
+      <span class="k">Why it's still the right baseline for Manitou</span>
+      <p>It's the one method here with zero external dependency and zero new infrastructure. Section 3 of
+        PROJECT_PLAN.md already settled this, and nothing below changes that — the other three methods are things to
+        potentially <em>add</em>, not reasons to rip this out.</p>
+    </div>
+  </section>
+
+  <section id="webauthn">
+    <div class="sec-head"><span class="sec-num">03</span><h2>WebAuthn / FIDO2</h2></div>
+    <p class="lede">The technology behind "passkeys." Structurally different from a password, not just a more
+      convenient version of one.</p>
+
+    <h3>The core idea: nothing secret ever crosses the network</h3>
+    <p>Your device generates a <b>key pair</b> — a private key that never leaves it, and a public key it hands to
+      the server. Logging in later means the server sends a random challenge; your device signs it with the private
+      key; the server checks that signature against the public key it already has on file. <b>The private key is
+      never transmitted, never typed, and never visible to the server — not even once.</b> There is no shared secret
+      for a breach or a phishing page to capture.</p>
+
+    <h3>Two ceremonies</h3>
+    <pre class="flow"><b>REGISTRATION (once, when you enable it)</b>
+
+  <span class="c-web">Device</span>                                    <span class="c-muted">Server (relying party)</span>
+    │  "please register a credential"          │
+    │◀─────────────────────────────────────────┤  sends a random challenge
+    │  generate key pair, bound to THIS origin  │
+    │  (manitou.example — not a lookalike)      │
+    │  { public_key, credential_id }            │
+    ├─────────────────────────────────────────▶│  stores the public key against your account
+
+<b>AUTHENTICATION (every login)</b>
+
+  <span class="c-web">Device</span>                                    <span class="c-muted">Server</span>
+    │◀─────────────────────────────────────────┤  sends a fresh random challenge
+    │  unlock private key locally               │
+    │  (Face ID / Touch ID / Windows Hello /     │
+    │   device PIN — never sent anywhere)        │
+    │  sign(challenge, private_key)              │
+    │  { signature }                             │
+    ├─────────────────────────────────────────▶│  verify against stored public key</pre>
+
+    <h3>Why this is structurally phishing-resistant, not just harder to phish</h3>
+    <div class="callout">
+      <span class="k">Origin binding</span>
+      <p>The key pair is cryptographically bound to the exact origin it was created for —
+        <code>manitou.example</code>, specifically. A lookalike domain, <code>manitou-example.com</code>, physically
+        cannot obtain a signature from a key that was never registered to it. This isn't user vigilance or a URL bar
+        someone might not check — the browser itself enforces the match before the device will sign anything. A
+        password has no equivalent: a person can be fooled into typing it anywhere. A private key cannot be fooled
+        into signing for the wrong site.</p>
+    </div>
+
+    <h3>Platform vs. roaming authenticators</h3>
+    <table class="tbl">
+      <tbody>
+        <tr><td class="m" style="width:170px">Platform authenticator</td><td>Built into the device — Face ID, Touch ID, Windows Hello. The key lives in the device's secure hardware enclave.</td></tr>
+        <tr><td class="m">Roaming authenticator</td><td>A separate physical security key (YubiKey and similar) connected via USB, NFC, or Bluetooth. Portable across devices.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Passkeys: the syncable evolution</h3>
+    <p>Early FIDO2 credentials were bound to one physical device — lose the phone, lose the credential, full stop.
+      <b>Passkeys</b> solve that by syncing the key pair across your devices through an encrypted cloud store (iCloud
+      Keychain, Google Password Manager) rather than trusting one piece of hardware alone. The cryptographic model
+      underneath — WebAuthn — is identical; what changed is that the private key can now travel with you.</p>
+
+    <div class="callout good">
+      <span class="k">This is no longer just an industry trend — it has formal regulatory backing</span>
+      <p>NIST's Digital Identity Guidelines (SP 800-63B, Revision 4) formally incorporated syncable authenticators —
+        passkeys — into the federal standard, and industry commentary now describes FIDO2 as the emerging gold
+        standard for phishing-resistant authentication. This is the answer to "is this becoming a new standard":
+        yes, and it now has the weight of a federal digital-identity standard behind it, not just adoption by big
+        tech companies.</p>
+    </div>
+
+    <table class="tbl">
+      <tbody>
+        <tr><td class="m yes" style="width:170px">Phishing-resistant</td><td>Structurally, via origin binding — not procedurally, via user caution.</td></tr>
+        <tr><td class="m yes">Nothing to steal in a breach</td><td>The server only ever stores public keys. A stolen database yields nothing an attacker can use to log in as anyone.</td></tr>
+        <tr><td class="m yes">Fast for the user</td><td>A fingerprint or face scan, no typing.</td></tr>
+        <tr><td class="m no">Needs modern browser/OS support</td><td>Broadly available now, but not on every legacy device a customer might use.</td></tr>
+        <tr><td class="m no">Account recovery is a real design problem</td><td>If someone loses every synced device, there must be a fallback — and that fallback is itself a security decision worth making deliberately, not an afterthought.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="oauth">
+    <div class="sec-head"><span class="sec-num">04</span><h2>OAuth / OpenID Connect</h2></div>
+    <p class="lede">The most commonly misunderstood item on this list — including what the "Oauth" in your question
+      most likely refers to. Worth untangling carefully.</p>
+
+    <div class="callout warn">
+      <span class="k">OAuth alone is not a login system</span>
+      <p><b>OAuth 2.0 is an authorization framework</b> — it answers "can this app read my Google Calendar," not
+        "who is this person." That's the same AuthN/AuthZ distinction from the companion auth reference, applied
+        to a name that gets used loosely. Plain OAuth has no concept of "who logged in" at all — only "what was this
+        token granted access to."</p>
+      <p><b>OpenID Connect (OIDC)</b> is a thin identity layer built on top of OAuth specifically to answer the login
+        question. It's what actually powers every "Sign in with Google" button. When people say "using OAuth to log
+        in," they mean OIDC riding on OAuth's transport mechanism.</p>
+    </div>
+
+    <h3>The payoff: OIDC's ID token is a JWT</h3>
+    <p>This closes a loop from the companion reference. OIDC's core addition to plain OAuth is the <b>ID token</b> —
+      and it is, structurally, exactly the JWT covered there: header, payload, signature, the same three
+      Base64url-encoded segments. Google (or Apple, or whichever provider) signs it instead of your own server, and
+      its payload carries standard identity claims — <code>sub</code>, <code>email</code>, <code>name</code> —
+      instead of ones you defined yourself. Same anatomy, different issuer.</p>
+
+    <h3>The flow: Authorization Code with PKCE</h3>
+    <p>The historical "Implicit" flow — which returned tokens directly in the browser's URL — is now formally
+      retired. Current OAuth security guidance (RFC 9700, folded into the OAuth 2.1 consolidation) requires the
+      Authorization Code flow with PKCE for every client type, public or confidential, no exceptions. This is the
+      one true modern flow to know:</p>
+    <pre class="flow">  <span class="c-oauth">Browser</span>              <span class="c-muted">Manitou API</span>                    <span class="c-oauth">Google</span>
+    │  "Sign in with Google" clicked          │                          │
+    ├─────────────────────────────────────────▶│                          │
+    │                       generate a random "code_verifier"             │
+    │                       derive "code_challenge" from it                │
+    │  redirect to Google, with code_challenge │                          │
+    │◀──────────────────────────────────────────────────────────────────▶│
+    │                                          │        user approves at Google
+    │  redirect back with a one-time "code"    │                          │
+    ├─────────────────────────────────────────▶│                          │
+    │                       exchange code + original code_verifier         │
+    │                       for tokens, server-to-server                   │
+    │                                          ├─────────────────────────▶│
+    │                                          │◀─────────────────────────┤
+    │                                          │   { id_token, access_token }
+    │  Manitou issues its OWN session/JWT       │                          │
+    │◀─────────────────────────────────────────┤                          │</pre>
+    <p><b>PKCE</b> (Proof Key for Code Exchange) exists to stop an intercepted authorization code from being
+      redeemed by anyone but the client that requested it — the <code>code_verifier</code> never travels in a URL,
+      only its derived hash does, so a captured redirect alone isn't enough to steal the session.</p>
+
+    <h3>What this actually looks like for Manitou</h3>
+    <p>Adding "Sign in with Google" wouldn't replace your auth system — it would <b>feed it</b>. Google's ID token
+      arrives, your backend verifies its signature came genuinely from Google, reads the verified email out of it,
+      finds or creates the matching row in your existing <code>users</code> table, and issues your own normal JWT
+      exactly as it does today. OIDC only ever replaces the credential-checking step; everything downstream —
+      your role claim, your token issuing, your existing endpoints — stays identical.</p>
+
+    <table class="tbl">
+      <tbody>
+        <tr><td class="m yes" style="width:170px">No password to steal</td><td>Manitou never sees or stores a credential for these users at all.</td></tr>
+        <tr><td class="m yes">Lower signup friction</td><td>One click for anyone already signed into Google — a real, measurable conversion win for a storefront.</td></tr>
+        <tr><td class="m no">Third-party dependency</td><td>If Google's identity service is down, or the user's Google account is compromised, that risk now touches your login too.</td></tr>
+        <tr><td class="m no">Real implementation complexity</td><td>Redirect handling, state/CSRF protection, token verification against the provider's public keys — meaningfully more moving parts than issuing your own JWT.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="sms">
+    <div class="sec-head"><span class="sec-num">05</span><h2>SMS one-time codes</h2></div>
+    <p class="lede">Familiar, cheap to explain to users — and the one method here with a formal regulatory downgrade
+      attached to it as of the most recent NIST guidance.</p>
+
+    <pre class="flow">  <span class="c-sms">User</span>                                    <span class="c-muted">API</span>                     <span class="c-muted">SMS gateway</span>
+    │  login attempt                           │                          │
+    ├─────────────────────────────────────────▶│                          │
+    │                       generate a random 6-digit code, store briefly  │
+    │                                          ├─────────────────────────▶│
+    │                                          │                          ├──▶ 📱 "Your code: 482913"
+    │  reads code from phone, types it in       │                          │
+    ├─────────────────────────────────────────▶│                          │
+    │                       compare, single use, short expiry              │
+    │  access granted                          │                          │</pre>
+
+    <div class="callout warn">
+      <span class="k">This is no longer just "SMS isn't ideal" — it's now a formal classification</span>
+      <p>The newest revision of NIST's Digital Identity Guidelines (SP 800-63B-4) formally classifies SMS and
+        phone-network one-time passcodes as a <b>"restricted authenticator"</b> — a new, explicit category. It isn't
+        banned, but organizations using it now carry documented obligations: a risk assessment, a migration plan
+        away from it, and user notification of the risk. This is a meaningfully stronger stance than the previous
+        revision's general caution.</p>
+    </div>
+
+    <h3>Why regulators moved on this specifically</h3>
+    <table class="tbl">
+      <tbody>
+        <tr><td class="m" style="width:170px">SIM swapping</td><td>An attacker convinces (or bribes, or social-engineers) a carrier to port your number to their SIM. Every SMS meant for you now arrives on their phone.</td></tr>
+        <tr><td class="m">SS7 interception</td><td>The decades-old telecom signaling protocol carrying SMS has known, demonstrated interception weaknesses — attackers with the right access can read texts in transit without touching your phone at all.</td></tr>
+        <tr><td class="m">Number porting fraud</td><td>Similar to SIM swapping, exploiting the number-transfer process between carriers directly.</td></tr>
+        <tr><td class="m">No phishing resistance</td><td>A fake login page can simply ask for the code the same moment it asks for the password, relaying it to the real site in real time — an adversary-in-the-middle attack that defeats SMS OTP just as easily as a password.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>If it's used anyway — the concrete mitigations NIST specifies</h3>
+    <p>SMS OTP isn't prohibited outright, and the standard is specific about what's required to use it responsibly:
+      rate-limit and throttle failed attempts (capping online guessing at no more than 100 consecutive failures),
+      enforce that each code works exactly once, and never deliver a code over email or VoIP — only genuine mobile
+      carrier SMS. None of these mitigations address the interception-based attacks above; they only slow down brute
+      forcing.</p>
+
+    <table class="tbl">
+      <tbody>
+        <tr><td class="m yes" style="width:170px">Zero learning curve</td><td>Every phone user already understands "type the code you were texted."</td></tr>
+        <tr><td class="m yes">No app install required</td><td>Works on any phone capable of receiving a text — a real accessibility advantage over an authenticator app or a passkey-capable device.</td></tr>
+        <tr><td class="m no">Formally restricted by NIST</td><td>Permitted only with a documented risk assessment and migration roadmap.</td></tr>
+        <tr><td class="m no">Vulnerable to interception</td><td>SIM swap, SS7, and adversary-in-the-middle relay all defeat it, none of which the code-formatting mitigations above address.</td></tr>
+        <tr><td class="m no">Ongoing per-message cost</td><td>Unlike every other method here, each attempt has a direct, recurring dollar cost via an SMS gateway.</td></tr>
+        <tr><td class="m no">International delivery is unreliable</td><td>Carrier delays and filtering vary widely outside the country a service is built for.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="proofing">
+    <div class="sec-head"><span class="sec-num">06</span><h2>Identity proofing (ID.me)</h2></div>
+    <p class="lede">A different question entirely from everything above — and the reason it belongs in its own
+      section rather than as a fifth entry in the comparison table.</p>
+
+    <div class="callout warn">
+      <span class="k">Authentication vs. identity proofing</span>
+      <p>Every method in §02–§05 answers: <b>"are you the same person who created this account?"</b> They compare
+        you against a credential you registered earlier. None of them care who you are in the real world — an
+        account registered as <code>batman@example.com</code> authenticates exactly as well as one registered with
+        your legal name.</p>
+      <p><b>Identity proofing</b> answers a different question: <b>"are you a specific, verifiable, real-world legal
+        person?"</b> That's ID.me's actual product. It happens <em>before</em> or <em>alongside</em>
+        authentication, not instead of it.</p>
+    </div>
+
+    <h3>What ID.me actually does</h3>
+    <p>Verification methods include scanning a government-issued document with machine vision, liveness detection
+      matching a selfie against the photo on that document, confirming the SIM in your phone is associated with the
+      identity you're claiming, and — where automated checks fail — a live video call with a trained "Trusted
+      Referee." It's accredited against NIST's IAL2/AAL2 identity-assurance standard.</p>
+    <p>Note that <b>IAL</b> (Identity Assurance Level) is a separate scale from the <b>AAL</b> in §08. AAL measures
+      how confidently you proved you hold a credential; IAL measures how confidently that credential was tied to a
+      real human in the first place. Different questions, different scales — a system can be strong on one and
+      absent on the other.</p>
+
+    <h3>Where it's genuinely used</h3>
+    <p>Adoption spans 21 federal agencies, 50 state agencies, and more than 70 healthcare organizations. Concrete
+      deployments include Medicare.gov beneficiary verification, FINRA's regulatory platform for financial-industry
+      account administrators handling sensitive data, and the IRS — where it's the only online path to taxpayer
+      tools. The common thread is unmistakable: tax records, government benefits, regulated financial access.
+      High-stakes, fraud-critical contexts where the friction of uploading a driver's license is genuinely worth it.</p>
+
+    <h3>The e-commerce exception worth knowing</h3>
+    <p>More than 600 consumer brands use ID.me — but for a narrow purpose: verifying <em>eligibility for a
+      segment</em>, not general login. This is the military, student, teacher, and first-responder discount use
+      case. The user proves they're active-duty military once, and the store applies a discount. It sits
+      <b>alongside</b> normal authentication rather than replacing it.</p>
+
+    <table class="tbl">
+      <tbody>
+        <tr><td class="m yes" style="width:170px">Real fraud prevention</td><td>Stops account creation by someone impersonating a real person — something no amount of password strength addresses.</td></tr>
+        <tr><td class="m yes">Regulatory acceptance</td><td>Federally accredited, which is why agencies can rely on it for benefits access.</td></tr>
+        <tr><td class="m no">Heavy user friction</td><td>Uploading a government ID and taking a verification selfie is a very different ask than typing a password. For a T-shirt purchase it's wildly disproportionate.</td></tr>
+        <tr><td class="m no">Per-verification cost</td><td>Tiered pricing based on volume of verifications requested — a real recurring expense.</td></tr>
+        <tr><td class="m no">Privacy considerations</td><td>Biometric and government-document handling has drawn public scrutiny, and adds compliance surface most stores don't want.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <span class="k">Verdict for Manitou</span>
+      <p><b>Not applicable as an authentication method</b> — it isn't one. The only realistic future hooks are
+        narrow: a military/student discount program in a cloned store, or age verification if a grocery clone ever
+        sold alcohol. Both are optional features layered on top of your existing auth, never replacements for it.</p>
+    </div>
+  </section>
+
+  <section id="iam">
+    <div class="sec-head"><span class="sec-num">07</span><h2>IAM and CIAM</h2></div>
+    <p class="lede">Also not an authentication method — a <b>category of platform</b> that packages several of the
+      methods above, plus user management, into a managed service you rent instead of build.</p>
+
+    <h3>IAM vs. CIAM — the distinction that matters</h3>
+    <table class="tbl">
+      <thead><tr><th style="width:16%">Term</th><th style="width:30%">Manages</th><th>Typical concerns</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="m">IAM</td>
+          <td><b>Internal workforce</b> identity — employees accessing enterprise systems.</td>
+          <td>Provisioning and deprovisioning staff, role hierarchies, least-privilege access, audit trails.</td>
+        </tr>
+        <tr>
+          <td class="m">CIAM</td>
+          <td><b>External customer</b> identity across websites, mobile apps, and services.</td>
+          <td>Signup conversion, social login, consent and privacy, scaling to millions of accounts.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>CIAM focuses on managing external customer identities across websites, mobile apps, and digital services,
+      while IAM is typically used for internal workforce identity management, controlling employee access to
+      enterprise applications. <b>For Manitou, the relevant category is CIAM</b> — you're managing shoppers, not
+      staff. There's exactly one internal user, and <code>seed.py</code> already created them.</p>
+
+    <div class="callout">
+      <span class="k">You already have AWS IAM in the plan — and it's a third thing</span>
+      <p>PROJECT_PLAN.md Section 7 lists <b>AWS IAM</b> for managing which AWS services and people can touch your
+        infrastructure. That's cloud resource permissioning — who can read the S3 bucket, which role the container
+        assumes. It has nothing to do with your customers logging in. <b>AWS Cognito</b> is the separate AWS
+        service that would handle customer identity, and it's noted in the plan as an optional alternative to
+        rolling your own JWT auth.</p>
+    </div>
+
+    <h3>What a CIAM platform actually gives you</h3>
+    <p>These platforms cover the core of customer identity — authentication, authorization, consent, and user
+      management — as managed infrastructure. In practice you'd stop writing the code you're currently building in
+      Phase 2, and instead configure: password login, social login (OIDC), passkeys, MFA, password reset flows,
+      email verification, session management, and an admin console for user support.</p>
+    <p>The notable names, for orientation: <b>Auth0</b> (now part of Okta) for breadth and enterprise federation,
+      <b>Amazon Cognito</b> for teams already on AWS, <b>Clerk</b> for React and Next.js developer experience, plus
+      Descope, Stytch, WorkOS, FusionAuth, and Keycloak. Amazon Cognito is AWS's managed service for authentication
+      and user management, handling infrastructure, scaling, and availability automatically — a common choice for
+      teams already on AWS, with the unique advantage of direct AWS IAM integration.</p>
+
+    <h3>The honest tradeoff</h3>
+    <table class="tbl">
+      <tbody>
+        <tr><td class="m yes" style="width:170px">Enormous time savings</td><td>Passkeys, social login, MFA, and reset flows all work on day one rather than being months of work each.</td></tr>
+        <tr><td class="m yes">Security expertise included</td><td>Token handling, rotation, and breach-detection built by people who do only this.</td></tr>
+        <tr><td class="m yes">Compliance groundwork</td><td>SOC 2, ISO 27001, HIPAA certifications the vendor already holds.</td></tr>
+        <tr><td class="m no">Cost scales with users</td><td>Pricing is typically per monthly active user (MAU), and cost curves diverge sharply as you grow.</td></tr>
+        <tr><td class="m no">Vendor lock-in</td><td>Auth flow changes often require code even for simple updates, and migrating away later is real work. Teams frequently outgrow their first choice as products scale.</td></tr>
+        <tr><td class="m no">You learn less</td><td>The whole point is that someone else solved it. For a learning project, that's a cost, not a benefit.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout good">
+      <span class="k">Verdict for Manitou — and the pattern you'll recognize</span>
+      <p>This is the same fork as Django's admin panel, WooCommerce, and MedusaJS: a mature platform that does the
+        work for you, versus building it yourself to understand it. <b>Same answer as those:</b> for a business
+        optimizing to ship fast, a CIAM platform is often the right call. For your stated goal — mastering
+        full-stack development from first principles — building the auth yourself is the point.</p>
+      <p>Worth knowing the category exists, and worth knowing Cognito sits closest to your stack if you ever change
+        your mind mid-project. But nothing here argues for changing course now.</p>
+    </div>
+  </section>
+
+  <section id="aal">
+    <div class="sec-head"><span class="sec-num">08</span><h2>Assurance levels</h2></div>
+    <p class="lede">NIST's Authenticator Assurance Levels (AAL) give a shared vocabulary for "how confident is this,
+      really" — useful for placing all four methods on one scale rather than debating them in isolation.</p>
+    <table class="tbl">
+      <thead><tr><th style="width:12%">Level</th><th style="width:30%">Requires</th><th>Reachable by</th></tr></thead>
+      <tbody>
+        <tr><td class="m">AAL1</td><td>Any single factor</td><td>Password alone</td></tr>
+        <tr><td class="m">AAL2</td><td>Two distinct factors</td><td>Password + SMS OTP; password + authenticator app</td></tr>
+        <tr><td class="m">AAL3</td><td>A hardware-based, <b>verifier-impersonation-resistant</b> factor</td><td>WebAuthn/FIDO2 only, among the methods here</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">
+      <span class="k">The line that matters most</span>
+      <p>OTP-based methods — including SMS — can support AAL1 up to AAL2, but <b>can never reach AAL3</b>, because
+        they aren't verifier-impersonation-resistant: a convincing fake verifier can still successfully collect and
+        relay the code. WebAuthn is the only method in this document built to resist that specific attack, by
+        design, at the protocol level — which is the technical grounding behind calling it "phishing-resistant"
+        rather than just "safer."</p>
+    </div>
+  </section>
+
+  <section id="compare">
+    <div class="sec-head"><span class="sec-num">09</span><h2>Head-to-head</h2></div>
+    <p class="lede">The four <em>authentication methods</em>, across the dimensions that actually differ. Identity
+      proofing (§06) and CIAM platforms (§07) are deliberately absent — they aren't authentication methods, so
+      comparing them on these axes would be a category error.</p>
+    <table class="tbl">
+      <thead><tr><th style="width:18%"></th><th>Password + JWT</th><th>WebAuthn / FIDO2</th><th>OAuth / OIDC</th><th>SMS OTP</th></tr></thead>
+      <tbody>
+        <tr><td class="m">Answers</td><td>Who are you</td><td>Who are you</td><td>Who does a third party say you are</td><td>Usually: a second factor</td></tr>
+        <tr><td class="m">Phishing-resistant</td><td class="no">No</td><td class="yes">Yes, structurally</td><td>Depends on the provider's own login</td><td class="no">No</td></tr>
+        <tr><td class="m">Max AAL reachable</td><td>AAL1</td><td>AAL3</td><td>Whatever the provider supports</td><td>AAL2</td></tr>
+        <tr><td class="m">Server stores</td><td>A bcrypt hash</td><td>A public key only</td><td>Nothing secret — a token from the provider</td><td>A phone number</td></tr>
+        <tr><td class="m">If the database leaks</td><td>Hashes to brute-force offline</td><td class="yes">Nothing usable</td><td>Nothing usable directly</td><td>Phone numbers exposed</td></tr>
+        <tr><td class="m">Per-use cost</td><td class="yes">None</td><td class="yes">None</td><td>None (provider absorbs it)</td><td class="no">Real, recurring, per message</td></tr>
+        <tr><td class="m">New infrastructure needed</td><td class="yes">None — already built</td><td>Browser/library support</td><td>Redirect handling, token verification</td><td>SMS gateway account</td></tr>
+        <tr><td class="m">Works offline</td><td>Yes (server-side check only)</td><td class="yes">Yes, locally</td><td class="no">No — needs the provider reachable</td><td class="no">No — needs carrier delivery</td></tr>
+        <tr><td class="m">2026 regulatory stance</td><td>Standard, unremarkable</td><td class="yes">Actively endorsed, incorporated into NIST 800-63B-4</td><td>Standard, current best practice is Authorization Code + PKCE</td><td class="no">Formally "restricted"</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="manitou">
+    <div class="sec-head"><span class="sec-num">10</span><h2>What fits Manitou</h2></div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">Password + bcrypt + JWT</span><span class="badge rec">Keep — already the plan</span></div>
+      <div class="card-body">
+        <p>Remains the correct baseline. It's the only method here with no external dependency, and Section 3
+          already settled it. Nothing above is an argument to change course.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">WebAuthn / FIDO2 (passkeys)</span><span class="badge rec">Strong future addition</span></div>
+      <div class="card-body">
+        <p>The best candidate for a genuine security upgrade later — offer it <em>alongside</em> passwords, not
+          instead of them, since not every customer's device supports it yet. A real Phase 8 hardening item, and one
+          with growing regulatory backing behind it.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">OAuth / OIDC ("Sign in with Google")</span><span class="badge rec">Reasonable future addition</span></div>
+      <div class="card-body">
+        <p>A conversion-rate feature more than a security one — it lowers signup friction for customers already
+          signed into Google or Apple. Feeds into your existing JWT issuing rather than replacing it; a natural
+          post-launch enhancement once the core store works end to end.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">SMS one-time codes</span><span class="badge warn">Not recommended</span></div>
+      <div class="card-body">
+        <p>Given the 2026 NIST "restricted" classification and the concrete SIM-swap/SS7 exposure, this isn't worth
+          adding as a primary or secondary factor for Manitou. If a second factor is ever genuinely needed, an
+          authenticator app (TOTP) or WebAuthn itself both reach AAL2+ without the interception risk, at no
+          per-message cost.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">Identity proofing (ID.me)</span><span class="badge warn">Not applicable</span></div>
+      <div class="card-body">
+        <p>Not an authentication method, so it isn't an alternative to anything above. Government-ID verification
+          for a T-shirt purchase is disproportionate friction for the actual risk. The only realistic hooks are
+          narrow optional features — a military/student discount program, or age verification if a grocery clone
+          sold alcohol — layered on top of your existing auth.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">CIAM platform (Auth0, Cognito, Clerk)</span><span class="badge warn">Against the project's purpose</span></div>
+      <div class="card-body">
+        <p>Would genuinely save months and give you passkeys, social login, and MFA on day one. It would also mean
+          not building the thing you set out to learn. Same fork as Django's admin, WooCommerce, and MedusaJS —
+          and the same answer. If you ever do change your mind, Cognito sits closest to your existing AWS stack.</p>
+      </div>
+    </div>
+
+    <div class="callout good" style="margin-top:32px">
+      <span class="k">The honest bottom line</span>
+      <p>Nothing here changes what to build right now. It's context for later — when Phase 8 hardening comes around,
+        WebAuthn is the upgrade worth prioritizing, OIDC is worth adding if signup friction turns out to matter, and
+        SMS is the one option this document actively steers away from.</p>
+    </div>
+  </section>
+
+  <section id="glossary">
+    <div class="sec-head"><span class="sec-num">11</span><h2>Glossary</h2></div>
+    <table class="tbl">
+      <tbody>
+        <tr><td class="m" style="width:230px">FIDO2</td><td>The umbrella standard combining WebAuthn (the browser-facing API) and CTAP (the protocol for talking to external authenticators like a YubiKey).</td></tr>
+        <tr><td class="m">WebAuthn</td><td>The W3C API standard letting a browser create and use public-key credentials for login.</td></tr>
+        <tr><td class="m">Passkey</td><td>A WebAuthn credential that syncs across a user's devices via an encrypted cloud store, rather than being bound to one piece of hardware.</td></tr>
+        <tr><td class="m">Relying party</td><td>The service asking for authentication — Manitou's API, in this document's diagrams.</td></tr>
+        <tr><td class="m">Authenticator</td><td>The thing holding the private key: a phone, a laptop's secure enclave, or a hardware security key.</td></tr>
+        <tr><td class="m">Platform authenticator</td><td>An authenticator built into the device — Face ID, Windows Hello.</td></tr>
+        <tr><td class="m">Roaming authenticator</td><td>A separate, portable authenticator — a physical security key.</td></tr>
+        <tr><td class="m">OAuth 2.0</td><td>A framework for delegated authorization — letting one application access resources on another service on a user's behalf.</td></tr>
+        <tr><td class="m">OIDC (OpenID Connect)</td><td>An identity layer built on top of OAuth 2.0, adding the ID token and standard identity claims — what actually powers social login.</td></tr>
+        <tr><td class="m">ID token</td><td>OIDC's JWT proving identity, issued by the identity provider rather than your own server.</td></tr>
+        <tr><td class="m">PKCE</td><td>Proof Key for Code Exchange — a mechanism preventing an intercepted OAuth authorization code from being redeemed by anyone but the original requester. Mandatory for every client type under current guidance.</td></tr>
+        <tr><td class="m">Implicit flow</td><td>A retired OAuth flow that returned tokens directly in the URL. Formally deprecated by current security best practice.</td></tr>
+        <tr><td class="m">OTP</td><td>One-Time Password/code — a short-lived credential valid for a single use.</td></tr>
+        <tr><td class="m">SIM swap</td><td>An attack porting a victim's phone number to an attacker-controlled SIM, redirecting their SMS messages.</td></tr>
+        <tr><td class="m">SS7</td><td>The decades-old telecom signaling protocol carrying SMS, with known interception weaknesses.</td></tr>
+        <tr><td class="m">Restricted authenticator</td><td>A new NIST classification (SP 800-63B-4) for authenticator types — currently SMS/phone OTP — permitted only with documented risk mitigation.</td></tr>
+        <tr><td class="m">Verifier impersonation resistance</td><td>An authenticator's ability to resist a fake verifier (a phishing site) successfully collecting and relaying a valid credential. Required for AAL3.</td></tr>
+        <tr><td class="m">AAL</td><td>Authenticator Assurance Level — NIST's three-tier scale (AAL1–AAL3) for how confidently an authentication method establishes identity.</td></tr>
+        <tr><td class="m">IAL</td><td>Identity Assurance Level — a separate NIST scale for how confidently a credential was tied to a real-world person in the first place. AAL and IAL answer different questions.</td></tr>
+        <tr><td class="m">Identity proofing</td><td>Verifying someone is a specific real-world legal person, typically via government documents and biometrics. What ID.me does; distinct from authentication.</td></tr>
+        <tr><td class="m">IAM</td><td>Identity and Access Management — managing internal workforce identity and what employees can access. Also the name of AWS's service for permissioning cloud resources.</td></tr>
+        <tr><td class="m">CIAM</td><td>Customer Identity and Access Management — the same discipline aimed at external customers rather than staff. The relevant category for a storefront.</td></tr>
+        <tr><td class="m">MAU</td><td>Monthly Active Users — the usual billing unit for CIAM platforms, and the reason their costs scale with your growth.</td></tr>
+        <tr><td class="m">Trusted Referee</td><td>A trained human reviewer who verifies identity over video call when automated document checks fail.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    <span>Manitou — authentication methods reference</span>
+    <span>Companion to the API authentication reference</span>
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var sections = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+  function sync(){
+    var pos = window.scrollY + 130, idx = 0;
+    for (var i = 0; i < sections.length; i++){
+      if (sections[i] && sections[i].offsetTop <= pos) idx = i;
+    }
+    links.forEach(function(a,i){ a.classList.toggle('on', i === idx); });
+  }
+  var ticking = false;
+  window.addEventListener('scroll', function(){
+    if (!ticking){ window.requestAnimationFrame(function(){ sync(); ticking = false; }); ticking = true; }
+  }, { passive:true });
+  sync();
+})();
+</script>
+</body>
+</html>
